@@ -65,13 +65,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 	const diagram = useDiagramField(fieldRef, () => thinkingRef.current, setField);
 
 	useDictationTarget(
-		{
-			read: () => thinkingRef.current,
-			write: (v) => {
-				thinkingRef.current = v;
-				setThinking(v);
-			},
-		},
+		{ read: () => thinkingRef.current, write: setField },
 		true,
 	);
 
