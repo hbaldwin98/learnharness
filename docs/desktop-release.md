@@ -42,11 +42,10 @@ The release workflow also checks providers from the **packaged** payload under h
 
 `npm run desktop:dist` is the local **signed macOS** path using the `LH_NOTARY` keychain profile and Xcode `DEVELOPER_DIR`. It clears `dist` and `.next/standalone`, builds, checks the fresh provider trace, curates, runs the server smoke under **host Node**, and packages. It does not itself run the Electron-Node/post-package gates or the tag-upload workflow.
 
-For Windows/Linux, perform steps 1–6 on that OS, then:
+For a local Windows build, run `npm ci`, then `npm run desktop:dist:win` from PowerShell or cmd — it runs steps 3–6 above, then packages an unsigned NSIS installer into `dist/` without publishing. For a local Linux build, perform steps 1–6 on Linux, then:
 
 ```sh
-npx electron-builder --win --x64 --publish never    # Windows
-npx electron-builder --linux --x64 --publish never # Linux
+npx electron-builder --linux --x64 --publish never
 ```
 
 ## CI and release modes
