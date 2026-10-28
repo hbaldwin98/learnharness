@@ -19,7 +19,7 @@ function loadProcessor() {
 }
 
 describe("pcm-capture worklet", () => {
-	it("posts audio as a transferable ArrayBuffer the local engine can re-transfer", () => {
+	it("posts audio as an ArrayBuffer, not a typed-array view", () => {
 		const { processor, posted } = loadProcessor();
 		// 16 render quanta of 128 samples = one 2048-sample frame.
 		for (let i = 0; i < 16; i++) processor.process([[new Float32Array(128).fill(0.5)]]);
@@ -29,9 +29,7 @@ describe("pcm-capture worklet", () => {
 		// isArrayBuffer, not instanceof: the buffer comes from the vm's realm.
 		assert.ok(types.isArrayBuffer(buffer), "a typed-array view is not transferable");
 		assert.equal((buffer as ArrayBuffer).byteLength, 2048 * 2);
-		// The local engine's send: transfer the frame on to the worker's port.
-		const { port1 } = new MessageChannel();
-		assert.doesNotThrow(() => port1.postMessage({ type: "audio", pcm: buffer }, [buffer as ArrayBuffer]));
-		port1.close();
+		assert.equal(audio[0]!.transfer?.length, 1);
+		assert.equal(audio[0]!.transfer![0], buffer, "the frame's buffer is transferred, not copied");
 	});
 });

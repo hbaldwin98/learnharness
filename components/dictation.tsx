@@ -498,7 +498,10 @@ export function useDictation({ target }: { target: DictationTarget }): Dictation
 		port.start();
 		port.postMessage({ type: "start", runId: gen, language, vad: settings.local.vad });
 		attach({
-			send: (frame) => port.postMessage({ type: "audio", runId: gen, pcm: frame }, [frame]),
+			// Cloned, never transferred: Electron silently drops a message
+			// that transfers an ArrayBuffer to the utility process (verified
+			// on Electron 44, 2026-10-28). A frame is 4 KB per 128 ms.
+			send: (frame) => port.postMessage({ type: "audio", runId: gen, pcm: frame }),
 			stop: () => {
 				port.postMessage({ type: "stop", runId: gen });
 				safetyRef.current = setTimeout(() => {

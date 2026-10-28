@@ -43,8 +43,8 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
 			const s = Math.max(-1, Math.min(1, channel[i]));
 			this.frame[this.count++] = s < 0 ? s * 0x8000 : s * 0x7fff;
 			if (this.count === this.frame.length) {
-				// The ArrayBuffer, not the view: the local engine re-transfers
-				// it to the worker, and only buffers are transferable.
+				// The ArrayBuffer, not the view: it is what the transfer list
+				// moves, and what the engines declare they receive.
 				this.port.postMessage({ type: "audio", buffer: this.frame.buffer }, [this.frame.buffer]);
 				this.frame = new Int16Array(2048);
 				this.count = 0;
