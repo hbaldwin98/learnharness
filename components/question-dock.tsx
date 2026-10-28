@@ -345,13 +345,24 @@ function QuestionDockForm({
 	// mode owns "Your answer", select modes own "Your thinking". The claim
 	// is effect-scoped, so the question unmounting releases it and
 	// dictation falls back to the composer automatically.
+	// The fields' one write path (typing, dictation, diagram inserts):
+	// mirror first, then state.
+	const setAnswerField = (v: string) => {
+		answerTextRef.current = v;
+		setText(v);
+	};
+	const setThinkingField = (v: string) => {
+		thinkingTextRef.current = v;
+		setThinking(v);
+	};
+
 	useDictationTarget(
 		// Ref-first (see the refs block above): the run reads the mirror,
 		// then both mirrors agree with state — a submit resuming post-finish
 		// reads the tail, never a stale closure.
 		qd.mode === "text"
-			? { read: () => answerTextRef.current, write: (v) => { answerTextRef.current = v; setText(v); } }
-			: { read: () => thinkingTextRef.current, write: (v) => { thinkingTextRef.current = v; setThinking(v); } },
+			? { read: () => answerTextRef.current, write: setAnswerField }
+			: { read: () => thinkingTextRef.current, write: setThinkingField },
 		// Released while a teach check sits unrevealed (owner 2026-10-03):
 		// the reading-thinking field owns dictated speech during the reading.
 		dictationClaim,
@@ -431,14 +442,6 @@ function QuestionDockForm({
 	const otherInputRef = useRef<HTMLDivElement>(null);
 	const thinkingRef = useRef<HTMLDivElement>(null);
 	const answerRef = useRef<HTMLDivElement>(null);
-	const setAnswerField = (v: string) => {
-		answerTextRef.current = v;
-		setText(v);
-	};
-	const setThinkingField = (v: string) => {
-		thinkingTextRef.current = v;
-		setThinking(v);
-	};
 	const answerDiagram = useDiagramField(answerRef, () => answerTextRef.current, setAnswerField);
 	const thinkingDiagram = useDiagramField(thinkingRef, () => thinkingTextRef.current, setThinkingField);
 	const diagram = qd.mode === "text" ? answerDiagram : thinkingDiagram;
