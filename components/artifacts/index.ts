@@ -6,6 +6,7 @@ import { VisualCard } from "@/components/artifacts/visual-card";
 import { ProbeDoneCard } from "@/components/artifacts/probe-done-card";
 import { ToolCallCard } from "@/components/artifacts/tool-call-card";
 import { ProblemCard, ConcludeCard } from "@/components/practice-cards";
+import { ReadingOfferCard } from "@/components/readings/offer-card";
 
 /**
  * Artifact renderer registry — the extension point for tool-part UI.
@@ -50,4 +51,7 @@ export const artifactRenderers: Record<string, ComponentType<ArtifactPartProps>>
 	// discipline (their results are pre-formatted strings too).
 	list_sessions: ToolCallCard,
 	list_propositions: ToolCallCard,
+	// Readings (docs/readings.md §6.2): the teacher's OFFER — a card the
+	// learner may click to opt in; nothing is written until he does.
+	suggest_reading: ReadingOfferCard,
 };

@@ -40,12 +40,9 @@ Image resizing uses the shipped Photon 0.3.4 JS/WASM engine and unbundled worker
 
 `npm run desktop:dist` is the local macOS signing path, using the `LH_NOTARY` keychain profile. It clears local `dist` and `.next/standalone`, builds, checks the fresh provider trace, curates the payload, runs the server smoke under host Node, then packages. Unlike CI's `--electron` smoke, that script does not itself check Electron's Node runtime or run the post-package probes. It has no publish flag and is not the tag-upload workflow.
 
-For a local Windows/Linux build, run steps 1–6 above, then:
+For a local Windows build, run `npm ci`, then `npm run desktop:dist:win` from PowerShell or cmd — it runs steps 3–6 above, then packages an unsigned NSIS installer into `dist/` without publishing. For a local Linux build, run steps 1–6 above, then:
 
 ```sh
-# On Windows:
-npx electron-builder --win --x64 --publish never
-
 # On Linux:
 npx electron-builder --linux --x64 --publish never
 ```
