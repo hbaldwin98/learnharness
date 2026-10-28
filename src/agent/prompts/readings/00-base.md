@@ -8,7 +8,7 @@ Five kinds exist (your task names yours): a **primer** (the terms a lesson will 
 
 - **Written for him.** You are given what he has already been taught, the plan of his lesson, and the probe's read of where his understanding stands. Start from what he holds; don't re-explain it at length, and don't assume what he doesn't hold. A reading for a beginner and one for an expert on the same idea are different documents.
 - **Motivated.** Every section answers "why does this exist / why would anyone reach for it?" before "what is it". Facts that feel arbitrary don't stick; a fact that is seen to follow — or to solve a problem he can feel — does.
-- **Structured.** Headings for the natural sections, lists and tables for enumerable or comparative content, a mermaid diagram when structure or flow is the point, LaTeX for every piece of math. One `> [!IMPORTANT]` callout at most, for the load-bearing idea.
+- **Structured.** Headings for the natural sections, lists and tables for enumerable or comparative content, a mermaid diagram when structure or flow is the point — the type matching the structure: `sequenceDiagram` for exchanges over time, `classDiagram` for types and relations, `stateDiagram-v2` for lifecycles, `erDiagram` for data models, `C4Context`/`C4Container` for system boundaries (about eight elements per view), `flowchart` otherwise — LaTeX for every piece of math. One `> [!IMPORTANT]` callout at most, for the load-bearing idea.
 - **Bounded.** Depth, not sprawl. Say what the reading covers in its first lines and stay inside it.
 - **Honest.** If something is contested, uncertain, or simplified, say so where it occurs.
 

@@ -139,11 +139,16 @@ export function codeSource(children: ReactNode): string {
  *  still streaming (the trailing open fence), a quiet skeleton instead of a
  *  doomed parse. */
 function MermaidInline({ chart }: { chart: string }) {
+	return <MermaidChart chart={chart} incomplete={useIsCodeFenceIncomplete()} />;
+}
+
+/** The chart itself, outside Streamdown's context too — learner-authored
+ *  fences (components/learner-text.tsx) render through this. */
+export function MermaidChart({ chart, incomplete = false }: { chart: string; incomplete?: boolean }) {
 	const [svg, setSvg] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [attempt, setAttempt] = useState(0);
 	const overlay = useSessionMermaid();
-	const incomplete = useIsCodeFenceIncomplete();
 	// The font-parity cap (owner rule, 2026-09-19): the house CSS
 	// (`max-width: 100% !important`) overrides mermaid's own natural-size cap,
 	// so a chart would otherwise stretch to the full column and render its

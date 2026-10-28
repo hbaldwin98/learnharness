@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { PathInput } from "@/components/path-input";
+import { DiagramButton, submitHint, useDiagramField } from "@/components/diagram-button";
+import { DiagramPreview } from "@/components/diagram-preview";
 import { cn } from "@/lib/utils";
 
 /**
@@ -55,6 +57,12 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 	// discipline): a submit resuming after `await finishDictation()` reads
 	// the tail, never a stale closure.
 	const thinkingRef = useRef("");
+	const fieldRef = useRef<HTMLDivElement>(null);
+	const setField = (v: string) => {
+		thinkingRef.current = v;
+		setThinking(v);
+	};
+	const diagram = useDiagramField(fieldRef, () => thinkingRef.current, setField);
 
 	useDictationTarget(
 		{
@@ -122,11 +130,10 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 					YOUR THINKING
 				</div>
 				<PathInput
+					ref={fieldRef}
 					value={thinking}
-					onValueChange={(value) => {
-						thinkingRef.current = value;
-						setThinking(value);
-					}}
+					onValueChange={setField}
+					onSelect={diagram.track}
 					onKeyDown={(e) => {
 						// Esc ends dictation — stopPropagation claims it (the
 						// keyboard machine) so the window chain doesn't also fire.
@@ -138,6 +145,8 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 						}
 						// Enter SENDS — the single lane (owner round 2, 2026-10-05);
 						// Shift+Enter is the newline, ⌘/Ctrl+Enter the chord too.
+						// Inside a ```mermaid fence a bare Enter is a newline.
+						if (e.key === "Enter" && diagram.enterIsNewline(e)) return;
 						if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
 							e.preventDefault();
 							submit();
@@ -148,13 +157,15 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 						"field-sizing-content lh-input max-h-64 min-h-16 w-full resize-none bg-transparent px-2.5 pb-2 outline-none placeholder:text-muted-foreground",
 					)}
 				/>
+				<DiagramPreview text={thinking} />
 				{/* The submit row (owner round 4, 2026-10-05): IDENTICAL to the
 				    question dock's — hint left, the SAME Button (h-9, px-3.5),
 				    one p-1 row. Corner radii concentric: shell 16 − m-1.5 (6) =
 				    field 10 − p-1 (4) = button 6. */}
 				<div className="flex items-center justify-between gap-2 p-1">
-					<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
-						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
+					<DiagramButton onInsert={diagram.insert} />
+					<span aria-hidden className="text-xs text-muted-foreground">
+						{compactionRunning ? "compacting session…" : submitHint(diagram.inFence)}
 					</span>
 					<Button
 						type="button"
