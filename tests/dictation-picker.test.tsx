@@ -38,7 +38,8 @@ async function fixture(failRead = false) {
 	win.HTMLElement.prototype.scrollIntoView = () => {};
 	win.HTMLElement.prototype.getBoundingClientRect = () => ({ top: 200, bottom: 230, left: 400, right: 500, width: 100, height: 30, x: 400, y: 200, toJSON() {} });
 	const state = {
-		record: { version: 1, dictation: { language: "en" } } as UserSettings,
+		// The language picker belongs to the Deepgram engine (Local is the factory default).
+		record: { version: 1, dictation: { engine: "deepgram", language: "en" } } as UserSettings,
 		writes: [] as string[], failWrite: false, outerEscapes: 0,
 		failRead,
 		keys: [] as AuthKeyStatus[],
@@ -195,7 +196,7 @@ test("a remounted picker stays disabled throughout an outstanding save", async (
 	assert.equal(trigger().disabled, true);
 	await click(trigger());
 	assert.equal(menu(), null);
-	f.state.record.dictation = { language: "multi" };
+	f.state.record.dictation = { engine: "deepgram", language: "multi" };
 	await act(async () => { complete(Response.json({ settings: f.state.record })); });
 	assert.equal(trigger().disabled, false);
 	assert.match(trigger().textContent!, /Multilingual/);
@@ -224,17 +225,17 @@ for (const source of ["none", "file", "env"] as const) test(`Language is below t
 	}];
 	const { KeysSection } = await import("../components/settings/keys-section.tsx");
 	await f.render(<KeysSection />);
-	const group = byTest("group-dictation");
-	const rows = group.lastElementChild!.children;
-	assert.equal(rows[0]!.getAttribute("data-testid"), "key-deepgram_api_key");
-	assert.equal(rows[1]!.getAttribute("data-testid"), "row-dictation-language");
-	assert.equal(rows[2]!.getAttribute("data-testid"), "dictation-setup-hint");
+	const rows = [...byTest("dictation-settings").children];
+	assert.equal(rows[0]!.getAttribute("data-testid"), "row-dictation-engine");
+	assert.equal(rows[1]!.getAttribute("data-testid"), "key-deepgram_api_key");
+	assert.equal(rows[2]!.getAttribute("data-testid"), "row-dictation-language");
+	assert.equal(rows[3]!.getAttribute("data-testid"), "dictation-setup-hint");
 	assert.equal(byTest("dictation-setup-hint").textContent, "Create a Deepgram API key with the Member role or higher, then add it above.");
 	assert.match(byTest("dictation-setup-hint").className, /text-muted-foreground/);
 	assert.equal(byTest("dictation-setup-hint").querySelector("a")!.href, "https://console.deepgram.com/");
 	assert.equal(byTest("dictation-setup-hint").querySelector("a")!.textContent, "Deepgram API key");
 	assert.equal(byTest("dictation-setup-hint").querySelectorAll("a").length, 1);
-	assert.match(rows[1]!.querySelector(".font-prose")!.className, /text-\(length:--lh-prose-size\)/);
+	assert.match(rows[2]!.querySelector(".font-prose")!.className, /text-\(length:--lh-prose-size\)/);
 	assert.equal(trigger().disabled, false, "language is independent of key ownership");
 	await click(byTest("key-deepgram_api_key-row"));
 	if (source !== "env") assert.ok(byTest("key-deepgram_api_key-editor"));

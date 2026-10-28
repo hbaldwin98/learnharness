@@ -149,7 +149,7 @@ Chats and graph-family files have separate version guards; absent stamps read as
 
 ## Host and providers
 
-Packaged Electron launches a private standalone Next child on loopback, sets data/auth paths, and loads a sandboxed renderer. Its navigation/permission and credential transport guards are desktop boundaries, not web multi-user authentication. [Desktop releases](desktop-release.md) covers tracing/packaging checks.
+Packaged Electron launches a private standalone Next child on loopback, sets data/auth paths, and loads a sandboxed renderer. Its navigation/permission and credential transport guards are desktop boundaries, not web multi-user authentication. [Desktop releases](desktop-release.md) covers tracing/packaging checks. Local dictation runs transcribe.cpp (via koffi, with Silero VAD) in an Electron utility process (`electron/dictation-worker.mjs`, models in `userData/models`); the renderer streams PCM frames to it and receives committed/tentative text over a direct MessagePort, so audio never passes through the app server.
 
 [`models.ts`](../src/agent/models.ts) composes Pi providers and app bridges. Strong/Cheap/Vision slots have no factory model pins. Sessions retain explicit choices; background roles resolve independently. Missing configuration/readiness refuses rather than silently choosing another provider.
 
@@ -157,7 +157,7 @@ API environment values override saved keys. Packaged subscription refresh creden
 
 ### File access and external services
 
-Read-only file tools default to the server user's home, not a selected project or app data root. Walk exclusions reduce noise; they are not access authority. Session attachments carry local paths rather than uploads.
+Read-only file tools default to the server user's home, not a selected project or app data root. Walk exclusions reduce noise; they are not access authority. Session attachments carry local paths rather than uploads. Dictation defaults to the local engine (see the Electron host above); the Deepgram engine mints short-lived tokens server-side, then streams audio browser → Deepgram, not through the app server. Its language preference is shared app settings.
 
 The **sensitive-path guard** refuses known private home locations, `.env` files, configured auth/subscription files, and recognized credential temporary files. It checks named/canonical paths and aliases; walks skip protected locations. It is path-based defense in depth, not a content scanner, sandbox, or allowed-folders setting. Other sensitive files and learning records can remain readable. See [`fs-shared.ts`](../src/agent/tools/fs-shared.ts).
 

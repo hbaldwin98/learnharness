@@ -83,6 +83,24 @@ files:
   - node_modules/argparse/**/*
   # Main-process ID-token signature verification (no bundled OAuth implementation).
   - node_modules/jose/**/*
+  # Local dictation (2026-10-27): the utility process (electron/
+  # dictation-worker.mjs) imports transcribe-cpp → koffi (FFI) → the
+  # platform's prebuilt koffi.node (@koromix/*) and transcribe.cpp library
+  # (@transcribe-cpp/*). Only the host platform's optional packages are
+  # installed, so each CI job ships its own. Tree: npm ls --all transcribe-cpp.
+  - node_modules/transcribe-cpp/**/*
+  - node_modules/koffi/**/*
+  - node_modules/@koromix/**/*
+  - node_modules/@transcribe-cpp/**/*
+# Native code cannot load from inside an asar (dlopen needs a real path):
+# the dictation stack lives in app.asar.unpacked, and the main process hands
+# the worker TRANSCRIBE_LIBRARY there (electron/main.cjs). The JS packages
+# ride along so their relative lookups resolve next to the natives.
+asarUnpack:
+  - node_modules/transcribe-cpp/**/*
+  - node_modules/koffi/**/*
+  - node_modules/@koromix/**/*
+  - node_modules/@transcribe-cpp/**/*
 extraResources:
   # Attribution/license for the bounded local Pi cutoff-selector port.
   - from: docs/compaction-accounting.md

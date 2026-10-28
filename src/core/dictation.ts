@@ -81,10 +81,18 @@ export function isDictationLanguage(value: unknown): value is DictationLanguage 
 	return DICTATION_LANGUAGES.some(({ code }) => code === value);
 }
 
-/** Only language varies. Keep the owner's tuned streaming parameters. */
-export function deepgramListenUrl(language: DictationLanguage): string {
+/** Language varies, plus two switches; the owner's tuned streaming
+ *  parameters stay. interim_results feed the strip's live guess (live
+ *  text, 2026-10-27); Deepgram omits filler words by default, so keeping
+ *  them (removal off) asks for filler_words=true. */
+export function deepgramListenUrl(
+	language: DictationLanguage,
+	opts: { interim?: boolean; keepFillerWords?: boolean } = {},
+): string {
 	return "wss://api.deepgram.com/v1/listen" +
 		"?model=nova-3&encoding=linear16&sample_rate=16000&channels=1" +
 		"&smart_format=true&punctuate=true&endpointing=300" +
+		(opts.interim ? "&interim_results=true" : "") +
+		(opts.keepFillerWords ? "&filler_words=true" : "") +
 		`&language=${encodeURIComponent(language)}`;
 }

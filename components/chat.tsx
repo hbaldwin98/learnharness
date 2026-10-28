@@ -31,7 +31,7 @@ import { dockStateKey } from "@/components/dock-state-key";
 import { clearOpeningPrompt, readOpeningPromptEntry, stashOpeningPrompt, OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { forwardDockWheel, useDockHeight } from "@/components/dock-height";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
-import { DictationBar, finishDictation, joinDictation, useDictation } from "@/components/dictation";
+import { DictationBar, finishDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
 import { StatsBar } from "@/components/stats-bar";
@@ -710,9 +710,9 @@ export function Chat({
 	}, []);
 	useFieldCycle(cycleChatFields);
 	const dictation = useDictation({
-		// Ref-first (see textRef): the join is computed from the mirror so a
-		// send resuming after `await finish()` reads the dictated tail.
-		append: (t) => applyText(joinDictation(textRef.current, t)),
+		// Ref-first (see textRef): the run reads the mirror so a send
+		// resuming after `await finish()` reads the dictated tail.
+		target: { read: () => textRef.current, write: applyText },
 	});
 	/* When a dictation run ends, the bare composer takes focus (owner
 	 * 2026-10-01) — the hands are already on the keyboard from the stop.
