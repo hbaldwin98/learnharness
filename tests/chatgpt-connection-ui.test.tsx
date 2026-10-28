@@ -80,14 +80,18 @@ test("Providers is the first/default page; General is last and other pages keep 
 test("Providers has five ordered sections including External CLI; unknown variables stay masked/read-only at the end of Model API keys", async () => {
  globalThis.fetch = async (url) => {
   if (url === "/api/claude-code") return Response.json({ state: "not-found", version: null, minimumVersion: "2.1.259" });
+  // The Dictation group reads its section (no record → the factory's Local engine).
+  if (url === "/api/settings") return Response.json({ settings: null });
   assert.equal(url, "/api/keys");
   return Response.json({ providers: [{ id: "openai", envVar: "OPENAI_API_KEY", label: "OpenAI" }], keys: [{ id: "FUTURE_VAR", info: null, present: true, masked: "…abcd", source: "file", shadowedByEnv: false }] });
  };
  fixture(); await mount(<KeysSection />);
+ await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
  const headings = [...document.querySelectorAll('[data-testid^="group-"] > p')].map((el) => el.textContent);
  assert.deepEqual(headings, ["Model API keys", "Subscriptions", "External CLI", "Dictation", "Search"]);
  assert(byTest("claude-code-installation").closest('[data-testid="group-external-cli"]'));
- assert(byTest("key-deepgram_api_key").closest('[data-testid="group-dictation"]'));
+ assert(byTest("dictation-settings").closest('[data-testid="group-dictation"]'));
+ assert.equal(document.querySelector('[data-testid="key-deepgram_api_key"]'), null, "the Deepgram key row belongs to the Deepgram engine");
  assert(byTest("key-tavily_api_key").closest('[data-testid="group-search"]'));
  assert(byTest("key-brave_api_key").closest('[data-testid="group-search"]'));
  assert(byTest("unknown-FUTURE_VAR").closest('[data-testid="group-provider-keys"]'));

@@ -35,6 +35,10 @@ import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
 import type { SearchEngineId } from "./search.ts";
 import { isDictationLanguage, type DictationLanguage } from "./dictation.ts";
+import {
+	DEFAULT_LOCAL_DICTATION_MODEL, isLocalDictationLanguage, isLocalDictationModelId,
+	type LocalDictationLanguage, type LocalDictationModelId,
+} from "./dictation-local.ts";
 
 /** The schema version this code understands. Bump ONLY for breaking shape
  *  changes (a field renamed/meaning changed); pure additions never bump. */
@@ -338,10 +342,35 @@ export interface GeneralSettings {
 	autoUpdate?: boolean;
 }
 
+export type DictationEngine = "local" | "deepgram";
+export type DictationDevice = "auto" | "gpu" | "cpu";
+
+/** The local engine (transcribe.cpp in the Electron dictation worker). */
+export interface LocalDictationSettings {
+	model?: LocalDictationModelId;
+	/** Kept across model switches; a model that lacks it uses its default. */
+	language?: LocalDictationLanguage;
+	device?: DictationDevice;
+	/** Silero voice-activity gating of the frames fed to the model. */
+	vad?: boolean;
+}
+
 /** One app-wide dictation preference, shared by every composer. */
 export interface DictationSettings {
+	engine?: DictationEngine;
+	/** Deepgram's language (the field predates engines, hence its name). */
 	language?: DictationLanguage;
+	/** Handy's filler-word removal — applies to every engine. */
+	removeFillerWords?: boolean;
+	/** Handy's append_trailing_space: a finished run's text ends with a space. */
+	appendTrailingSpace?: boolean;
+	local?: LocalDictationSettings;
 }
+
+const DICTATION_ENGINES: readonly DictationEngine[] = ["local", "deepgram"];
+const DICTATION_DEVICES: readonly DictationDevice[] = ["auto", "gpu", "cpu"];
+export const isDictationEngine = (v: unknown): v is DictationEngine => DICTATION_ENGINES.includes(v as DictationEngine);
+export const isDictationDevice = (v: unknown): v is DictationDevice => DICTATION_DEVICES.includes(v as DictationDevice);
 
 /** Agent settings — everything about the non-conversation machinery. */
 export interface AgentSettings {
@@ -491,7 +520,7 @@ export interface UserSettings {
 export interface FactorySettings {
 	version: number;
 	general: Required<GeneralSettings>;
-	dictation: Required<DictationSettings>;
+	dictation: Required<Omit<DictationSettings, "local">> & { local: Required<LocalDictationSettings> };
 	appearance: {
 		mode: "dark" | "light";
 		background: string | null;
@@ -511,7 +540,13 @@ export interface FactorySettings {
 export const FACTORY_SETTINGS: FactorySettings = {
 	version: CURRENT_SETTINGS_VERSION,
 	general: { autoUpdate: true },
-	dictation: { language: "en" },
+	dictation: {
+		engine: "local",
+		language: "en",
+		removeFillerWords: true,
+		appendTrailingSpace: false, // Handy's default
+		local: { model: DEFAULT_LOCAL_DICTATION_MODEL, language: "auto", device: "auto", vad: true },
+	},
 	appearance: {
 		mode: "dark",
 		background: null, // the dark default (#141414) lives in the mode's derivation curve
@@ -794,6 +829,45 @@ function sanitizeCompaction(raw: Record<string, unknown>): CompactionSettings {
 	return out;
 }
 
+export type ResolvedDictationSettings = FactorySettings["dictation"];
+
+/** Fill every absent dictation field from the factory. */
+export function resolveDictationSettings(d: DictationSettings | undefined): ResolvedDictationSettings {
+	const f = FACTORY_SETTINGS.dictation;
+	return {
+		engine: d?.engine ?? f.engine,
+		language: d?.language ?? f.language,
+		removeFillerWords: d?.removeFillerWords ?? f.removeFillerWords,
+		appendTrailingSpace: d?.appendTrailingSpace ?? f.appendTrailingSpace,
+		local: {
+			model: d?.local?.model ?? f.local.model,
+			language: d?.local?.language ?? f.local.language,
+			device: d?.local?.device ?? f.local.device,
+			vad: d?.local?.vad ?? f.local.vad,
+		},
+	};
+}
+
+/** Field-wise: an invalid field drops (its default resolves at read time). */
+export function sanitizeDictation(raw: Record<string, unknown>): DictationSettings {
+	const out: DictationSettings = {};
+	if (isDictationEngine(raw.engine)) out.engine = raw.engine;
+	if (isDictationLanguage(raw.language)) out.language = raw.language;
+	if (typeof raw.removeFillerWords === "boolean") out.removeFillerWords = raw.removeFillerWords;
+	if (typeof raw.appendTrailingSpace === "boolean") out.appendTrailingSpace = raw.appendTrailingSpace;
+	const local = raw.local;
+	if (local !== null && typeof local === "object" && !Array.isArray(local)) {
+		const l = local as Record<string, unknown>;
+		const outLocal: LocalDictationSettings = {};
+		if (isLocalDictationModelId(l.model)) outLocal.model = l.model;
+		if (isLocalDictationLanguage(l.language)) outLocal.language = l.language;
+		if (isDictationDevice(l.device)) outLocal.device = l.device;
+		if (typeof l.vad === "boolean") outLocal.vad = l.vad;
+		out.local = outLocal;
+	}
+	return out;
+}
+
 /**
  * Coerce arbitrary JSON (disk file, network body) into a valid delta record:
  * known fields validated strictly (invalid ones drop/clamp per module doc),
@@ -811,9 +885,8 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	}
 	if (r.dictation !== undefined) {
 		const raw = r.dictation;
-		out.dictation = raw !== null && typeof raw === "object" && !Array.isArray(raw) &&
-			isDictationLanguage((raw as Record<string, unknown>).language)
-			? { language: (raw as DictationSettings).language }
+		out.dictation = raw !== null && typeof raw === "object" && !Array.isArray(raw)
+			? sanitizeDictation(raw as Record<string, unknown>)
 			: {};
 	}
 	if (r.claudeCode !== undefined) {

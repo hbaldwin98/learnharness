@@ -8,7 +8,7 @@ import { MinimalHome } from "@/components/minimal-home";
 import { SetupDialog } from "@/components/setup-dialog";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
 import { useModelSetup, selectedModelUnavailable, openModelPicker, ZeroKeysPill } from "@/components/setup-cta";
-import { DictationBar, joinDictation, useDictation } from "@/components/dictation";
+import { DictationBar, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
@@ -50,12 +50,14 @@ export function Home({
 	// Voice dictation (STT wave, 2026-09-17): finals append at the end of the
 	// topic draft; the strip lives in the stats bar's middle slot.
 	const dictation = useDictation({
-		// Ref-first: the join reads the mirror so the send resuming after
+		// Ref-first: the run reads the mirror so the send resuming after
 		// `await finish()` sees the dictated tail.
-		append: (t) => {
-			const v = joinDictation(topicRef.current, t);
-			topicRef.current = v;
-			setTopic(v);
+		target: {
+			read: () => topicRef.current,
+			write: (v) => {
+				topicRef.current = v;
+				setTopic(v);
+			},
 		},
 	});
 	const [busy, setBusy] = useState(false);

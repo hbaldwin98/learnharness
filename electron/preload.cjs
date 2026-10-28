@@ -24,12 +24,24 @@
  *   snapshot for a late subscriber; checkForUpdates requests a manual
  *   check (including download/install-on-quit, even with automatic checks OFF).
  *
+ *   window.lh.dictation — local dictation (2026-10-27): control(command)
+ *   reaches the main process ("lh:dictation:control": status, configure,
+ *   download, cancel, delete, connect); onChange(cb) receives snapshots.
+ *   "connect" delivers a direct MessagePort to the dictation worker —
+ *   ports cannot cross contextBridge, so it arrives in the page as a
+ *   same-origin window message {type: "lh:dictation:port"} (Electron's
+ *   documented context-isolation pattern).
+ *
  *   window.lh.onOpenSettings(cb) — menu navigation, buffered until React
  *   subscribes after a window is reopened. Browser builds have no bridge.
  *
  * Channel names are mirrored in electron/main.cjs — keep them in sync.
  */
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
+
+ipcRenderer.on("lh:dictation:port", (event) => {
+	window.postMessage({ type: "lh:dictation:port" }, window.location.origin, event.ports);
+});
 
 let openSettingsListener = null;
 let pendingOpenSettings = null;
@@ -74,6 +86,14 @@ contextBridge.exposeInMainWorld("lh", {
 			const listener = () => cb();
 			ipcRenderer.on("lh:subscriptions:changed", listener);
 			return () => ipcRenderer.removeListener("lh:subscriptions:changed", listener);
+		},
+	},
+	dictation: {
+		control: (command) => ipcRenderer.invoke("lh:dictation:control", command),
+		onChange: (cb) => {
+			const listener = (_event, snapshot) => cb(snapshot);
+			ipcRenderer.on("lh:dictation:changed", listener);
+			return () => ipcRenderer.removeListener("lh:dictation:changed", listener);
 		},
 	},
 	expandWindow: () => ipcRenderer.send("lh:expand-window"),

@@ -31,6 +31,7 @@ const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cj
 const { attachSubscriptionChild, subscriptionControl } = require("./subscription-ipc.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
 const { openWebSubscriptionBrowser } = require("./web-subscription-browser.cjs");
+const { createLocalDictation } = require("./dictation.cjs");
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -175,6 +176,13 @@ function freePort() {
  *  its own read/reflect/write, so a key saved in the settings page takes
  *  effect on the next model call — no restart. Real environment variables
  *  still win over the file inside the child (its documented rule). */
+
+/** The packaged native transcribe.cpp library (see the dictation wiring). */
+function transcribeLibraryPath() {
+	const tuple = { win32: "win32-x64-cpu-vulkan", darwin: "darwin-arm64-metal", linux: "linux-x64-cpu-vulkan" }[process.platform];
+	const lib = { win32: "transcribe.dll", darwin: "libtranscribe.dylib", linux: "libtranscribe.so" }[process.platform];
+	return path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "@transcribe-cpp", tuple, lib);
+}
 
 function log(line) {
 	const stamp = new Date().toISOString();
@@ -724,6 +732,43 @@ async function main() {
 	ipcMain.handle("lh:update:check", (event) => {
 		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) throw new Error("Untrusted desktop request.");
 		checkForUpdates({ manual: true });
+	});
+
+	// Local dictation (owner, 2026-10-27): transcribe.cpp in a utility
+	// process; models under userData/models. Packaged, the native library
+	// sits in app.asar.unpacked — koffi cannot dlopen through the archive,
+	// so the worker gets its exact path (electron-builder.yml asarUnpack).
+	// Same contract as the updater: a dictation failure is a log line and
+	// never blocks boot — the window reports local dictation unavailable.
+	let dictation = null;
+	try {
+		dictation = createLocalDictation({
+			modelsDir: path.join(app.getPath("userData"), "models"),
+			workerEnv: app.isPackaged ? { TRANSCRIBE_LIBRARY: transcribeLibraryPath() } : {},
+			log,
+			broadcast: (snapshot) => {
+				for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:dictation:changed", snapshot);
+			},
+		});
+		app.on("before-quit", () => dictation.dispose());
+	} catch (e) {
+		log(`[dictation] local engine unavailable: ${e instanceof Error ? e.message : e}`);
+	}
+	ipcMain.handle("lh:dictation:control", async (event, command) => {
+		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) throw new Error("Untrusted desktop request.");
+		if (!dictation) {
+			if (command?.op === "status") return { available: false, engine: { state: "error", model: null, backend: null, device: null, error: "The local dictation engine could not start", gpuFallback: false }, models: {}, vad: null };
+			throw new Error("The local dictation engine could not start.");
+		}
+		switch (command?.op) {
+			case "status": return dictation.snapshot();
+			case "configure": return dictation.configure(command.config);
+			case "download": return dictation.download(command.id);
+			case "cancel": return dictation.cancel(command.id);
+			case "delete": return dictation.remove(command.id);
+			case "connect": return dictation.connect(event.sender);
+			default: throw new Error("Unknown dictation request.");
+		}
 	});
 
 	// Sidebar-at-narrow-window (owner, 2026-09-17): the renderer auto-closes

@@ -29,6 +29,8 @@ import type {
 import { BACKGROUND_MODEL_ROLES, CACHE_RETENTIONS, COMPACTION_THRESHOLD_FLOOR, CUSTOM_MODEL_PIN_FLOOR, EXTRACTION_CHUNK_TOKENS_FLOOR, MODEL_SLOTS } from "../core/settings.ts";
 import { WRITABLE_TOOL_KEYS } from "../core/pending.ts";
 import { isDictationLanguage } from "../core/dictation.ts";
+import { isLocalDictationLanguage, isLocalDictationModelId } from "../core/dictation-local.ts";
+import { isDictationDevice, isDictationEngine } from "../core/settings.ts";
 
 /** Parsed-or-rejected — `ok: false` carries the 400's error message. */
 export type SettingsBodyResult<T> =
@@ -396,13 +398,51 @@ export function parseCompactionSettingsBody(body: unknown): SettingsBodyResult<C
 	return { ok: true, settings };
 }
 
-/** dictation: { language?: one of Nova-3's supported language codes } */
+/** dictation: { engine?, language? (Nova-3 code), removeFillerWords?, appendTrailingSpace?,
+ *  local?: { model?, language?, device?, vad? } } — every present field
+ *  must be valid (strict, unlike the record sanitizer). */
 export function parseDictationSettingsBody(body: unknown): SettingsBodyResult<DictationSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
-	if (raw.language === undefined) return { ok: true, settings: {} };
-	if (!isDictationLanguage(raw.language)) return { ok: false, error: "Unsupported dictation language" };
-	return { ok: true, settings: { language: raw.language } };
+	const settings: DictationSettings = {};
+	if (raw.engine !== undefined) {
+		if (!isDictationEngine(raw.engine)) return { ok: false, error: "Unsupported dictation engine" };
+		settings.engine = raw.engine;
+	}
+	if (raw.language !== undefined) {
+		if (!isDictationLanguage(raw.language)) return { ok: false, error: "Unsupported dictation language" };
+		settings.language = raw.language;
+	}
+	if (raw.removeFillerWords !== undefined) {
+		if (typeof raw.removeFillerWords !== "boolean") return { ok: false, error: "removeFillerWords must be a boolean" };
+		settings.removeFillerWords = raw.removeFillerWords;
+	}
+	if (raw.appendTrailingSpace !== undefined) {
+		if (typeof raw.appendTrailingSpace !== "boolean") return { ok: false, error: "appendTrailingSpace must be a boolean" };
+		settings.appendTrailingSpace = raw.appendTrailingSpace;
+	}
+	if (raw.local !== undefined) {
+		const local = asRecord(raw.local);
+		if (!local) return { ok: false, error: "local must be an object" };
+		settings.local = {};
+		if (local.model !== undefined) {
+			if (!isLocalDictationModelId(local.model)) return { ok: false, error: "Unsupported local dictation model" };
+			settings.local.model = local.model;
+		}
+		if (local.language !== undefined) {
+			if (!isLocalDictationLanguage(local.language)) return { ok: false, error: "Unsupported local dictation language" };
+			settings.local.language = local.language;
+		}
+		if (local.device !== undefined) {
+			if (!isDictationDevice(local.device)) return { ok: false, error: "Unsupported dictation device" };
+			settings.local.device = local.device;
+		}
+		if (local.vad !== undefined) {
+			if (typeof local.vad !== "boolean") return { ok: false, error: "vad must be a boolean" };
+			settings.local.vad = local.vad;
+		}
+	}
+	return { ok: true, settings };
 }
 
 /** The custom endpoint's per-model pins (PATCH /api/custom-provider): the

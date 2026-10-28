@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronRightIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
-import { joinDictation, useDictationTarget } from "@/components/dictation";
+import { useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { PathInput } from "@/components/path-input";
 import { cn } from "@/lib/utils";
@@ -57,14 +57,13 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 	const thinkingRef = useRef("");
 
 	useDictationTarget(
-		useCallback(
-			(t: string) => {
-				const v = joinDictation(thinkingRef.current, t);
+		{
+			read: () => thinkingRef.current,
+			write: (v) => {
 				thinkingRef.current = v;
 				setThinking(v);
 			},
-			[],
-		),
+		},
 		true,
 	);
 

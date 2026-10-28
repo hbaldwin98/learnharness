@@ -54,7 +54,7 @@ async function fixture({ desktop = true, claimed = true } = {}) {
 	const { createRoot } = await import("react-dom/client");
 	const root = createRoot(doc.getElementById("root")!);
 	function Harness() {
-		useDictationTarget((text) => appends.push(text), claimed);
+		useDictationTarget({ read: () => "", write: (text) => { appends.push(text); } }, claimed);
 		return <>
 			<aside data-testid="sidebar">Sidebar</aside>
 			<FilePathDropZone>
