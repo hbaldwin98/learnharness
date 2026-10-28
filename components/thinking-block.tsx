@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
+import { LearnerText } from "@/components/learner-text";
 import { cn } from "@/lib/utils";
-import { PathText } from "@/components/file-path-chip";
 
 /** The unified user-thinking row (owner round, 2026-10-05): ONE visual
  *  language for every surface where the learner's own thinking renders —
@@ -128,7 +128,9 @@ export function ThinkingBlock({
 				<ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", open ? "rotate-180" : "rotate-0")} />
 			</button>
 			{open && (
-				<span className="lh-prose mt-1.5 block whitespace-pre-wrap text-[15px] italic text-foreground/50"><PathText text={text} /></span>
+				<div className="lh-prose mt-1.5 text-[15px]">
+					<LearnerText text={text} textClassName="italic text-foreground/50" />
+				</div>
 			)}
 		</div>
 	);

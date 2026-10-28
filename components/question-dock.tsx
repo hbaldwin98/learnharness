@@ -7,6 +7,8 @@ import { finishDictation, isDictationActive, useDictationTarget } from "@/compon
 import { useEnterSubmits } from "@/components/enter-submits";
 import { PathInput } from "@/components/path-input";
 import { MalformedQuestion } from "@/components/malformed-question";
+import { DiagramButton, submitHint, useDiagramField } from "@/components/diagram-button";
+import { DiagramPreview } from "@/components/diagram-preview";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
 import {
@@ -428,6 +430,18 @@ function QuestionDockForm({
 	const rootRef = useRef<HTMLDivElement>(null);
 	const otherInputRef = useRef<HTMLDivElement>(null);
 	const thinkingRef = useRef<HTMLDivElement>(null);
+	const answerRef = useRef<HTMLDivElement>(null);
+	const setAnswerField = (v: string) => {
+		answerTextRef.current = v;
+		setText(v);
+	};
+	const setThinkingField = (v: string) => {
+		thinkingTextRef.current = v;
+		setThinking(v);
+	};
+	const answerDiagram = useDiagramField(answerRef, () => answerTextRef.current, setAnswerField);
+	const thinkingDiagram = useDiagramField(thinkingRef, () => thinkingTextRef.current, setThinkingField);
+	const diagram = qd.mode === "text" ? answerDiagram : thinkingDiagram;
 	// One row past the options is the trailing row: quiz → don't-know,
 	// ask → Other (a question never has both). Text mode (ask/explain)
 	// has no rows — the composer IS the answer surface.
@@ -840,11 +854,10 @@ function QuestionDockForm({
 					</div>
 					{qd.mode === "text" ? (
 						<PathInput
+							ref={answerRef}
 							value={text}
-							onValueChange={(value) => {
-								answerTextRef.current = value;
-								setText(value);
-							}}
+							onValueChange={setAnswerField}
+							onSelect={answerDiagram.track}
 							onKeyDown={(e) => {
 								// Esc ends dictation (the dictate decisions: click-again
 								// or Esc) — stopPropagation claims it (keyboard wave
@@ -857,6 +870,8 @@ function QuestionDockForm({
 								}
 								// Chat convention: Enter submits, Shift+Enter is a newline;
 								// ⌘/Ctrl+Enter also submits (universal across the app).
+								// Inside a ```mermaid fence a bare Enter is a newline.
+								if (e.key === "Enter" && answerDiagram.enterIsNewline(e)) return;
 								if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
 									e.preventDefault();
 									submit();
@@ -869,10 +884,8 @@ function QuestionDockForm({
 						<PathInput
 							ref={thinkingRef}
 							value={thinking}
-							onValueChange={(value) => {
-								thinkingTextRef.current = value;
-								setThinking(value);
-							}}
+							onValueChange={setThinkingField}
+							onSelect={thinkingDiagram.track}
 							onKeyDown={(e) => {
 								// Esc ends dictation (the dictate decisions: click-again
 								// or Esc) — stopPropagation claims it (keyboard wave
@@ -886,6 +899,8 @@ function QuestionDockForm({
 								// THE STANDARD CHORD (owner round 5, 2026-10-05): Enter
 								// submits, Shift+Enter is a newline, ⌘/Ctrl+Enter works
 								// too — identical to the practice dock and the composer.
+								// Inside a ```mermaid fence a bare Enter is a newline.
+								if (e.key === "Enter" && thinkingDiagram.enterIsNewline(e)) return;
 								if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
 									e.preventDefault();
 									submit();
@@ -900,9 +915,11 @@ function QuestionDockForm({
 							)}
 						/>
 					)}
+					<DiagramPreview text={qd.mode === "text" ? text : thinking} />
 					<div className="flex items-center justify-between gap-2 p-1">
-						<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
-								{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
+						<DiagramButton onInsert={diagram.insert} />
+						<span aria-hidden className="text-xs text-muted-foreground">
+								{compactionRunning ? "compacting session…" : submitHint(diagram.inFence)}
 						</span>
 						<Button
 							type="submit"
