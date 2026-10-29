@@ -91,3 +91,4 @@ export * from "./coverage.ts";
 // export share it. Pure, browser-safe.
 export * from "./session-markdown.ts";
 export * from "./readings.ts";
+export * from "./reading-discussions.ts";
