@@ -13,7 +13,7 @@ import { after, describe, it } from "node:test";
 import { execFileSync } from "node:child_process";
 
 import { CODE_LANGUAGES, type CodeFile, type CodeLanguage } from "../src/agent/workspaces/code/languages.ts";
-import { createCodeModule, type CodePose } from "../src/agent/workspaces/code/module.ts";
+import { createCodeModule, overlay, type CodePose } from "../src/agent/workspaces/code/module.ts";
 import { createDockerRunner } from "../src/server/workspaces/docker-runner.ts";
 
 function dockerRunning(): boolean {
@@ -202,7 +202,7 @@ describe("coding workspace — real Docker", { skip: enabled ? false : "set LH_D
 			});
 
 			it("a starter with a syntax error is refused", { timeout: 5 * 60_000 }, async () => {
-				const errors = await verify({ ...fixture.pose, files: fixture.syntax }, "syntax");
+				const errors = await verify({ ...fixture.pose, files: overlay(fixture.pose.files, fixture.syntax) }, "syntax");
 				assert.match(errors.join("\n"), /starter files do not build/);
 			});
 
