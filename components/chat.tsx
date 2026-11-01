@@ -58,6 +58,7 @@ import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
+import { workspaceComponentFor } from "@/components/workspaces/registry";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
@@ -2376,6 +2377,9 @@ function DockOverlay({
 	// practice (owner fix, 2026-10-06). Typing growth keeps the key and
 	// never animates; the fold/unfold morphs like teaching always has.
 	const stateKey = dockStateKey(mode, !!pending || !!practice, expanded);
+	// PRACTICE WORKSPACES (plan step 1): a problem's workspace module UI
+	// replaces the thinking dock; none / unknown → the thinking dock.
+	const Workspace = practice ? workspaceComponentFor(practice.input) : null;
 	const prevRef = useRef<{ key: string; height: number } | null>(null);
 	useIsoLayoutEffect(() => {
 		const el = shellRef.current;
@@ -2463,6 +2467,18 @@ function DockOverlay({
 									onSaveDraft={onSaveQuestionDraft}
 									onEscape={dictationCancel}
 									dictationClaim={!revealPending}
+									compactionRunning={compactionRunning}
+								/>
+							) : practice && Workspace ? (
+								<Workspace
+									problemCallId={practice.toolCallId}
+									input={practice.input as { statement: string }}
+									expanded={expanded}
+									onExpand={() => {
+										setExpanded(true);
+										void suppressFoldDuringReveal();
+									}}
+									onEscape={dictationCancel}
 									compactionRunning={compactionRunning}
 								/>
 							) : practice ? (

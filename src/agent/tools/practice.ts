@@ -27,6 +27,8 @@ import { activeProblemOf } from "../../core/native-messages.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
+import { workspaceOf } from "../../core/workspaces.ts";
+import { moduleFor, workspaceFieldSchema, type AgentWorkspaceModule } from "../workspaces/registry.ts";
 
 
 /** The record-reading context the gates need (the plan-tools idiom). */
@@ -44,6 +46,10 @@ export interface PracticeToolContext {
 	 *  Each absent context (tests) = absent from the registry. */
 	graph?: GraphToolContext;
 	jobs?: JobToolContext;
+	/** PRACTICE WORKSPACES (plan step 1): the modules AVAILABLE this turn —
+	 *  the server decides (src/server/workspaces.ts). Absent/empty = none:
+	 *  the problem schema, description and prompt are today's exactly. */
+	workspaceModules?: readonly AgentWorkspaceModule[];
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
@@ -94,22 +100,38 @@ export const problemInputObject = Type.Object({
 
 export type ProblemInput = Static<typeof problemInputObject>;
 
+/** The problem schema for the modules available this turn (practice
+ *  workspaces, plan step 1): with none, exactly problemInputObject. */
+export function problemInputSchema(modules: readonly AgentWorkspaceModule[] = []): typeof problemInputObject {
+	const workspace = workspaceFieldSchema(modules);
+	if (workspace === null) return problemInputObject;
+	return Type.Object({ ...problemInputObject.properties, workspace }) as unknown as typeof problemInputObject;
+}
+
+const PROBLEM_DESCRIPTION =
+	"Pose one practice problem. Ends the turn — the learner works in the thinking field; their thinking " +
+	"traces and answer commits arrive back as labeled messages. The modelSolution rides this call's " +
+	"arguments and stays hidden from the learner until you conclude (conclude shows it verbatim — the " +
+	"reveal needs no new field). Only one problem may be active — conclude it before posing the next.";
+
+const WORKSPACE_DESCRIPTION_SUFFIX =
+	" A `workspace` gives the learner a workspace instead of the thinking field; the pose is verified before it goes through.";
+
 export function problemTool(
 	gate: PracticeGate,
 	graphNodes?: PracticeToolContext["graphNodes"],
+	modules: readonly AgentWorkspaceModule[] = [],
+	chatId = "",
 ): AgentTool<typeof problemInputObject> {
+	const parameters = problemInputSchema(modules);
 	return {
 		name: "problem",
 		label: "problem",
-		description:
-			"Pose one practice problem. Ends the turn — the learner works in the thinking field; their thinking " +
-			"traces and answer commits arrive back as labeled messages. The modelSolution rides this call's " +
-			"arguments and stays hidden from the learner until you conclude (conclude shows it verbatim — the " +
-			"reveal needs no new field). Only one problem may be active — conclude it before posing the next.",
-		parameters: problemInputObject,
+		description: modules.length === 0 ? PROBLEM_DESCRIPTION : PROBLEM_DESCRIPTION + WORKSPACE_DESCRIPTION_SUFFIX,
+		parameters,
 		executionMode: "sequential",
 		prepareArguments: (args: unknown) => {
-			const healed = healEncodedArguments(args, problemInputObject);
+			const healed = healEncodedArguments(args, parameters);
 			// TARGET NORMALIZATION (owner round 9): names silently become ids —
 			// the RECORD carries canonical ids (the mastery trace groups on
 			// them); unresolvable strings pass through for execute to reject.
@@ -133,7 +155,7 @@ export function problemTool(
 			if (normalized.every((t, i) => t === target[i])) return healed as never;
 			return { ...(healed as Record<string, unknown>), target: normalized } as never;
 		},
-		execute: async (_toolCallId, input) => {
+		execute: async (toolCallId, input, signal) => {
 			if (gate.problemActive) {
 				return invalidInputResult("problem", [
 					"a problem is already active — call conclude on it before posing the next one",
@@ -153,6 +175,23 @@ export function problemTool(
 						`target ${JSON.stringify(unknown)} is not a known proposition — targets must be proposition ids from the session context; if the material is not in the map, omit target entirely`,
 					]);
 				}
+			}
+			// WORKSPACE VERIFICATION (practice workspaces, plan step 1): a
+			// workspace must name an available module, and that module must
+			// accept the pose — otherwise a correctable invalid result, the
+			// gate stays closed, and the model re-poses.
+			const workspace = (input as { workspace?: unknown }).workspace;
+			if (workspace !== undefined) {
+				const descriptor = workspaceOf(input);
+				const workspaceModule = descriptor ? moduleFor(modules, descriptor.module) : undefined;
+				if (!workspaceModule) {
+					const named = descriptor ? JSON.stringify(descriptor.module) : "no module";
+					return invalidInputResult("problem", [
+						`workspace module ${named} is not available — omit workspace for an ordinary problem`,
+					]);
+				}
+				const errors = await workspaceModule.verifyPose(workspace, { chatId, problemCallId: toolCallId, signal });
+				if (errors.length > 0) return invalidInputResult("problem", errors);
 			}
 			gate.problemActive = true;
 			return problemResult();
@@ -231,12 +270,14 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 	// toggle-filtered: problem/conclude are the session; these are
 	// exceptions the doctrine says to reach for rarely.
 	const jobs = ctx.jobs ? jobTools(ctx.jobs) : null;
+	const modules = ctx.workspaceModules ?? [];
+	const moduleTools = Object.assign({}, ...modules.map((m) => m.tools?.({ chatId: ctx.chatId }) ?? {})) as Record<string, AgentTool<any>>;
 	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry. problem/conclude
 	// keep their own (target-normalizing) prepareArguments as the composed
 	// inner pass; the double heal is idempotent by construction.
 	return healToolRecord({
-		problem: problemTool(gate, ctx.graphNodes),
+		problem: problemTool(gate, ctx.graphNodes, modules, ctx.chatId),
 		conclude: concludeTool(gate),
 		read: readTool,
 		ls: lsTool,
@@ -245,5 +286,6 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
 		...(ctx.graph ? proberGraphTools(ctx.graph) : {}),
+		...moduleTools,
 	});
 }

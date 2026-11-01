@@ -9,7 +9,8 @@
  *
  * Path grammar: "system-prompt.md" (the shared base), "shared/<fragment>"
  * (sources v1: fragments composed by BOTH agents), "prober/<fragment>" /
- * "teacher/<fragment>" — where <fragment> is numeric-prefixed + .md
+ * "teacher/<fragment>" / "practice/<fragment>", and "workspace-<id>/<fragment>"
+ * (a practice workspace module's doctrine) — where <fragment> is numeric-prefixed + .md
  * (e.g. 20-teaching.md). POSIX-relative, no traversal, no nesting.
  */
 
@@ -44,7 +45,9 @@ export interface PromptSegmentInfo {
  *  CURRENT source segment list. */
 export function isValidSegmentPath(segmentPath: string): boolean {
 	if (segmentPath === "system-prompt.md") return true;
-	const m = /^(prober|teacher|practice|shared)\/([\w.-]+\.md)$/.exec(segmentPath);
+	// workspace-<id>/ (practice workspaces, owner ruling 2026-11-01): a
+	// module's doctrine, composed into practice only while it is available.
+	const m = /^(prober|teacher|practice|shared|workspace-[a-z][a-z0-9-]*)\/([\w.-]+\.md)$/.exec(segmentPath);
 	if (!m || m[2] === undefined) return false;
 	return FRAGMENT_RE.test(m[2]);
 }

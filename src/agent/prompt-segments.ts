@@ -31,6 +31,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { PATHS, PROMPTS_OVERRIDE_DIR } from "../../config.ts";
 import { FRAGMENT_RE, isValidSegmentPath, type PromptAgent, type PromptSegmentInfo } from "../core/prompt-segments.ts";
+import { WORKSPACE_ID_RE, WORKSPACE_PROMPT_PREFIX } from "../core/workspaces.ts";
 
 const PROMPTS_DIR = path.join(PATHS.root, "src", "agent", "prompts");
 
@@ -64,7 +65,10 @@ export function readPromptOverride(segmentPath: string): string | null {
  *  the shared/ fragments (the 2026-09-27 reorder: the agent's job and
  *  method lead; the shared tool/file/format mechanics are an appendix).
  *  The exact order composeInstructions composes them in. */
-export function listSourceSegments(agent: PromptAgent): Array<{ path: string; shared: boolean; file: string }> {
+export function listSourceSegments(
+	agent: PromptAgent,
+	workspaceModules?: readonly string[],
+): Array<{ path: string; shared: boolean; file: string }> {
 	// PRACTICE (owner, 2026-10-04): its own directory plus a CURATED
 	// shared appendix — the teaching base and the question/confidence/
 	// file mechanics stay out (the doctrine contradicts them; 00-base.md
@@ -79,6 +83,20 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 		const fragments = fs.readdirSync(dir).filter((f) => FRAGMENT_RE.test(f)).sort();
 		for (const f of fragments) {
 			segments.push({ path: `${agent}/${f}`, shared: false, file: path.join(dir, f) });
+		}
+	}
+	// WORKSPACE DOCTRINE (practice workspaces, owner ruling 2026-11-01):
+	// each module's workspace-<id>/ fragments follow the practice fragments
+	// — for COMPOSITION only the modules available this turn (the caller
+	// passes them); for LISTING (settings, route validation: undefined)
+	// every module directory on disk, so its segments stay overridable.
+	if (agent === "practice") {
+		for (const id of workspacePromptModules(workspaceModules)) {
+			const moduleDir = path.join(PROMPTS_DIR, `${WORKSPACE_PROMPT_PREFIX}${id}`);
+			const fragments = fs.readdirSync(moduleDir).filter((f) => FRAGMENT_RE.test(f)).sort();
+			for (const f of fragments) {
+				segments.push({ path: `${WORKSPACE_PROMPT_PREFIX}${id}/${f}`, shared: false, file: path.join(moduleDir, f) });
+			}
 		}
 	}
 	const sharedDir = path.join(PROMPTS_DIR, "shared");
@@ -96,6 +114,19 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 	return segments;
 }
 
+/** The workspace modules whose doctrine directories compose: the given
+ *  available ids that have a directory, or (undefined) every directory on
+ *  disk — sorted, so composition order is stable. */
+function workspacePromptModules(available: readonly string[] | undefined): string[] {
+	if (!fs.existsSync(PROMPTS_DIR)) return [];
+	const onDisk = fs
+		.readdirSync(PROMPTS_DIR, { withFileTypes: true })
+		.filter((e) => e.isDirectory() && e.name.startsWith(WORKSPACE_PROMPT_PREFIX))
+		.map((e) => e.name.slice(WORKSPACE_PROMPT_PREFIX.length))
+		.filter((id) => WORKSPACE_ID_RE.test(id));
+	return (available === undefined ? onDisk : onDisk.filter((id) => available.includes(id))).sort();
+}
+
 /**
  * The effective segment view for one agent — every segment with its source
  * text, override text, and effective switch state. `switches` is the
@@ -105,8 +136,9 @@ export function listSourceSegments(agent: PromptAgent): Array<{ path: string; sh
 export function effectivePromptSegments(
 	agent: PromptAgent,
 	switches: Record<string, boolean>,
+	workspaceModules?: readonly string[],
 ): PromptSegmentInfo[] {
-	return listSourceSegments(agent).map((segment) => {
+	return listSourceSegments(agent, workspaceModules).map((segment) => {
 		let sourceText: string;
 		try {
 			sourceText = fs.readFileSync(segment.file, "utf-8");

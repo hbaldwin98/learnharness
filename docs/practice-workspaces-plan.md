@@ -8,7 +8,7 @@ Step 1's three open decisions were ruled on 2026-11-01 and are marked **Ruled**.
 
 ---
 
-## Step 1 — the workspace seam
+## Step 1 — the workspace seam (BUILT 2026-11-01)
 
 **Goal:** practice's `problem` can carry a workspace descriptor; modules register per layer; the dock switches on the module. **Ships with zero modules available**, so there is no visible or model-facing change: the problem schema, tool description and prompt are byte-identical to today when no module is available (pinned by a test).
 

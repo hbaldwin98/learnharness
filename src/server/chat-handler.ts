@@ -12,6 +12,7 @@ import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
+import { availableWorkspaceModules } from "./workspaces.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
 import type { ModelRole } from "../../config.ts";
@@ -64,6 +65,14 @@ import {
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
 import type {CallUsage} from "../core/contracts.ts";
+
+/** The source-prompt composition a record's agent runs (prompt-size
+ *  estimates): practice includes its available workspace doctrine. */
+function promptKindFor(kind: string | undefined): Parameters<typeof composeInstructions> {
+	return kind === "practice"
+		? ["practice", undefined, availableWorkspaceModules().map((m) => m.id)]
+		: ["teacher"];
+}
 
 /**
  * One chat turn over the server-owned native record. Framework-free (plain
@@ -294,7 +303,7 @@ export async function handleChatInput(
 				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
 			),
-			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : "teacher").length / 4),
+			systemPromptTokens: Math.ceil(composeInstructions(...promptKindFor(record.kind)).length / 4),
 		},
 		chatId,
 	);
@@ -489,6 +498,9 @@ export async function handleChatInput(
 							searchAvailable,
 						},
 						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
+						// PRACTICE WORKSPACES (plan step 1): the modules available
+						// this turn — none until step 2 registers the coding module.
+						workspaceModules: availableWorkspaceModules(),
 					},
 					agentOpts,
 				)
@@ -669,7 +681,7 @@ export async function handleChatInput(
 								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
 							),
-							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher").length / 4),
+							systemPromptTokens: Math.ceil(composeInstructions(...promptKindFor(freshRecord.kind)).length / 4),
 						};
 					}, chatId);
 			},

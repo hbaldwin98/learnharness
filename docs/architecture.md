@@ -75,6 +75,8 @@ Practice uses the same turn/persistence/recovery path, not a separate problem-se
 
 [Prompt composition](../src/agent/prompts/README.md) and [tool-content display recovery](tool-content-recovery.md) have separate references.
 
+**Workspaces** ([design](practice-workspaces.md)): `problem` can carry an optional `workspace` descriptor naming a module — a richer place to work than the thinking field. A module is one id with a piece per layer: the pure reader `workspaceOf` (`src/core/workspaces.ts`); its pose schema, pose-time verification and extra tools (`src/agent/workspaces/registry.ts`); the server's per-turn availability (`src/server/workspaces.ts`); and its UI (`components/workspaces/registry.ts`). The `workspace` field, its description sentence and the module's `prompts/workspace-<id>/` doctrine appear only while a module is available; an unavailable or unknown module is a correctable pose refusal, and verification errors leave the gate closed. An absent workspace is the thinking field, and an unknown module in a saved record falls back to it. No module is registered yet.
+
 ## Background work
 
 Research, PDF, demo, and visual tools persist jobs, acknowledge dispatch, and start independent workers through [`subagents/runner.ts`](../src/agent/subagents/runner.ts). Demos are checked using the browser helper; visuals use render-and-inspect loops. PDF/SVG rendering is native; demo execution uses Electron's browser service with system Chrome fallback.

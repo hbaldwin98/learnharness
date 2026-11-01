@@ -74,8 +74,12 @@ export type AgentKind = "prober" | "teacher" | "practice";
  *  tests/prompt-overrides.test.ts). Overrides are a static-file read
  *  through config paths, not request state — the store import carries no
  *  chat/job machinery. */
-export function composeInstructions(kind: AgentKind, switches?: Record<string, boolean>): string {
-	const segments = effectivePromptSegments(kind, switches ?? {});
+export function composeInstructions(
+	kind: AgentKind,
+	switches?: Record<string, boolean>,
+	workspaceModules: readonly string[] = [],
+): string {
+	const segments = effectivePromptSegments(kind, switches ?? {}, workspaceModules);
 	return segments
 		.map((s) => (s.enabled ? s.overrideText! : s.sourceText))
 		.map((t) => t.trim())
@@ -176,7 +180,12 @@ function makeQuestionStopper(kind: AgentKind) {
 	};
 }
 
-function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
+function baseAgentOptions(
+	kind: AgentKind,
+	opts: AgentBuildOptions,
+	tools: AgentTool<any, any>[],
+	workspaceModules: readonly string[] = [],
+) {
 	// Practice never reaches the role fallback (the handler ALWAYS injects
 	// the session's conversation engine — practice rides the same
 	// conversation-spec resolution as teaching); the cast keeps AgentKind
@@ -184,8 +193,10 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
 	const stopper = makeQuestionStopper(kind);
 	const narrationGuard = narrationGuardApplies(kind, engine.model, opts.tools !== undefined);
-	const composedPrompt = opts.promptSwitches
-		? composeInstructions(kind, opts.promptSwitches)
+	// Available workspace modules (practice only) add their doctrine, so
+	// the composition is per turn; with none, the cached path is unchanged.
+	const composedPrompt = opts.promptSwitches || workspaceModules.length > 0
+		? composeInstructions(kind, opts.promptSwitches, workspaceModules)
 		: composedInstructions[kind]!;
 	const systemPrompt = narrationGuard ? `${composedPrompt}\n\n---\n\n${SEND_TO_USER_DELIVERY_RULE}` : composedPrompt;
 	// Debug recorder (owner, 2026-10-04): raw provider events when
@@ -343,7 +354,7 @@ export function bareQuestionTools(): Record<string, AgentTool<any>> {
  */
 export function createPracticeAgent(ctx: PracticeToolContext, opts: AgentBuildOptions = {}) {
 	const tools = opts.tools ?? practiceTools(ctx);
-	return baseAgentOptions("practice", opts, Object.values(tools));
+	return baseAgentOptions("practice", opts, Object.values(tools), (ctx.workspaceModules ?? []).map((m) => m.id));
 }
 
 export type ProberAgent = ReturnType<typeof createProberAgent>;

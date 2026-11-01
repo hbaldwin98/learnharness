@@ -39,7 +39,7 @@ A **module** supplies:
 | Runner | Server-side execution | Docker containers (§4) |
 | Agent tools | Module-specific actions for the practice agent | Line annotations (§6) |
 | Trace contribution | What the module adds to the learner's trace | Code snapshots, run results (§6) |
-| Doctrine section | A prompt fragment, composed only when the module is active | Owner-authored |
+| Doctrine section | Prompt fragments in `prompts/workspace-<id>/`, composed whenever the module is available (the agent needs them to decide to pose one) | Owner-authored |
 
 The practice gate (`createPracticeGate` / `activeProblemOf`), `conclude`, dismissals, recovery and outcome projection stay shared.
 
