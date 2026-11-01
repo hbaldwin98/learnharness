@@ -50,7 +50,7 @@ The practice gate (`createPracticeGate` / `activeProblemOf`), `conclude`, dismis
 - **Docker is required for coding problems.** When Docker is missing or not running, the app refuses explicitly ("Docker isn't running") — the same refuse-don't-guess policy as missing credentials. No fallback to unsandboxed local execution.
 - **Images per language, pulled on demand** at first use, with visible progress. Official base images (node, python, dotnet/sdk, eclipse-temurin, golang, rust, gcc), extended with the test framework and language server for each. First builds are large (roughly 1 GB for .NET, 1.5 GB for Rust). **(ruled)** The app builds these images locally from Dockerfiles shipped in the repo, pinned with the code; no registry. Publishing prebuilt images from CI stays a later option if first-build time hurts.
 - **One warm container per active problem.** Started at pose time; runs execute inside it (`docker exec`), so a Run after the first is sub-second. Torn down at conclude/dismiss and on app exit; orphans are reaped at startup.
-- **Lockdown:** `--network none`, non-root user, read-only root filesystem with a writable scratch volume holding the workspace files. **Limits (ruled):** 60 s per build, 10 s per test run, 1 GB memory, 2 CPUs, 256 processes; output capped at 64 KB shown to the learner, of which 8 KB goes to the agent.
+- **Lockdown:** `--network none`, non-root user, read-only root filesystem with a writable scratch volume holding the workspace files. **Limits (ruled):** 60 s per build, 10 s per test run, 2 GiB memory (raised from 1 GB on 2026-11-01 to fit the language server beside a build), 2 CPUs, 256 processes; output capped at 64 KB shown to the learner, of which 8 KB goes to the agent.
 - **Languages: all seven at once (ruled):** JavaScript, TypeScript, Python, C#, Java, Go, Rust, C++ (C# and Java listed together, as are Go/Rust/C++).
 
 ## 5. Problems and tests
@@ -122,7 +122,7 @@ Delivery uses the existing wake path (`src/server/jobs.ts` idle wakes / live ste
 
 The workspace holds a file tree, the editor, a run/test output panel, the narration strip with the dictation toggle, and Run / Submit / Ask.
 
-**Editor (ruled): CodeMirror 6**, with **errors and warnings only (ruled)** from language servers — no autocomplete, hover, signature help or code actions. Language servers (tsserver, pyright, a C# server, jdtls, gopls, rust-analyzer, clangd) run inside the problem's container; their diagnostics relay over a server-side stdio ↔ browser bridge. The client advertises only diagnostic capabilities.
+**Editor (ruled): CodeMirror 6**, with **errors and warnings only (ruled)** from language servers — no autocomplete, hover, signature help or code actions. Language servers (typescript-language-server, basedpyright, csharp-ls, jdtls, gopls, rust-analyzer, clangd) run inside the problem's container. **The app's server is their only client (ruled 2026-11-01, replacing the earlier stdio ↔ browser relay):** it feeds them the saved files and visible tests, advertises only diagnostic capabilities, and hands the browser errors and warnings only, through the event bus and a diagnostics route. The browser never speaks LSP.
 
 **Persistence (ruled):** the workspace — files, open tabs, narration — comes back exactly as left across reload and restart.
 
@@ -180,7 +180,7 @@ All ten were ruled at the recommended defaults; each is written into its section
 | 4 | Annotation lifetime | Moves with its code; marked outdated when its lines are deleted | §6 |
 | 5 | Workspace storage | Per-problem store under `data/workspaces/`; snapshots in the record | §7 |
 | 6 | Interview outcomes | App-computed tests passed, time, asks/hints; verdict unchanged | §5 |
-| 7 | Limits | 60 s build, 10 s tests, 1 GB, 2 CPUs, 256 pids, 64 KB / 8 KB output | §4 |
+| 7 | Limits | 60 s build, 10 s tests, 2 GiB (was 1 GB), 2 CPUs, 256 pids, 64 KB / 8 KB output | §4 |
 | 8 | Naming | `workspace` / `WorkspaceModule` in code; learner sees "Coding" | §7 |
 | 9 | Enable switch | None — availability follows Docker installed / running | §8a |
 | 10 | Teacher exercises | Inline in the lesson; result returns like a quiz answer | §8b |

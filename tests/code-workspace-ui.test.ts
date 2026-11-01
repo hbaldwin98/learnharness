@@ -73,6 +73,10 @@ const fakeRunner = {
 	remove: async () => {},
 	reapAll: async () => {},
 	retainOnly: async () => {},
+	writeFiles: async () => {},
+	spawn: async () => {
+		throw new Error("no language server in this test");
+	},
 	run: async (req: { files: readonly CodeFile[] }) => {
 		runs.push({ files: req.files.map((f) => f.path) });
 		const solved = req.files.some((f) => f.path === "solution.py" && f.content.includes("[::-1]"));
@@ -156,6 +160,24 @@ describe("the saved workspace", () => {
 		saveMessages(chat.id, concluded);
 		assert.equal(server.loadWorkspace(chat.id, "call_p1").active, false);
 		assert.throws(() => server.saveWorkspace(chat.id, "call_p1", STARTER), (e: Error & { status?: number }) => e.status === 409);
+	});
+});
+
+describe("diagnostics (plan step 4)", () => {
+	it("loading an active problem starts its language server; the status is served; inactive = unavailable", async () => {
+		const chat = practiceChat();
+		const before = server.workspaceDiagnostics(chat.id, "call_p1");
+		assert.equal(before.status, "unavailable");
+		assert.equal(before.name, "Python");
+		server.loadWorkspace(chat.id, "call_p1");
+		// This fake runner can't spawn, so the session ends "crashed" after its one restart.
+		const end = Date.now() + 3000;
+		while (server.workspaceDiagnostics(chat.id, "call_p1").status !== "crashed" && Date.now() < end) await new Promise((r) => setTimeout(r, 20));
+		assert.equal(server.workspaceDiagnostics(chat.id, "call_p1").status, "crashed");
+		assert.throws(() => server.workspaceDiagnostics(chat.id, "call_missing"), (e: Error & { status?: number }) => e.status === 404);
+		server.reconcileWorkspaces(chat.id, []);
+		await new Promise((r) => setTimeout(r, 20));
+		assert.equal(server.workspaceDiagnostics(chat.id, "call_p1").status, "unavailable");
 	});
 });
 

@@ -17,6 +17,8 @@ import type { AgentWorkspaceModule } from "../agent/workspaces/registry.ts";
 import { CODE_MODULE_ID, createCodeModule } from "../agent/workspaces/code/module.ts";
 import type { DockerStatus } from "../agent/workspaces/code/runner.ts";
 import { createDockerRunner } from "./workspaces/docker-runner.ts";
+import { emit } from "../core/events.ts";
+import { createDiagnosticsSession, unavailableSnapshot, type DiagnosticsSession, type DiagnosticsSnapshot } from "../agent/workspaces/code/diagnostics.ts";
 
 type DockerRunner = ReturnType<typeof createDockerRunner>;
 
@@ -28,17 +30,44 @@ interface ModuleState {
 	code: AgentWorkspaceModule;
 	status: DockerStatus | null;
 	reaped: boolean;
+	/** Live language servers by problem (plan step 4). Optional so a state
+	 *  object made by an older module instance (or a test) still works. */
+	diagnostics?: Map<string, DiagnosticsSession>;
 }
 const STATE_KEY = Symbol.for("learnharness.workspaces");
 function state(): ModuleState {
 	const g = globalThis as unknown as Record<symbol, ModuleState | undefined>;
 	let s = g[STATE_KEY];
 	if (!s) {
-		const runner = createDockerRunner();
+		const runner = createDockerRunner({ onIdleRemoved: (key) => void stopDiagnostics(key.chatId, key.problemCallId) });
 		s = { runner, code: createCodeModule(runner), status: null, reaped: false };
 		g[STATE_KEY] = s;
 	}
 	return s;
+}
+
+const sessionKey = (chatId: string, problemCallId: string) => `${chatId}\0${problemCallId}`;
+function sessions(): Map<string, DiagnosticsSession> {
+	const s = state();
+	return (s.diagnostics ??= new Map());
+}
+
+/** Stop one problem's language server (idle removal, conclude, deletion). */
+async function stopDiagnostics(chatId: string, problemCallId: string): Promise<void> {
+	const key = sessionKey(chatId, problemCallId);
+	const session = sessions().get(key);
+	if (!session) return;
+	sessions().delete(key);
+	await session.stop().catch(() => {});
+	emit("workspace-diagnostics", { chatId, problemCallId });
+}
+
+/** Stop every language server of a chat except the kept problem's. */
+function stopChatDiagnostics(chatId: string, keep: string | null): void {
+	for (const key of [...sessions().keys()]) {
+		const [c, p] = key.split("\0") as [string, string];
+		if (c === chatId && p !== keep) void stopDiagnostics(c, p);
+	}
 }
 
 /** Refresh Docker's status (cached 30 s by the runner); reap leftover
@@ -69,6 +98,7 @@ export function reconcileWorkspaces(chatId: string, messages: readonly LhMessage
 	if (s.status !== "running") return;
 	const active = activeProblemOf(messages);
 	const keep = active && workspaceOf(active.input)?.module === CODE_MODULE_ID ? active.toolCallId : null;
+	stopChatDiagnostics(chatId, keep);
 	void s.runner.retainOnly(chatId, keep).catch(() => {});
 }
 
@@ -113,6 +143,7 @@ function codeProblem(chatId: string, problemCallId: string): { pose: CodePose; a
 export function loadWorkspace(chatId: string, problemCallId: string): WorkspaceState {
 	const { pose, active } = codeProblem(chatId, problemCallId);
 	const record = getWorkspace(chatId, problemCallId);
+	if (active) ensureDiagnostics(chatId, problemCallId, pose, record?.files ?? pose.files);
 	return {
 		language: pose.language,
 		files: record?.files ?? pose.files,
@@ -140,6 +171,47 @@ export function saveWorkspace(chatId: string, problemCallId: string, files: unkn
 	const bytes = next.reduce((n, f) => n + Buffer.byteLength(f.content, "utf8"), 0);
 	if (bytes > MAX_WORKSPACE_BYTES) throw new WorkspaceError(`files too large (${bytes} bytes; at most ${MAX_WORKSPACE_BYTES})`, 413);
 	mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({ ...r, files: next }));
+	// The saves feed the language server (plan step 4: one write path).
+	sessions().get(sessionKey(chatId, problemCallId))?.update(next);
+}
+
+// ─── language-server diagnostics (plan step 4) ───────────────────────────────
+
+/** Start the problem's language server if it isn't running (the pane's
+ *  load). Fire-and-forget: Docker down = "unavailable". */
+function ensureDiagnostics(chatId: string, problemCallId: string, pose: CodePose, files: readonly CodeFile[]): void {
+	const key = sessionKey(chatId, problemCallId);
+	if (sessions().has(key) || starting.has(key)) return;
+	starting.add(key);
+	void (async () => {
+		try {
+			// Also reaps leftovers on the first sight of a running Docker.
+			await refreshWorkspaceAvailability();
+			const s = state();
+			if (s.status !== "running" || sessions().has(key)) return;
+			const session = createDiagnosticsSession({
+				runner: s.runner,
+				key: { chatId, problemCallId },
+				language: pose.language,
+				files,
+				visibleTests: pose.tests.visible,
+				onChange: () => emit("workspace-diagnostics", { chatId, problemCallId }),
+			});
+			sessions().set(key, session);
+			emit("workspace-diagnostics", { chatId, problemCallId });
+		} finally {
+			starting.delete(key);
+		}
+	})();
+}
+const starting = new Set<string>();
+
+/** The latest diagnostics and server status for the pane. */
+export function workspaceDiagnostics(chatId: string, problemCallId: string): DiagnosticsSnapshot {
+	const { pose, active } = codeProblem(chatId, problemCallId);
+	const session = sessions().get(sessionKey(chatId, problemCallId));
+	if (!session || !active) return unavailableSnapshot(pose.language);
+	return session.snapshot();
 }
 
 /** The learner's current files (saved, else the starter) — the thinking
@@ -208,6 +280,7 @@ export async function runWorkspace(
 
 /** Session deletion: the chat's saved workspaces and containers. */
 export function forgetChatWorkspaces(chatId: string): void {
+	stopChatDiagnostics(chatId, null);
 	deleteChatWorkspaces(chatId);
 	const s = state();
 	if (s.status === "running") void s.runner.retainOnly(chatId, null).catch(() => {});

@@ -79,3 +79,28 @@ export function describeRunResult(result: WorkspaceRunResult): string {
 	if (!result.ok && result.output && (result.phase === "build" || result.visible.length === 0)) lines.push("Output:\n" + result.output);
 	return lines.join("\n");
 }
+
+// ─── language-server diagnostics (plan step 4) ───────────────────────────────
+
+/** One error or warning, 0-based positions (LSP lines and UTF-16 columns). */
+export interface CodeDiagnostic {
+	path: string;
+	line: number;
+	column: number;
+	endLine: number;
+	endColumn: number;
+	severity: "error" | "warning";
+	message: string;
+	source?: string;
+}
+
+export type DiagnosticsStatus = "starting" | "ready" | "crashed" | "unavailable";
+
+/** What the pane fetches (GET …/diagnostics). */
+export interface DiagnosticsSnapshot {
+	status: DiagnosticsStatus;
+	/** "Python", "C#", … for the status line. */
+	name: string;
+	/** Errors and warnings by file (learner files and visible tests only). */
+	files: Record<string, CodeDiagnostic[]>;
+}

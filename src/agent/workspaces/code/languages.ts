@@ -41,7 +41,63 @@ export interface LanguageSpec {
 	report: string | null;
 	/** Report (file contents, or stdout when report is null) → results. */
 	parse(report: string): TestCaseResult[];
+	/** The language server (plan step 4). */
+	lsp: LspSpec;
 }
+
+/** How a language's server runs in /work/lsp (plan step 4). */
+export interface LspSpec {
+	/** For the pane's status line ("Starting the Python language server…"). */
+	name: string;
+	/** Shell command that becomes the server (stdio), run in /work/lsp. */
+	command: string;
+	/** Shell run once in /work/lsp after the files land, before the start. */
+	setup?: string;
+	/** Config files the app writes beside the learner's (never shown). */
+	config: CodeFile[];
+	languageId(path: string): string;
+	initializationOptions?: unknown;
+	settings?: Record<string, unknown>;
+	/** initialize may take this long (jdtls, csharp-ls). */
+	initializeTimeoutMs?: number;
+}
+
+/** The directory the language server works in (beside /work/run). */
+export const LSP_ROOT = "/work/lsp";
+
+const TS_BIN = "/opt/lsp/node_modules/.bin/typescript-language-server";
+const TS_INIT = { tsserver: { path: "/opt/lsp/node_modules/typescript/lib" } };
+const tsconfig = (strict: boolean) => ({
+	path: "tsconfig.json",
+	content: JSON.stringify(
+		{
+			compilerOptions: {
+				target: "esnext",
+				module: "nodenext",
+				moduleResolution: "nodenext",
+				noEmit: true,
+				allowJs: true,
+				checkJs: true,
+				strict,
+				skipLibCheck: true,
+				...(strict ? { allowImportingTsExtensions: true, erasableSyntaxOnly: true, verbatimModuleSyntax: true } : {}),
+				types: ["node"],
+				typeRoots: ["/opt/lsp/node_modules/@types"],
+			},
+			include: ["**/*"],
+		},
+		null,
+		"\t",
+	),
+});
+/** jdtls runs on Java 25 (/opt/jre25) but checks against the image's 21. */
+const JAVA_SETTINGS = {
+	java: {
+		project: { referencedLibraries: ["/opt/lh/junit.jar"] },
+		configuration: { runtimes: [{ name: "JavaSE-21", path: "/opt/java/openjdk", default: true }] },
+	},
+};
+const RUST_SETTINGS = { cargo: { targetDir: true }, checkOnSave: true, check: { command: "check", allTargets: true } };
 
 // ─── report parsers ──────────────────────────────────────────────────────────
 
@@ -155,6 +211,13 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: "node --test --test-reporter=junit --test-reporter-destination=report.xml",
 		report: "report.xml",
 		parse: parseJUnitXml,
+		lsp: {
+			name: "JavaScript",
+			command: `${TS_BIN} --stdio`,
+			config: [tsconfig(false)],
+			languageId: () => "javascript",
+			initializationOptions: TS_INIT,
+		},
 	},
 	typescript: {
 		id: "typescript",
@@ -169,6 +232,13 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: "node --test --test-reporter=junit --test-reporter-destination=report.xml",
 		report: "report.xml",
 		parse: parseJUnitXml,
+		lsp: {
+			name: "TypeScript",
+			command: `${TS_BIN} --stdio`,
+			config: [tsconfig(true)],
+			languageId: (p) => (/\.[cm]?js$/.test(p) ? "javascript" : "typescript"),
+			initializationOptions: TS_INIT,
+		},
 	},
 	python: {
 		id: "python",
@@ -182,6 +252,13 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: "python -m pytest -q -p no:cacheprovider --junitxml=report.xml",
 		report: "report.xml",
 		parse: parseJUnitXml,
+		lsp: {
+			name: "Python",
+			command: "basedpyright-langserver --stdio",
+			config: [{ path: "pyrightconfig.json", content: '{ "typeCheckingMode": "standard" }\n' }],
+			languageId: () => "python",
+			settings: { basedpyright: { analysis: { typeCheckingMode: "standard" } } },
+		},
 	},
 	csharp: {
 		id: "csharp",
@@ -196,6 +273,14 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: 'dotnet test --no-build -nologo -v q --logger "junit;LogFilePath=report.xml"',
 		report: "report.xml",
 		parse: parseJUnitXml,
+		lsp: {
+			name: "C#",
+			setup: "dotnet restore -nologo -v q >/dev/null 2>&1 || true",
+			command: "/opt/lsp/csharp-ls",
+			config: [],
+			languageId: () => "csharp",
+			initializeTimeoutMs: 180_000,
+		},
 	},
 	java: {
 		id: "java",
@@ -209,6 +294,20 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: "java -jar /opt/lh/junit.jar execute --class-path out --scan-class-path --disable-banner --reports-dir=reports",
 		report: "reports/TEST-junit-jupiter.xml",
 		parse: parseJUnitXml,
+		lsp: {
+			name: "Java",
+			setup: "mkdir -p /work/.jdtls/config && cp -r /opt/jdtls/config_linux/. /work/.jdtls/config/",
+			command:
+				"exec /opt/jre25/bin/java -Declipse.application=org.eclipse.jdt.ls.core.id1 -Dosgi.bundles.defaultStartLevel=4 " +
+				"-Declipse.product=org.eclipse.jdt.ls.core.product -Dlog.level=ERROR -Xmx768m -XX:+UseSerialGC " +
+				"--add-modules=ALL-SYSTEM --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED " +
+				"-jar $(ls /opt/jdtls/plugins/org.eclipse.equinox.launcher_*.jar) -configuration /work/.jdtls/config -data /work/.jdtls/data",
+			config: [],
+			languageId: () => "java",
+			initializationOptions: { settings: JAVA_SETTINGS },
+			settings: JAVA_SETTINGS,
+			initializeTimeoutMs: 180_000,
+		},
 	},
 	go: {
 		id: "go",
@@ -222,6 +321,12 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: "go test -count=1 -json ./...",
 		report: null,
 		parse: parseGoTestJson,
+		lsp: {
+			name: "Go",
+			command: "gopls",
+			config: [],
+			languageId: () => "go",
+		},
 	},
 	rust: {
 		id: "rust",
@@ -236,6 +341,14 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: "cargo test --offline --quiet --no-fail-fast -- --format=pretty --test-threads=1",
 		report: null,
 		parse: parseLibtest,
+		lsp: {
+			name: "Rust",
+			command: "rust-analyzer",
+			config: [],
+			languageId: () => "rust",
+			initializationOptions: RUST_SETTINGS,
+			settings: { "rust-analyzer": RUST_SETTINGS },
+		},
 	},
 	cpp: {
 		id: "cpp",
@@ -250,6 +363,12 @@ export const LANGUAGES: Record<CodeLanguage, LanguageSpec> = {
 		test: "./lh_tests --reporters=junit --out=report.xml --no-intro",
 		report: "report.xml",
 		parse: parseJUnitXml,
+		lsp: {
+			name: "C++",
+			command: "clangd --log=error --background-index=false",
+			config: [{ path: "compile_flags.txt", content: "-std=c++20\n-I/opt/lh/include\n-xc++\n" }],
+			languageId: () => "cpp",
+		},
 	},
 };
 

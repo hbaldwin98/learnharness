@@ -10,7 +10,7 @@
  * until removed (owner ruling).
  *
  * Containers: one warm, locked-down container per active problem (no
- * network, read-only root, tmpfs /work and /tmp, uid 1000, 1 GB, 2 CPUs,
+ * network, read-only root, tmpfs /work and /tmp, uid 1000, 2 GiB, 2 CPUs,
  * 256 pids, no capabilities, no-new-privileges), auto-removed when
  * stopped. Files enter by a tar stream on an exec's stdin — nothing is
  * mounted, and the archive API can't write into a tmpfs mount. Each run
@@ -22,7 +22,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { Readable, Writable } from "node:stream";
+import { PassThrough, Readable, Writable } from "node:stream";
 import Docker from "dockerode";
 import { PATHS } from "../../../config.ts";
 import type { CodeImage } from "../../agent/workspaces/code/languages.ts";
@@ -159,11 +159,23 @@ async function exec(
 	return { code: info.Running ? null : info.ExitCode, stdout: out.text(), stderr: err.text(), timedOut: false };
 }
 
+/** Extract the tar on stdin into `dir`, then stamp exactly the extracted
+ *  files with the current time at full precision. The tar header holds
+ *  whole seconds, so a file rewritten within the second of the last build
+ *  could look no newer than that build's outputs: cargo (and MSBuild)
+ *  would skip the rebuild and report the previous result, and Eclipse
+ *  (jdtls) would keep the old text. */
+export const extractFresh = (dir: string) =>
+	`list=$(mktemp) && tar -x -v -C ${dir} > "$list" && (cd ${dir} && xargs -r -d '\\n' touch -c -- < "$list"); s=$?; rm -f "$list"; exit $s`;
+
 const isTimeout = (r: ExecResult) => r.timedOut || r.code === 124 || r.code === 137;
 
 export interface DockerRunnerOptions {
 	/** Idle removal sweep (tests disable it). */
 	sweep?: boolean;
+	/** A container was removed for idleness (its language server must stop
+	 *  too, or its restart would bring the container back). */
+	onIdleRemoved?: (key: ProblemKey) => void;
 }
 
 export function createDockerRunner(options: DockerRunnerOptions = {}): CodeRunner & {
@@ -199,7 +211,11 @@ export function createDockerRunner(options: DockerRunnerOptions = {}): CodeRunne
 	if (options.sweep !== false) {
 		setInterval(() => {
 			const now = Date.now();
-			for (const [name, entry] of lastUsed) if (now - entry.at > IDLE_MS) void removeByName(name);
+			for (const [name, entry] of lastUsed) {
+				if (now - entry.at <= IDLE_MS) continue;
+				options.onIdleRemoved?.(entry.key);
+				void removeByName(name);
+			}
 		}, 5 * 60_000).unref();
 	}
 
@@ -223,8 +239,8 @@ export function createDockerRunner(options: DockerRunnerOptions = {}): CodeRunne
 				NetworkMode: "none",
 				ReadonlyRootfs: true,
 				Tmpfs: { "/work": "rw,exec,nosuid,size=768m,mode=1777", "/tmp": "rw,exec,nosuid,size=256m,mode=1777" },
-				Memory: GIB,
-				MemorySwap: GIB,
+				Memory: 2 * GIB,
+				MemorySwap: 2 * GIB,
 				NanoCpus: 2_000_000_000,
 				PidsLimit: 256,
 				SecurityOpt: ["no-new-privileges"],
@@ -308,7 +324,7 @@ export function createDockerRunner(options: DockerRunnerOptions = {}): CodeRunne
 				try {
 					const prepared = await exec(container, modem, ["sh", "-c", "rm -rf /work/run && mkdir -p /work/run && cp -a /opt/scaffold/. /work/run/"], { timeoutMs: 30_000, ...sig });
 					if (prepared.code !== 0) throw new Error(`could not prepare the run: ${prepared.stderr.trim()}`);
-					const copied = await exec(container, modem, ["tar", "-x", "-C", "/work/run"], { stdin: tarFiles(files), timeoutMs: 30_000, ...sig });
+					const copied = await exec(container, modem, ["sh", "-c", extractFresh("/work/run")], { stdin: tarFiles(files), timeoutMs: 30_000, ...sig });
 					if (copied.code !== 0) throw new Error(`could not copy the files: ${copied.stderr.trim()}`);
 
 					const outcomes: StepOutcome[] = [];
@@ -355,6 +371,67 @@ export function createDockerRunner(options: DockerRunnerOptions = {}): CodeRunne
 		},
 
 		remove,
+
+		async writeFiles({ key, image, dir, files, fresh }) {
+			const name = containerName(key);
+			const container = await ensureContainer(key, imageTag(image));
+			lastUsed.set(name, { key, at: Date.now() });
+			const modem = docker().modem;
+			if (fresh) {
+				const prepared = await exec(
+					container,
+					modem,
+					["sh", "-c", `rm -rf ${dir} && mkdir -p ${dir} /work/.home && cp -a /opt/scaffold/. ${dir}/`],
+					{ timeoutMs: 30_000 },
+				);
+				if (prepared.code !== 0) throw new Error(`could not prepare ${dir}: ${prepared.stderr.trim()}`);
+			}
+			const copied = await exec(container, modem, ["sh", "-c", extractFresh(dir)], { stdin: tarFiles(files), timeoutMs: 30_000 });
+			if (copied.code !== 0) throw new Error(`could not copy the files: ${copied.stderr.trim()}`);
+		},
+
+		async spawn({ key, image, command, workingDir }) {
+			const name = containerName(key);
+			const container = await ensureContainer(key, imageTag(image));
+			lastUsed.set(name, { key, at: Date.now() });
+			const created = await container.exec({
+				Cmd: ["sh", "-c", command],
+				AttachStdin: true,
+				AttachStdout: true,
+				AttachStderr: true,
+				Tty: false,
+				WorkingDir: workingDir,
+			});
+			const stream = await created.start({ hijack: true, stdin: true });
+			const stdout = new PassThrough();
+			// stderr is the server's own log: drained, never shown.
+			const stderr = new Writable({ write: (_c, _e, cb) => cb() });
+			docker().modem.demuxStream(stream, stdout, stderr);
+			const exited = new Promise<void>((resolve) => {
+				const done = () => {
+					stdout.end();
+					resolve();
+				};
+				stream.on("end", done);
+				stream.on("close", done);
+				stream.on("error", done);
+			});
+			const stdin = new Writable({
+				write(chunk, _encoding, callback) {
+					stream.write(chunk, callback);
+				},
+				final(callback) {
+					stream.end();
+					callback();
+				},
+			});
+			return {
+				stdin,
+				stdout,
+				exited,
+				kill: () => stream.destroy(),
+			};
+		},
 
 		/** Remove every workspace container (server startup). */
 		async reapAll() {

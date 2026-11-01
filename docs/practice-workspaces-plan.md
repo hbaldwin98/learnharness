@@ -267,7 +267,7 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Step 4 — language servers (PLANNED, awaiting approval)
+## Step 4 — language servers (BUILT 2026-11-01)
 
 **Goal:** while the learner types, the editor underlines errors and warnings from a real language server for the problem's language. Nothing else from the server: no completion, hover, signature help or code actions.
 
@@ -303,6 +303,20 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 - **Live check:** in the app, a type error in each of two languages (Python and one compiled language) underlines and clears.
 
 **Risks:** jdtls and csharp-ls are slow to start; the offline setups (Java's referenced library, C#'s restore) are the likeliest places to need fixing during the build; image build time grows.
+
+**Built (2026-11-01).** Versions pinned (each at least two weeks old): typescript-language-server 6.0.2 with TypeScript 6.0.3 and @types/node 24.19.2; basedpyright 1.40.2; csharp-ls 0.28.0; jdtls 1.62.0; gopls 0.20.0; rust-analyzer and rust-src from the image's toolchain; clangd from Debian trixie; @codemirror/lint 6.9.7.
+
+**Decided while building (recommended defaults):**
+- **TypeScript 6, not 7:** TS 7 (the native port) ships no tsserver, which typescript-language-server needs.
+- **gopls 0.20.0:** the newest release that builds with the image's Go 1.24; later ones need Go 1.25 to 1.27.
+- **csharp-ls on .NET 10:** csharp-ls 0.28 targets .NET 10, so a `sdk:10.0` stage installs it and copies the 10 runtime beside the 9 SDK. Learners still build with .NET 9.
+- **jdtls on Java 25:** jdtls 1.62 needs Java 25, so a `temurin:25-jre` stage provides `/opt/jre25` for the server alone. It checks the code against the image's Java 21 via `java.configuration.runtimes`, and learners still run Java 21.
+- **Container lifetime:** the runner's idle sweep now tells the server to stop that problem's language server (`onIdleRemoved`), so a restart after idle removal can't bring the container back. The language server also starts only after the same availability refresh that reaps leftover containers.
+- **Fixtures moved:** the per-language fixtures moved to `tests/helpers/code-fixtures.ts`, shared by both real-Docker suites.
+- **One-shot commands keep stdin open:** the language setup scripts and the test's file listing don't close the exec's stdin. On Docker Desktop for Windows a half-close could drop the exec before its output arrived.
+- **Fixed a step 2 bug: copied files are re-stamped at full precision.** Tar headers carry whole seconds. A file rewritten within the same second as the last build looked no newer than that build's output, so cargo (and MSBuild) skipped the rebuild and reported the previous result: a broken Rust starter passed verification, and a Run could show stale results. jdtls likewise kept the old text. After each extraction the runner now touches exactly the extracted files (`extractFresh`). The real-Docker suites caught it once step 4's faster warm runs made the timing likely; both now pass 41/41.
+
+**Tests:** `tests/code-lsp.test.ts` (framing, normalization, the client against a fake server, the session over a fake runner including restart-then-crashed, the table, position mapping); `tests/code-workspace-ui.test.ts` (the diagnostics status served and stopped by reconcile); `tests/code-lsp-docker.test.ts` (opt-in, all eight languages: a syntax error appears and clears, hidden tests absent from `/work/lsp`).
 
 ---
 

@@ -55,6 +55,23 @@ export interface CodeRunner {
 	}): Promise<RunOutcome>;
 	/** Remove the problem's container. */
 	remove(key: ProblemKey): Promise<void>;
+	/** Write files into a directory of the problem's container (created,
+	 *  with the image's scaffold, when `fresh`). Plan step 4: the language
+	 *  server's /work/lsp. Counts as activity for the idle sweep. */
+	writeFiles(request: { key: ProblemKey; image: CodeImage; dir: string; files: readonly CodeFile[]; fresh?: boolean }): Promise<void>;
+	/** Start a long-lived process in the problem's container with its
+	 *  stdio piped (plan step 4: the language server). It ends when its
+	 *  stdin closes, when it exits, or with the container. */
+	spawn(request: { key: ProblemKey; image: CodeImage; command: string; workingDir: string }): Promise<SpawnedProcess>;
+}
+
+export interface SpawnedProcess {
+	stdin: import("node:stream").Writable;
+	stdout: import("node:stream").Readable;
+	/** Resolves when the process's streams end. */
+	exited: Promise<void>;
+	/** Close its stdio (the process normally exits on EOF). */
+	kill(): void;
 }
 
 /** Limits (owner-ruled): 60 s per build, 10 s per test run. */

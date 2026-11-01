@@ -12,7 +12,7 @@ import { LANGUAGES, parseGoTestJson, parseJUnitXml, parseLibtest, type CodeFile 
 import { createCodeModule, overlay, validateCodePose, type CodePose } from "../src/agent/workspaces/code/module.ts";
 import { capOutput, runCode, type CodeRunner, type DockerStatus, type RunOutcome } from "../src/agent/workspaces/code/runner.ts";
 import { tarFiles } from "../src/server/workspaces/tar.ts";
-import { containerName, imageTag } from "../src/server/workspaces/docker-runner.ts";
+import { containerName, extractFresh, imageTag } from "../src/server/workspaces/docker-runner.ts";
 
 const f = (path: string, content = "x"): CodeFile => ({ path, content });
 
@@ -163,6 +163,10 @@ function fakeRunner(opts: { status?: DockerStatus; image?: boolean; reference?: 
 		remove: async (key) => {
 			calls.push(`remove:${key.problemCallId}`);
 		},
+		writeFiles: async () => {},
+		spawn: async () => {
+			throw new Error("not used");
+		},
 	};
 	return { runner, calls };
 }
@@ -244,6 +248,10 @@ describe("runCode", () => {
 		ensureImage: async () => ({ ok: true }),
 		run: async () => outcome,
 		remove: async () => {},
+		writeFiles: async () => {},
+		spawn: async () => {
+			throw new Error("not used");
+		},
 	});
 	const key = { chatId: "c", problemCallId: "p" };
 
@@ -395,5 +403,18 @@ describe("Docker engine discovery", () => {
 		assert.equal(dockerInstalled(engineEnv({}, { env: { PATH: "/usr/bin" } })), false);
 		assert.equal(dockerInstalled(engineEnv({}, { env: { DOCKER_HOST: "tcp://h:2375" } })), true);
 		assert.equal(dockerInstalled(engineEnv({ "C:/Program Files/Docker/Docker/resources/bin/docker.exe": "" }, { platform: "win32", env: { ProgramFiles: "C:\\Program Files" } })), true);
+	});
+});
+
+describe("copying files into a container", () => {
+	// Whole-second tar mtimes let cargo/MSBuild skip a rebuild (and jdtls keep
+	// old text) when a file is rewritten within the second of the last build:
+	// the extracted files are re-stamped at full precision, and a tar failure
+	// still fails the copy.
+	it("extracts, re-stamps exactly the extracted files, and keeps tar's exit status", () => {
+		const cmd = extractFresh("/work/run");
+		assert.match(cmd, /tar -x -v -C \/work\/run > "\$list" &&/);
+		assert.match(cmd, /cd \/work\/run && xargs -r -d '\\n' touch -c -- < "\$list"/);
+		assert.match(cmd, /s=\$\?; rm -f "\$list"; exit \$s$/);
 	});
 });

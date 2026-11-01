@@ -14,6 +14,9 @@
 
 import { useEffect, useRef } from "react";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import { lintGutter, setDiagnostics } from "@codemirror/lint";
+import type { CodeDiagnostic } from "@/src/core";
+import { toEditorDiagnostics } from "./diagnostic-positions";
 import {
 	EditorView,
 	crosshairCursor,
@@ -110,6 +113,12 @@ const theme = EditorView.theme(
 		".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },
 		".cm-panels": { backgroundColor: "var(--card)", color: "var(--foreground)", borderColor: "var(--border)" },
 		".cm-panels-bottom": { borderTop: "1px solid var(--border)", fontFamily: "var(--font-mono)", fontSize: "12px" },
+		".cm-tooltip": { backgroundColor: "var(--card)", color: "var(--foreground)", border: "1px solid var(--border)", borderRadius: "6px" },
+		".cm-tooltip-lint": { fontFamily: "var(--font-mono)", fontSize: "12px", maxWidth: "36rem" },
+		".cm-diagnostic": { padding: "4px 8px", whiteSpace: "pre-wrap" },
+		".cm-diagnostic-error": { borderLeft: "3px solid #ef4444" },
+		".cm-diagnostic-warning": { borderLeft: "3px solid #f59e0b" },
+		".cm-diagnosticSource": { color: "var(--muted-foreground)" },
 		".cm-matchingBracket": { backgroundColor: "color-mix(in oklab, var(--primary) 18%, transparent)", outline: "none" },
 		".cm-fat-cursor": { background: "color-mix(in oklab, var(--foreground) 70%, transparent) !important", color: "var(--background) !important" },
 		"&:not(.cm-focused) .cm-fat-cursor": { background: "none !important", outline: "1px solid var(--muted-foreground)" },
@@ -125,9 +134,11 @@ export interface CodeEditorProps {
 	onChange?: (content: string) => void;
 	/** Focus on mount (the active tab). */
 	autoFocus?: boolean;
+	/** The language server's errors and warnings for this file. */
+	diagnostics?: readonly CodeDiagnostic[];
 }
 
-export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange, autoFocus }: CodeEditorProps) {
+export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange, autoFocus, diagnostics }: CodeEditorProps) {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const viewRef = useRef<EditorView | null>(null);
 	const vimSlot = useRef(new Compartment());
@@ -163,6 +174,7 @@ export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange,
 					highlightSelectionMatches(),
 					keymap.of([...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
 					languageFor(path),
+					lintGutter(),
 					theme,
 					EditorState.readOnly.of(readOnly),
 					EditorView.editable.of(!readOnly),
@@ -185,6 +197,17 @@ export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange,
 	useEffect(() => {
 		viewRef.current?.dispatch({ effects: vimSlot.current.reconfigure(vimMode ? vim({ status: true }) : []) });
 	}, [vimMode]);
+
+	// The language server's errors and warnings (plan step 4). They were
+	// computed for the last save; positions are clamped to the current text,
+	// and the lint extension maps them through later edits itself.
+	const diagnosticsKey = JSON.stringify(diagnostics ?? []);
+	useEffect(() => {
+		const view = viewRef.current;
+		if (!view) return;
+		view.dispatch(setDiagnostics(view.state, toEditorDiagnostics(view.state.doc, diagnostics ?? [])));
+		// diagnosticsKey stands in for the array (a new array each fetch).
+	}, [diagnosticsKey]);
 
 	return (
 		<div

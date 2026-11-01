@@ -19,10 +19,13 @@ import {
 	bindingForAction,
 	formatBinding,
 	kbdEventForAction,
+	type CodeDiagnostic,
 	type CodeFile,
+	type DiagnosticsSnapshot,
 	type WorkspaceRunResult,
 	type WorkspaceState,
 } from "@/src/core";
+import { useServerEvent } from "@/components/server-events";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { registerWorkspaceFlush } from "@/components/workspaces/flush";
@@ -41,8 +44,9 @@ const LANGUAGE_LABEL: Record<string, string> = {
 	cpp: "C++",
 };
 
-/** How long typing settles before the files save. */
-const SAVE_DEBOUNCE_MS = 600;
+/** How long typing settles before the files save (and the language server
+ *  sees them — plan step 4 cut it from 600 ms). */
+const SAVE_DEBOUNCE_MS = 400;
 
 const url = (chatId: string, callId: string) =>
 	`/api/workspaces/${encodeURIComponent(chatId)}/${encodeURIComponent(callId)}`;
@@ -61,6 +65,7 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 	const [runError, setRunError] = useState<string | null>(null);
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const vimMode = useVimEnabled();
+	const diagnostics = useDiagnostics(chatId, problemCallId, state !== null);
 
 	// The live files (the editors own their documents; this mirrors them for
 	// saving) and the save machinery.
@@ -272,6 +277,7 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 					>
 						{readOnly && <LockIcon className="size-3" aria-label="read-only" />}
 						{file.path}
+						<ProblemDot list={diagnostics?.files[file.path]} />
 					</button>
 				))}
 			</div>
@@ -284,10 +290,12 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 							readOnly={readOnly || !state.active}
 							vimMode={vimMode}
 							onChange={readOnly ? undefined : (content) => onEdit(file.path, content)}
+							diagnostics={diagnostics?.files[file.path]}
 						/>
 					</div>
 				))}
 			</div>
+			<ServerStatus snapshot={diagnostics} />
 			{saveError && (
 				<p role="alert" className="shrink-0 border-t border-border/70 px-3 py-1 text-xs text-destructive">
 					Not saved: {saveError}
@@ -413,6 +421,83 @@ function ResultPanel({
 	return (
 		<div data-testid="workspace-results" className="max-h-[40%] shrink-0 overflow-y-auto border-t border-border/70 px-3 py-2 text-sm">
 			{body}
+		</div>
+	);
+}
+
+/** The problem's language-server diagnostics (plan step 4): fetched once
+ *  the workspace has loaded (the load starts the server) and again on each
+ *  workspace-diagnostics bus event for this problem — one fetch in flight,
+ *  one more queued behind it. */
+function useDiagnostics(chatId: string, problemCallId: string, loaded: boolean): DiagnosticsSnapshot | null {
+	const [snapshot, setSnapshot] = useState<DiagnosticsSnapshot | null>(null);
+	const inflight = useRef(false);
+	const again = useRef(false);
+	const alive = useRef(true);
+	useEffect(() => {
+		alive.current = true;
+		return () => {
+			alive.current = false;
+		};
+	}, []);
+
+	const refetch = useCallback(() => {
+		if (inflight.current) {
+			again.current = true;
+			return;
+		}
+		inflight.current = true;
+		void fetch(`${url(chatId, problemCallId)}/diagnostics`)
+			.then((res) => (res.ok ? (res.json() as Promise<DiagnosticsSnapshot>) : null))
+			.then((s) => {
+				if (s && alive.current) setSnapshot(s);
+			})
+			.catch(() => {})
+			.finally(() => {
+				inflight.current = false;
+				if (again.current) {
+					again.current = false;
+					refetch();
+				}
+			});
+	}, [chatId, problemCallId]);
+
+	useEffect(() => {
+		if (loaded) refetch();
+	}, [loaded, refetch]);
+	useServerEvent("workspace-diagnostics", (p) => {
+		if (p.chatId === chatId && p.problemCallId === problemCallId) refetch();
+	});
+	return snapshot;
+}
+
+/** A tab's marker: red for errors, amber for warnings only. */
+function ProblemDot({ list }: { list: readonly CodeDiagnostic[] | undefined }) {
+	if (!list || list.length === 0) return null;
+	const errors = list.filter((d) => d.severity === "error").length;
+	const warnings = list.length - errors;
+	return (
+		<span
+			data-testid="workspace-tab-problems"
+			title={[errors && `${errors} error${errors === 1 ? "" : "s"}`, warnings && `${warnings} warning${warnings === 1 ? "" : "s"}`].filter(Boolean).join(", ")}
+			className={cn("size-1.5 rounded-full", errors > 0 ? "bg-red-500" : "bg-amber-500")}
+		/>
+	);
+}
+
+/** The quiet line under the editor while the server isn't ready. */
+function ServerStatus({ snapshot }: { snapshot: DiagnosticsSnapshot | null }) {
+	if (!snapshot || snapshot.status === "ready" || snapshot.status === "unavailable") return null;
+	return (
+		<div data-testid="workspace-lsp-status" className="flex shrink-0 items-center gap-1.5 border-t border-border/70 px-3 py-1 text-xs text-muted-foreground">
+			{snapshot.status === "starting" ? (
+				<>
+					<LoaderCircleIcon className="size-3 animate-spin" />
+					Starting the {snapshot.name} language server…
+				</>
+			) : (
+				<>Error checking stopped: the {snapshot.name} language server crashed. Reopen the workspace to restart it.</>
+			)}
 		</div>
 	);
 }
