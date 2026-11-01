@@ -83,11 +83,11 @@ const nextConfig: NextConfig = {
 			// npm installs only the current platform's binary, so this glob
 			// resolves to exactly one Skia binary per build.
 			"node_modules/@napi-rs/canvas-*/**/*",
-			// Pi-compatible image resizing runs in an unbundled worker. Photon
-			// loads its colocated WASM through Node, also in packaged Electron.
 			// Practice coding workspaces (plan step 2): the server builds the
 			// language images from these Dockerfiles at runtime.
 			"docker/workspace-code/**/*",
+			// Pi-compatible image resizing runs in an unbundled worker. Photon
+			// loads its colocated WASM through Node, also in packaged Electron.
 			"src/agent/image-processing/*.mjs",
 			"src/agent/image-processing/LICENSE",
 			"node_modules/@silvia-odwyer/photon-node/**/*",
@@ -121,6 +121,7 @@ const nextConfig: NextConfig = {
 		"@napi-rs/canvas", // native binding — bundling breaks the .node require
 		"@silvia-odwyer/photon-node", // CJS loads its adjacent WASM from disk
 		"@resvg/resvg-js", // native binding — same
+		"dockerode", // practice coding workspaces: ssh2's optional native add-on and runtime requires
 	],
 };
 

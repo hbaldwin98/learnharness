@@ -101,7 +101,7 @@ The split-view layout is step 3. In step 1 a registered workspace would render w
 
 ---
 
-## Step 2 — the Docker runner and the `code` module (APPROVED 2026-11-01)
+## Step 2 — the Docker runner and the `code` module (BUILT 2026-11-01)
 
 **Goal:** the `code` module becomes available when Docker is installed. The agent can pose a coding problem in any of the eight languages, and the pose goes through only after the app has built the starter and passed every test against the reference solution, inside a locked-down container. No learner UI yet (step 3), so the learner sees an ordinary problem; this step is verified through tests and a scripted live pose.
 
@@ -199,6 +199,34 @@ The Dockerfiles join `outputFileTracingIncludes` in `next.config.ts` and the ass
 - **Live check:** with Docker running, a real practice turn poses a coding problem; the pose goes through and the container exists, then conclude removes it.
 
 ---
+
+## Step 2b — switch the runner to the Docker SDK (BUILT 2026-11-01)
+
+**Why:** measured on Windows, about 2 s of every Run (out of ~3.6 s for Python) was `docker` CLI process overhead — five process starts at ~400 ms each. **Owner ruling (2026-11-01): switch to the SDK.** The `CodeRunner` port, the module, the language table, the images and every behaviour of step 2 stay the same; only `src/server/workspaces/docker-runner.ts` changes underneath.
+
+**Rulings:**
+- **dockerode 5.0.1** (latest), pinned exactly.
+- **Typed by our own narrow declarations** (`src/server/workspaces/dockerode.d.ts`) covering only the calls the runner makes — no `@types/dockerode`.
+- **Engine discovery:** (1) `DOCKER_HOST` if set (dockerode reads it, with the TLS variables); (2) otherwise the current context — `DOCKER_CONTEXT` or `currentContext` in `~/.docker/config.json`, its endpoint read from `~/.docker/contexts/meta/<sha256(name)>/meta.json` (unix, npipe, tcp with the context's TLS files, ssh); (3) otherwise the platform default (`//./pipe/docker_engine` on Windows; `/var/run/docker.sock`, then `~/.docker/run/docker.sock`).
+
+**How each operation maps:**
+
+| Operation | CLI today | SDK |
+|---|---|---|
+| Installed? | binary on disk | unchanged: a filesystem check for the binary, or a configured `DOCKER_HOST`/context — no process is started |
+| Running? | `docker info` | `docker.ping()` |
+| Image present / build | `image inspect`, `build --progress=plain` | `getImage(tag).inspect()`; `buildImage` with the image directory sent as a tar (the existing encoder, extended to binary content), progress from the JSON stream's `Step N/M` lines |
+| Superseded images | `images` + `rmi` | `listImages` filtered by reference + `getImage().remove()` |
+| Containers | `run`, `inspect`, `rm -f`, `ps --filter` | `createContainer` + `start` with the same HostConfig lockdown and `AutoRemove`; `inspect`; `remove({ force: true })`; `listContainers` by label |
+| A run | 5 `docker exec` processes | the same steps as exec calls over one connection: wipe+scaffold, tar on stdin, build, test, read report, wipe — each exec's exit code from `exec.inspect()`, stdout/stderr split with `modem.demuxStream` |
+
+Files still go in by tar on an exec's stdin, not the archive API (a copy into a tmpfs mount is not visible inside the container). Timeouts are unchanged (`timeout` inside, host-side backstop that removes the container).
+
+**Packaging:** `dockerode` (and its `ssh2` dependency, whose native add-on is optional) joins `serverExternalPackages`; whatever the standalone trace misses joins `outputFileTracingIncludes`, with the pinned packaging tests updated. The desktop build's smoke checks must still pass.
+
+**Tests:** the unit suite is unchanged except where it touched CLI details; a new unit test covers engine discovery (env, context metadata, defaults) against temp config directories; the real-Docker suite must pass again in all eight languages; the timing script is re-run and the per-run overhead reported.
+
+**Measured after the switch (Windows, Docker Desktop):** a warm Python Run fell from ~3.6 s to ~0.95 s; pure Docker overhead per run from 1,953 ms to 201 ms; the real-Docker suite from 370 s to 205 s, all 33 cases passing in all eight languages. An API image build, the superseded-tag deletion and the standalone payload loading dockerode were each checked directly.
 
 ## Steps 3–10 — outline (detailed one at a time)
 

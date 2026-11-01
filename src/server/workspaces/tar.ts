@@ -7,7 +7,8 @@
 
 export interface TarEntry {
 	path: string;
-	content: string;
+	/** Text (UTF-8) or raw bytes (image build contexts). */
+	content: string | Buffer;
 }
 
 const BLOCK = 512;
@@ -45,7 +46,7 @@ export function tarFiles(entries: readonly TarEntry[]): Buffer {
 			dirs.add(dir);
 			parts.push(header(dir, 0, "5", 0o755));
 		}
-		const body = Buffer.from(entry.content, "utf8");
+		const body = typeof entry.content === "string" ? Buffer.from(entry.content, "utf8") : entry.content;
 		parts.push(header(entry.path, body.length, "0", 0o644), body);
 		const pad = (BLOCK - (body.length % BLOCK)) % BLOCK;
 		if (pad > 0) parts.push(Buffer.alloc(pad, 0));

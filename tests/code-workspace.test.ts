@@ -323,3 +323,77 @@ describe("tar stream, image tags, container names", () => {
 		assert.equal(containerName({ chatId: "abc_D-1", problemCallId: "call|x:y" }), "lh-code-abc_D-1-call_x_y");
 	});
 });
+
+// ─── engine discovery (plan step 2b) ────────────────────────────────────────
+
+import { createHash } from "node:crypto";
+import { dockerInstalled, parseDockerHost, resolveEngine, type EngineEnvironment } from "../src/server/workspaces/docker-engine.ts";
+
+function engineEnv(files: Record<string, string>, opts: Partial<EngineEnvironment> = {}): EngineEnvironment {
+	const norm = (p: string) => p.replaceAll("\\", "/");
+	const table = new Map(Object.entries(files).map(([k, v]) => [norm(k), v]));
+	return {
+		env: {},
+		platform: "linux",
+		homeDir: "/home/u",
+		exists: (p) => table.has(norm(p)) || [...table.keys()].some((k) => k.startsWith(norm(p) + "/")),
+		read: (p) => table.get(norm(p)) ?? null,
+		...opts,
+	};
+}
+const metaPath = (name: string) => `/home/u/.docker/contexts/meta/${createHash("sha256").update(name).digest("hex")}/meta.json`;
+const meta = (host: string) => JSON.stringify({ Name: "x", Endpoints: { docker: { Host: host, SkipTLSVerify: false } } });
+
+describe("Docker engine discovery", () => {
+	it("parses unix, npipe, tcp (with and without TLS) and ssh hosts", () => {
+		assert.deepEqual(parseDockerHost("unix:///var/run/docker.sock"), { socketPath: "/var/run/docker.sock" });
+		assert.deepEqual(parseDockerHost("npipe:////./pipe/dockerDesktopLinuxEngine"), { socketPath: "//./pipe/dockerDesktopLinuxEngine" });
+		assert.deepEqual(parseDockerHost("tcp://10.0.0.5:2375"), { host: "10.0.0.5", port: "2375", protocol: "http" });
+		assert.deepEqual(parseDockerHost("tcp://h:2376", { ca: "CA", cert: "C", key: "K" }), { host: "h", port: "2376", protocol: "https", ca: "CA", cert: "C", key: "K" });
+		assert.deepEqual(parseDockerHost("ssh://me@box:2222"), { protocol: "ssh", host: "box", port: "2222", username: "me" });
+		assert.equal(parseDockerHost("bogus"), null);
+	});
+
+	it("DOCKER_HOST wins over the context", () => {
+		const e = engineEnv({ "/home/u/.docker/config.json": `{"currentContext":"colima"}`, [metaPath("colima")]: meta("unix:///c.sock") }, { env: { DOCKER_HOST: "tcp://h:2375" } });
+		assert.deepEqual(resolveEngine(e), { source: "DOCKER_HOST", options: { host: "h", port: "2375", protocol: "http" } });
+	});
+
+	it("the current context from config.json, or DOCKER_CONTEXT", () => {
+		const files = {
+			"/home/u/.docker/config.json": `{"currentContext":"colima"}`,
+			[metaPath("colima")]: meta("unix:///home/u/.colima/default/docker.sock"),
+			[metaPath("orb")]: meta("unix:///home/u/.orbstack/run/docker.sock"),
+		};
+		assert.deepEqual(resolveEngine(engineEnv(files)), { source: "context colima", options: { socketPath: "/home/u/.colima/default/docker.sock" } });
+		assert.deepEqual(resolveEngine(engineEnv(files, { env: { DOCKER_CONTEXT: "orb" } })).options, { socketPath: "/home/u/.orbstack/run/docker.sock" });
+	});
+
+	it("a context's TLS files are used for tcp endpoints", () => {
+		const hash = createHash("sha256").update("remote").digest("hex");
+		const tls = `/home/u/.docker/contexts/tls/${hash}/docker`;
+		const e = engineEnv({
+			"/home/u/.docker/config.json": `{"currentContext":"remote"}`,
+			[metaPath("remote")]: meta("tcp://r:2376"),
+			[`${tls}/ca.pem`]: "CA",
+			[`${tls}/cert.pem`]: "C",
+			[`${tls}/key.pem`]: "K",
+		});
+		assert.deepEqual(resolveEngine(e).options, { host: "r", port: "2376", protocol: "https", ca: "CA", cert: "C", key: "K" });
+	});
+
+	it("falls back to the platform default (default context, missing or malformed metadata)", () => {
+		assert.deepEqual(resolveEngine(engineEnv({ "/home/u/.docker/config.json": `{"currentContext":"default"}` })), { source: "default", options: { socketPath: "/var/run/docker.sock" } });
+		assert.equal(resolveEngine(engineEnv({ "/home/u/.docker/config.json": `{"currentContext":"gone"}` })).source, "default");
+		assert.equal(resolveEngine(engineEnv({ "/home/u/.docker/config.json": "{not json" })).source, "default");
+		assert.deepEqual(resolveEngine(engineEnv({}, { platform: "win32" })).options, { socketPath: "//./pipe/docker_engine" });
+		assert.deepEqual(resolveEngine(engineEnv({ "/home/u/.docker/run/docker.sock": "" }, { platform: "darwin" })).options, { socketPath: "/home/u/.docker/run/docker.sock" });
+	});
+
+	it("installed: binary on PATH or in Docker Desktop's dir, or an explicit host/context — nothing else", () => {
+		assert.equal(dockerInstalled(engineEnv({ "/usr/bin/docker": "" }, { env: { PATH: "/usr/bin" } })), true);
+		assert.equal(dockerInstalled(engineEnv({}, { env: { PATH: "/usr/bin" } })), false);
+		assert.equal(dockerInstalled(engineEnv({}, { env: { DOCKER_HOST: "tcp://h:2375" } })), true);
+		assert.equal(dockerInstalled(engineEnv({ "C:/Program Files/Docker/Docker/resources/bin/docker.exe": "" }, { platform: "win32", env: { ProgramFiles: "C:\\Program Files" } })), true);
+	});
+});
