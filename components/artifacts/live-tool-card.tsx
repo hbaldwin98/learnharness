@@ -25,6 +25,8 @@ interface StreamingToolPart {
 	state: string;
 	toolCallId: string;
 	input?: unknown;
+	/** The running tool's latest progress line, when it reports one. */
+	progress?: string;
 }
 
 export function LiveToolCard({ part }: ArtifactPartProps) {
@@ -49,7 +51,7 @@ export function LiveToolCard({ part }: ArtifactPartProps) {
 			<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
 				<BrailleSpinner label={`${toolActivityLabel(tool)} — live`} />
 				<Shimmer duration={1} className="text-xs">
-					{toolActivityLabel(tool)}
+					{p.progress ?? toolActivityLabel(tool)}
 				</Shimmer>
 				{arg && <span className="truncate">{arg}</span>}
 				<ChevronRight className="size-3 shrink-0 opacity-50 transition-transform group-open:rotate-90" />

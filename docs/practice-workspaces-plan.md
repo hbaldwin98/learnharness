@@ -101,17 +101,107 @@ The split-view layout is step 3. In step 1 a registered workspace would render w
 
 ---
 
-## Steps 2–10 — outline (detailed one at a time)
+## Step 2 — the Docker runner and the `code` module (APPROVED 2026-11-01)
 
-2. **Runner.**
-   - Docker detection; installed → module available, not running → the pose is refused with "start Docker".
-   - Dockerfiles in the repo per language with the test framework and language server.
-   - Image build with progress.
-   - Warm container per active problem (start on pose, tear down on conclude, dismiss and app exit, reap orphans at startup).
-   - Lockdown and limits; run/test execution.
-   - `verifyPose` for code: build the starter, run all tests against the reference.
-   - The `code` pose schema (language, files, visible and hidden tests, reference solution).
-   - Before writing any route, read the Next.js guides in `node_modules/next/dist/docs/` (AGENTS.md).
+**Goal:** the `code` module becomes available when Docker is installed. The agent can pose a coding problem in any of the eight languages, and the pose goes through only after the app has built the starter and passed every test against the reference solution, inside a locked-down container. No learner UI yet (step 3), so the learner sees an ordinary problem; this step is verified through tests and a scripted live pose.
+
+### Layering
+
+| Piece | Where | Why there |
+|---|---|---|
+| `CodeRunner` port (interface) and the `code` module (pose schema, `verifyPose`) | `src/agent/workspaces/code/` | Agents may not import server code; the module receives the runner through its constructor. |
+| Docker CLI runner (implements the port) | `src/server/workspaces/docker-runner.ts` | External effects and process lifecycle are server concerns. |
+| Language table (images, scaffolds, run and test commands, result parsing) | `src/agent/workspaces/code/languages.ts` | Pure data plus parsers, shared by the module and the runner. |
+| Dockerfiles | `docker/workspace-code/<language>/Dockerfile` | Built locally (ruled); shipped in the packaged app. |
+| Availability | `src/server/workspaces.ts` | Registers the module when Docker is installed. |
+
+**Ruled — talking to Docker: the `docker` CLI.** Spawn the `docker` CLI (`child_process`), as the app already does for Claude Code, rather than adding a Docker Engine API client dependency. It works the same with Docker Desktop on Windows, macOS and Linux.
+
+### Availability
+
+- **Installed** (`docker --version` succeeds) → the `code` module is registered, so its schema field and doctrine reach the agent.
+- **Running** (`docker info` succeeds) is checked at pose time; when it fails, the pose is refused with "Docker isn't running — start Docker Desktop and pose again".
+- Both results are cached for 30 s so a turn doesn't spawn `docker` repeatedly.
+
+### Languages, images and scaffolds
+
+Eight languages, one image each, tagged `learnharness-code-<language>:<hash of its Dockerfile>` so an edited Dockerfile rebuilds automatically.
+
+| Language | Base image | Tests | App-provided scaffold | Run tests |
+|---|---|---|---|---|
+| JavaScript | `node:24-slim` | `node:test` | — | `node --test --test-reporter=junit` |
+| TypeScript | `node:24-slim` | `node:test` (types stripped by Node) | — | same |
+| Python | `python:3.13-slim` | pytest | — | `pytest --junitxml` |
+| C# | `mcr.microsoft.com/dotnet/sdk:9.0` | xUnit | `Solution.csproj` with xUnit packages restored into the image | `dotnet test` with a JUnit/TRX logger |
+| Java | `eclipse-temurin:21-jdk` | JUnit 5 | JUnit console standalone jar in the image | `javac` then the console launcher with XML reports |
+| Go | `golang:1.24` | `go test` | `go.mod` | `go test -json` |
+| Rust | `rust:1-slim` | `cargo test` | `Cargo.toml` (a lib crate), dependencies pre-fetched | `cargo test` (libtest output parsed) |
+| C++ | `gcc:14` | doctest | `doctest.h` in the image | `g++` all sources, run with the JUnit reporter |
+
+Images contain no network-dependent steps at run time. Language servers join these images in step 4.
+
+**Ruled — scaffold convention:** the app supplies the per-language project files above (csproj, go.mod, Cargo.toml…), so the agent only writes source and test files. The tool description states each language's file layout (e.g. Rust: `src/lib.rs` plus `tests/*.rs`; Go: one package with `*_test.go`). A pose that writes a scaffold file is refused.
+
+### The `code` pose schema
+
+```ts
+workspace: {
+  module: "code",
+  language: "javascript" | "typescript" | "python" | "csharp" | "java" | "go" | "rust" | "cpp",
+  files:     [{ path, content }],   // starter — what the learner sees and edits
+  tests:     { visible: [{ path, content }], hidden: [{ path, content }] },
+  reference: [{ path, content }],   // the reference solution, replacing starter files by path
+}
+```
+
+Paths are relative and validated (no `..`, no absolute paths, no scaffold files, no collisions between starter, test and reference sets). The existing `modelSolution` stays: prose for the reveal; `reference` is its runnable form.
+
+### `verifyPose`
+
+1. Docker running? Otherwise the "start Docker" refusal.
+2. Image present? (See the ⚑ on first use below.)
+3. Start the problem's warm container.
+4. **Reference run:** starter overlaid by the reference, plus visible and hidden tests. Every test must pass, and there must be at least one visible and one hidden test.
+5. **Starter build:** starter plus visible tests must compile or load. Test *failures* are expected (the starter is unsolved); a compile/syntax error is a refusal. For interpreted languages, "builds" means the test runner collects the tests without an import or syntax error.
+6. Any failure returns the build/test output (truncated to the agent's 8 KB) as correctable errors; the container is torn down.
+
+**Ruled — first use of a language: the pose waits and shows progress.** When the image isn't built yet (minutes; roughly 1 GB for .NET, 1.5 GB for Rust), `verifyPose` builds it before continuing. Progress (the current build step) goes out through the tool's `onUpdate` channel and shows as the pose's live activity label. The server already streams `tool_execution_update` events (`src/server/pi/ui-stream.ts`); if the browser projection doesn't yet surface them on the live tool card, this step adds that. One build per language runs at a time; a second pose waiting on the same build joins it. A failed build refuses the pose with the build output. The build has no 60 s limit; aborting the turn cancels it.
+
+### Containers
+
+- **One warm container per active problem**, created at pose verification and reused for every later Run/Submit (step 3). Name `lh-code-<chatId>-<problemCallId>`, label `learnharness.workspace=code`.
+- **Lockdown:** `--network none`, `--read-only`, `--tmpfs /work` and `/tmp`, non-root user, `--memory 1g --memory-swap 1g`, `--cpus 2`, `--pids-limit 256`, `--security-opt no-new-privileges`, `--cap-drop ALL`. Main process `sleep infinity`.
+- **Each run gets a fresh directory** under `/work/<runId>`. Files go in by piping a tar stream into `docker exec -i … tar -x`, so no host directory is ever mounted. Build caches (cargo, dotnet, go) live in the container's tmpfs and persist between runs of the same problem.
+- **Hidden tests enter the container only for Submit and pose verification**, never for Run, so the learner's code can't read them.
+- **Limits (ruled):** a build is killed after 60 s and a test run after 10 s (`timeout` inside the container plus a host-side kill). Output is capped at 64 KB, of which 8 KB goes to the agent.
+- **Teardown:** on `conclude`; on problem dismissal (the server's dismissal path); after 30 minutes idle; and at server startup, every container with the label is removed. A problem whose container is gone recreates it lazily on its next run.
+
+### Cleanup — nothing lingers (owner, 2026-11-01)
+
+- **Containers:** started with `--rm`, so a stopped container deletes itself. Removed explicitly on conclude, on dismissal, after 30 minutes idle and at server startup (every container labelled `learnharness.workspace=code`).
+- **No volumes and no host mounts.** All files live in tmpfs inside the container and vanish with it.
+- **Run directories** are deleted after each run.
+- **Images (ruled): kept until removed.** A language's image stays so later problems start fast; Settings (step 8) lists them with sizes and a Remove button. When a Dockerfile changes, the rebuilt image replaces it and the superseded `learnharness-code-<language>:<old hash>` image is deleted right away.
+- **Known limit:** Docker's own build cache and the pulled base images (e.g. `node:24-slim`) are shared with anything else on the machine, so the app does not prune them. Removing a language in Settings removes the app's image only.
+
+### Results
+
+Every run returns one normalized shape: `{ phase: "build" | "test", ok, timedOut, exitCode, output, tests: [{ name, file, status: "pass" | "fail" | "error", message }] }`. Each language's parser maps its native report (JUnit XML, `go test -json`, libtest text) into it. Step 3 renders it; step 5 records it in the trace.
+
+### Packaging
+
+The Dockerfiles join `outputFileTracingIncludes` in `next.config.ts` and the asset sanity check in `scripts/build-server.mjs`, so the packaged app can build images.
+
+### Tests
+
+- **Unit (no Docker):** path validation; schema shape; each language's result parser on recorded fixtures; the run-command table; `verifyPose` against a fake runner (Docker not running, reference failing, starter not building, success); availability caching; container naming and teardown calls.
+- **Docker integration (skipped when Docker isn't running):** for each language, a small fixture problem (reverse a list) verifies end to end: the reference passes, a broken reference is refused, a starter with a syntax error is refused, an infinite loop times out, and the network is unreachable.
+- **Live check:** with Docker running, a real practice turn poses a coding problem; the pose goes through and the container exists, then conclude removes it.
+
+---
+
+## Steps 3–10 — outline (detailed one at a time)
+
 3. **Editor + workspace UI.** Split view, CodeMirror 6, multi-file tree, output panel, Run/Submit, the `data/workspaces/` autosave store, restore on reload.
 4. **Language servers.** A stdio ↔ browser relay through the server; diagnostics-only client capabilities; a server per language.
 5. **Trace + Ask.** The narration strip as the dictation target; trace markers (snapshots and diffs, run and submit results, asks) in the record; the Ask button and hotkey; the computed outcome fields.

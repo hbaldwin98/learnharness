@@ -245,6 +245,8 @@ export class SessionModel {
 	private unconfirmedAnswers = new Map<string, string>();
 	// The live turn's execution layer (view model mid-turn states):
 	private executions = new Map<string, LiveExecution>();
+	/** toolCallId → latest progress line from tool_execution_update. */
+	private progress = new Map<string, string>();
 	private streamingIds = new Set<string>();
 	private incompleteUsageIds = new Set<string>();
 	/** The in-flight assistant message's client id (see applyWireEvent). */
@@ -289,7 +291,7 @@ export class SessionModel {
 	getState(): SessionState {
 		const live =
 			this.statusValue === "submitted" || this.statusValue === "streaming"
-				? { executions: this.executions, inFlight: true, streamingIds: this.streamingIds }
+				? { executions: this.executions, inFlight: true, streamingIds: this.streamingIds, progress: this.progress }
 				: undefined;
 		const messages = [...this.base, ...this.tail];
 		const latest = failedResponseAtEnd(messages);
@@ -480,8 +482,19 @@ export class SessionModel {
 				});
 				return true;
 			}
+			case "tool_execution_update": {
+				// A running tool's progress line (e.g. a coding pose building
+				// its language image) — the live card shows the latest.
+				const partial = agent.partialResult as { content?: Array<{ type?: string; text?: string }> } | null;
+				const text = partial?.content?.find((c) => c.type === "text")?.text;
+				if (!text) return false;
+				this.mutate(() => {
+					this.progress = new Map(this.progress).set(agent.toolCallId, text);
+				});
+				return true;
+			}
 			default:
-				return false; // agent_start/turn_start/tool_execution_start|update: no view work
+				return false; // agent_start/turn_start/tool_execution_start: no view work
 		}
 	}
 
@@ -525,6 +538,7 @@ export class SessionModel {
 			if (this.consumeAbort === controller) {
 				this.streamingIds = new Set();
 				this.executions = new Map();
+				this.progress = new Map();
 				if (sawDone && this.statusValue !== "error") this.setStatus("ready");
 			}
 		}
@@ -899,6 +913,7 @@ export class SessionModel {
 		this.streamingIds = new Set();
 		this.streamingMessageId = null;
 		this.executions = new Map();
+		this.progress = new Map();
 		this.setStatus("ready");
 	}
 

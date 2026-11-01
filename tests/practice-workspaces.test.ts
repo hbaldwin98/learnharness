@@ -147,3 +147,18 @@ describe("workspace doctrine segment paths", () => {
 		assert.ok(!isValidSegmentPath("workspace-code/x/10-doctrine.md"));
 	});
 });
+
+describe("live pose progress (tool_execution_update)", () => {
+	it("a streaming tool part carries its latest progress line; settled calls never do", async () => {
+		const { projectView } = await import("../src/core/view.ts");
+		const messages = [
+			{ id: "m1", role: "assistant", content: [{ type: "toolCall", id: "call_p", name: PRACTICE_PROBLEM_TOOL, arguments: POSE }], timestamp: 1 },
+		] as unknown as LhMessage[];
+		const live = { executions: new Map(), inFlight: true, streamingIds: new Set(["m1"]), progress: new Map([["call_p", "building the rust environment: [2/4] RUN …"]]) };
+		const part = projectView(messages, live)[0]!.parts.find((p) => p.toolCallId === "call_p")!;
+		assert.equal(part.state, "input-streaming");
+		assert.equal(part.progress, "building the rust environment: [2/4] RUN …");
+		const settled = projectView(messages, { ...live, streamingIds: new Set<string>() })[0]!.parts.find((p) => p.toolCallId === "call_p")!;
+		assert.equal(settled.progress, undefined);
+	});
+});

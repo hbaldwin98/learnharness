@@ -84,6 +84,9 @@ for (const asset of [
 	path.join("src", "agent", "prompts", "teacher", "20-teaching.md"),
 	// The readings writer (docs/readings.md) reads its own prompt tree.
 	path.join("src", "agent", "prompts", "readings", "00-base.md"),
+	// Practice coding workspaces build their images from these at runtime.
+	path.join("docker", "workspace-code", "node", "Dockerfile"),
+	path.join("docker", "workspace-code", "rust", "Cargo.toml"),
 ]) {
 	if (!exists(path.join(STANDALONE, asset))) {
 		console.error(`[build-server] prompt asset missing from the trace: ${asset}`);

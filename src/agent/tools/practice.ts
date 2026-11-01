@@ -155,7 +155,7 @@ export function problemTool(
 			if (normalized.every((t, i) => t === target[i])) return healed as never;
 			return { ...(healed as Record<string, unknown>), target: normalized } as never;
 		},
-		execute: async (toolCallId, input, signal) => {
+		execute: async (toolCallId, input, signal, onUpdate) => {
 			if (gate.problemActive) {
 				return invalidInputResult("problem", [
 					"a problem is already active — call conclude on it before posing the next one",
@@ -190,7 +190,12 @@ export function problemTool(
 						`workspace module ${named} is not available — omit workspace for an ordinary problem`,
 					]);
 				}
-				const errors = await workspaceModule.verifyPose(workspace, { chatId, problemCallId: toolCallId, signal });
+				const errors = await workspaceModule.verifyPose(workspace, {
+					chatId,
+					problemCallId: toolCallId,
+					signal,
+					...(onUpdate ? { onProgress: (line: string) => onUpdate({ content: [{ type: "text", text: line }], details: undefined }) } : {}),
+				});
 				if (errors.length > 0) return invalidInputResult("problem", errors);
 			}
 			gate.problemActive = true;

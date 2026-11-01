@@ -12,7 +12,7 @@ import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
-import { availableWorkspaceModules } from "./workspaces.ts";
+import { availableWorkspaceModules, reconcileWorkspaces, refreshWorkspaceAvailability } from "./workspaces.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
 import type { ModelRole } from "../../config.ts";
@@ -470,6 +470,9 @@ export async function handleChatInput(
 		// prompt fresh per turn, swapping in any enabled override segments.
 		promptSwitches: effective.agent.prompts,
 	};
+	// PRACTICE WORKSPACES (plan step 2): learn whether Docker is installed
+	// before the practitioner's registry and prompt are composed.
+	if (record.kind === "practice" && !buildAgent) await refreshWorkspaceAvailability();
 	// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
 	// session builds the practitioner from turn 1 — no prober→teacher
 	// split, no plan/question/job tools; the whole registry is
@@ -633,6 +636,12 @@ export async function handleChatInput(
 				// subsequent fetch reads the dismissal already in the record
 				// (the same ordering law as persistTurn itself).
 				applyParkedDismissal(stores.chatStore, chatId);
+				// PRACTICE WORKSPACES (plan step 2): a concluded or dismissed
+				// coding problem's container goes now (fire-and-forget).
+				if (record.kind === "practice") {
+					const settled = stores.chatStore.getChat(chatId);
+					if (settled) reconcileWorkspaces(chatId, settled.messages);
+				}
 				// LAST: a poller that sees not-in-flight must read an already-persisted
 				// record — endTurn only after persistTurn has done its job.
 				endTurn(chatId);

@@ -85,6 +85,9 @@ const nextConfig: NextConfig = {
 			"node_modules/@napi-rs/canvas-*/**/*",
 			// Pi-compatible image resizing runs in an unbundled worker. Photon
 			// loads its colocated WASM through Node, also in packaged Electron.
+			// Practice coding workspaces (plan step 2): the server builds the
+			// language images from these Dockerfiles at runtime.
+			"docker/workspace-code/**/*",
 			"src/agent/image-processing/*.mjs",
 			"src/agent/image-processing/LICENSE",
 			"node_modules/@silvia-odwyer/photon-node/**/*",

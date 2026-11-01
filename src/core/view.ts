@@ -93,6 +93,9 @@ export interface LiveTurnState {
 	 *  empty reasoning part — the thinking row — so the placeholder's
 	 *  handoff is seamless; settled empty messages stay hidden. */
 	streamingIds: ReadonlySet<string>;
+	/** toolCallId → the latest progress line a running tool reported
+	 *  (tool_execution_update — e.g. a coding pose building its image). */
+	progress?: ReadonlyMap<string, string>;
 }
 
 function textPart(text: string): LhViewPart {
@@ -343,6 +346,8 @@ function toolPartOf(
 		// mid-write). Anything else is a dangling call from a settled
 		// message — the dock's pending state, never a shimmer.
 		part.state = streamingMessage ? "input-streaming" : "input-available";
+		const progress = streamingMessage ? live?.progress?.get(block.id) : undefined;
+		if (progress) part.progress = progress;
 	}
 	return part;
 }

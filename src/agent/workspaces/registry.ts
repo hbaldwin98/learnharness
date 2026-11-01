@@ -19,6 +19,8 @@ export interface WorkspacePoseContext {
 	chatId: string;
 	problemCallId: string;
 	signal?: AbortSignal;
+	/** Live progress lines (e.g. an image build), shown as the pose's activity. */
+	onProgress?: (line: string) => void;
 }
 
 export interface AgentWorkspaceModule {
