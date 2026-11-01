@@ -38,7 +38,8 @@ export type KeyAction =
 	| "open-settings"
 	| "toggle-user-thinking"
 	| "workspace-run"
-	| "workspace-submit";
+	| "workspace-submit"
+	| "workspace-ask";
 
 /** Where the cheat sheet groups an action (display only — dispatch is
  *  global; a seam that isn't mounted simply no-ops). */
@@ -74,6 +75,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	// The coding workspace (practice workspaces, plan step 3; owner ruling).
 	{ id: "workspace-run", label: "Coding · run visible tests", scope: "chat", binding: "mod+'" },
 	{ id: "workspace-submit", label: "Coding · submit", scope: "chat", binding: "mod+shift+enter" },
+	// Plan step 5: Ask sends the narration draft + trace (next to Run's key).
+	{ id: "workspace-ask", label: "Coding · ask the agent", scope: "chat", binding: "mod+;" },
 	// Mod+F is surface-scoped: graph node search and session text Find share
 	// one action/binding. Only the currently mounted surface listens.
 	{ id: "find", label: "Find", scope: "global", binding: "mod+f" },

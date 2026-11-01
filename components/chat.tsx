@@ -61,14 +61,14 @@ import { PracticeDock } from "@/components/practice-dock";
 import { workspaceComponentFor } from "@/components/workspaces/registry";
 import { WorkspaceSide } from "@/components/workspaces/split";
 import { flushWorkspace } from "@/components/workspaces/flush";
-import { SubmissionCard, ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
+import { AskCard, SubmissionCard, ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import { ReadingsTray, useReadingsTray } from "@/components/readings/readings-tray";
 import { SessionReadingsContext } from "@/components/readings/api";
 import { PassageReadDeeper } from "@/components/readings/passage-action";
 import { ReadingDiscussedLine } from "@/components/readings/discussed-line";
-import type { ReadingDiscussionMarkerDetails, SubmissionDetails } from "@/src/core";
+import type { AskDetails, ReadingDiscussionMarkerDetails, SubmissionDetails } from "@/src/core";
 import type { ArtifactPartProps, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { LhViewMessage } from "@/src/core";
 import { PhaseChip, PhaseDivider } from "@/components/phase-divider";
@@ -478,8 +478,9 @@ export function Chat({
 	const busyRef = useRef(busy);
 	busyRef.current = busy;
 	// PRACTICE WORKSPACES (plan step 3): a coding problem's pane opens beside
-	// the transcript (the thinking dock stays the talk channel). Hidden only
-	// when the learner hides it; a new problem opens it again.
+	// the transcript. While open, its narration strip is the talk channel and
+	// the dock is the problem bar (step 5); hidden, the thinking dock returns.
+	// Hidden only when the learner hides it; a new problem opens it again.
 	const WorkspacePane = activeProblem ? workspaceComponentFor(activeProblem.input) : null;
 	const [workspaceHiddenFor, setWorkspaceHiddenFor] = useState<string | null>(null);
 	const workspaceOpen = !!WorkspacePane && workspaceHiddenFor !== activeProblem?.toolCallId;
@@ -528,6 +529,14 @@ export function Chat({
 	const submitWorkspace = useCallback(
 		(problemCallId: string) => {
 			void send({ type: "submission", problemCallId });
+		},
+		[send],
+	);
+	// The coding workspace's Ask (plan step 5): the strip's draft (maybe
+	// empty) as a direct request; the server attaches the trace.
+	const askWorkspace = useCallback(
+		(problemCallId: string, text: string) => {
+			void send({ type: "ask", problemCallId, text });
 		},
 		[send],
 	);
@@ -1518,6 +1527,8 @@ export function Chat({
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-submission":
 												return <SubmissionCard key={pi} data={part.data as SubmissionDetails} />;
+											case "data-practice-ask":
+												return <AskCard key={pi} data={part.data as AskDetails} />;
 											case "data-reading-discussion":
 												return <ReadingDiscussedLine key={pi} data={part.data as ReadingDiscussionMarkerDetails} />;
 											case "data-practice-next":
@@ -1769,6 +1780,7 @@ export function Chat({
 					initialQuestionDraft={pending ? questionDraft(pending.key)?.form : undefined}
 					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
 					practice={activeProblem}
+					practiceBarOnly={workspaceOpen}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
 					chatId={chatId}
@@ -1887,6 +1899,7 @@ export function Chat({
 						input={activeProblem.input as { statement: string }}
 						busy={busy}
 						onSubmitted={submitWorkspace}
+						onAsk={askWorkspace}
 						onHide={() => setWorkspaceHiddenFor(activeProblem.toolCallId)}
 					/>
 				</WorkspaceSide>
@@ -2042,6 +2055,7 @@ function DockOverlay({
 	initialQuestionDraft,
 	onSaveQuestionDraft,
 	practice,
+	practiceBarOnly,
 	compactionRunning,
 	onSubmitThinking,
 	requiresReveal,
@@ -2075,6 +2089,8 @@ function DockOverlay({
 	 *  {toolCallId, input} — dock ownership exactly like a pending
 	 *  question (the composer is replaced); null in teaching sessions. */
 	practice: { toolCallId: string; input: unknown } | null;
+	/** A workspace pane is open (plan step 5): the dock is the problem bar. */
+	practiceBarOnly: boolean;
 	/** (commit, text) — the practice dock's two submit lanes. */
 	onSubmitThinking: (text: string) => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
@@ -2532,6 +2548,7 @@ function DockOverlay({
 									onSubmit={onSubmitThinking}
 									onEscape={dictationCancel}
 									compactionRunning={compactionRunning}
+									barOnly={practiceBarOnly}
 								/>
 							) : (
 								composer

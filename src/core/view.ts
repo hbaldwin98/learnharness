@@ -34,7 +34,7 @@
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
-import { modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
+import { codingOutcomeForConclude, modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
@@ -260,6 +260,8 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 					if (block.name === PRACTICE_CONCLUDE_TOOL) {
 						part.reveal = modelSolutionForConclude(messages, block.id);
 						part.problemInput = problemInputForConclude(messages, block.id);
+						const coding = codingOutcomeForConclude(messages, block.id);
+						if (coding) part.codingOutcome = coding;
 					}
 					rest.push(part);
 				}
@@ -452,6 +454,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-practice-submission", id: `ps_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "practice-ask": {
+			// A coding problem's Ask (plan step 5): the learner's direct
+			// request, a user-side card; the model reads the content.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-practice-ask", id: `pa_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}

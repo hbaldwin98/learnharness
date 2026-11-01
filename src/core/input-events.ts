@@ -39,13 +39,14 @@ import {
 	newProblemDismissedMarker,
 	newThinkingMessage,
 	newSubmissionMessage,
+	newAskMessage,
 	newUserMessage,
 	newMessageId,
 	questionCallsOf,
 	pendingProblemDismissalOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
-import type { CodeFile, WorkspaceRunResult } from "./contracts/workspaces.ts";
+import type { CodeFile, TraceBundle, WorkspaceRunResult } from "./contracts/workspaces.ts";
 
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
@@ -65,6 +66,10 @@ export type ChatInput =
 	 *  results were produced and stored server-side by the run route; this
 	 *  input appends them as a marker and starts the agent's turn. */
 	| { type: "submission"; problemCallId: string }
+	/** A coding problem's Ask (plan step 5): a direct request — the
+	 *  strip's draft, possibly empty — sent with the trace since the
+	 *  agent last looked. Starts the agent's turn. */
+	| { type: "ask"; problemCallId: string; text: string }
 	/** The practice move-on signal (owner round 16): the learner's
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
@@ -206,6 +211,12 @@ export function parseChatInput(input: unknown): ChatInput {
 				throw new ChatInputError("submission input requires problemCallId");
 			}
 			return { type: "submission", problemCallId: i.problemCallId };
+		case "ask":
+			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
+				throw new ChatInputError("ask input requires problemCallId");
+			}
+			if (typeof i.text !== "string") throw new ChatInputError("ask input requires text (may be empty)");
+			return { type: "ask", problemCallId: i.problemCallId, text: i.text };
 		case "next":
 			return { type: "next" };
 		default:
@@ -230,6 +241,11 @@ export interface WorkspaceLookups {
 	snapshot(problemCallId: string): CodeFile[] | null;
 	/** The stored last Submit, or null when there is none. */
 	submission(problemCallId: string): { files: CodeFile[]; result: WorkspaceRunResult } | null;
+	/** The trace since the agent last looked (plan step 5), or null when
+	 *  not a coding problem. `files` = code the marker carries in full (a
+	 *  Submit): no changes section. The caller marks it delivered once the
+	 *  marker is saved. Optional: absent = no trace. */
+	trace?(problemCallId: string, files?: readonly CodeFile[]): TraceBundle | null;
 }
 
 export function inputAppends(
@@ -261,7 +277,8 @@ export function inputAppends(
 				throw new ChatInputError("thinking input targets no active problem");
 			}
 			const code = workspace?.snapshot(input.problemCallId) ?? undefined;
-			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, code)];
+			const trace = code ? (workspace?.trace?.(input.problemCallId) ?? undefined) : undefined;
+			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, code, trace)];
 		}
 		case "submission": {
 			const active = activeProblemOf(record.messages);
@@ -270,9 +287,27 @@ export function inputAppends(
 			}
 			const submitted = workspace?.submission(input.problemCallId);
 			if (!submitted) throw new ChatInputError("submission input has no stored submit result — submit first");
+			const trace = workspace?.trace?.(input.problemCallId, submitted.files) ?? undefined;
 			return [
 				...dismissalConclusion(record),
-				newSubmissionMessage({ problemCallId: input.problemCallId, files: submitted.files, result: submitted.result }),
+				newSubmissionMessage({
+					problemCallId: input.problemCallId,
+					files: submitted.files,
+					result: submitted.result,
+					...(trace ? { trace } : {}),
+				}),
+			];
+		}
+		case "ask": {
+			const active = activeProblemOf(record.messages);
+			if (!active || active.toolCallId !== input.problemCallId) {
+				throw new ChatInputError("ask input targets no active problem");
+			}
+			if (!workspace?.snapshot(input.problemCallId)) throw new ChatInputError("ask input targets no coding problem");
+			const trace = workspace.trace?.(input.problemCallId) ?? undefined;
+			return [
+				...dismissalConclusion(record),
+				newAskMessage({ problemCallId: input.problemCallId, text: input.text, ...(trace ? { trace } : {}) }),
 			];
 		}
 		case "next": {

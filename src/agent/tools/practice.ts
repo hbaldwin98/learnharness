@@ -127,7 +127,8 @@ const PROBLEM_DESCRIPTION =
 	"reveal needs no new field). Only one problem may be active — conclude it before posing the next.";
 
 const WORKSPACE_DESCRIPTION_SUFFIX =
-	" A `workspace` gives the learner a workspace beside the thinking field; the pose is verified before it goes through. A workspace problem concludes solved only after the learner's Submit passes every test.";
+	" A `workspace` gives the learner a workspace beside the transcript; the pose is verified before it goes through. A workspace problem concludes solved only after the learner's Submit passes every test." +
+	" While working they narrate aloud into the workspace without reaching you; their narration, Runs, code changes since you last looked and the editor's errors arrive together as a trace with their next Ask (a direct request for your help), Submit, or thinking message.";
 
 export function problemTool(
 	gate: PracticeGate,

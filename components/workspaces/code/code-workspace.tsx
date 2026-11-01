@@ -5,8 +5,9 @@
  * problem's working surface beside the transcript — the starter files to
  * edit (contents only; owner ruling), the visible tests read-only, Run
  * (visible tests, nothing goes to the agent) and Submit (every test,
- * hidden as counts; tells the agent). The thinking dock stays the talk
- * channel.
+ * hidden as counts; tells the agent). Plan step 5: the narration strip
+ * is the talk channel while the pane is open, and Ask sends its draft as a
+ * direct request with the trace (the dock is the problem bar meanwhile).
  *
  * Trust: the server owns the files (autosaved, debounced) and the tests;
  * Run, Submit and the thinking snapshot read from its store, so each one
@@ -14,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LoaderCircleIcon, PlayIcon, SendIcon, XIcon, LockIcon } from "lucide-react";
+import { HandIcon, LoaderCircleIcon, PlayIcon, SendIcon, XIcon, LockIcon } from "lucide-react";
 import {
 	bindingForAction,
 	formatBinding,
@@ -31,7 +32,9 @@ import { Button } from "@/components/ui/button";
 import { registerWorkspaceFlush } from "@/components/workspaces/flush";
 import { setVimEnabled, useVimEnabled } from "@/components/workspaces/vim-preference";
 import type { WorkspaceProps } from "@/components/workspaces/registry";
+import { finishDictation } from "@/components/dictation";
 import { CodeEditor } from "./editor";
+import { NarrationStrip, useNarration } from "./narration";
 
 const LANGUAGE_LABEL: Record<string, string> = {
 	javascript: "JavaScript",
@@ -56,7 +59,7 @@ async function readError(res: Response): Promise<string> {
 	return body?.error ?? `${res.status} ${res.statusText}`;
 }
 
-export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide }: WorkspaceProps) {
+export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk, onHide }: WorkspaceProps) {
 	const [state, setState] = useState<WorkspaceState | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [activePath, setActivePath] = useState<string | null>(null);
@@ -66,6 +69,8 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const vimMode = useVimEnabled();
 	const diagnostics = useDiagnostics(chatId, problemCallId, state !== null);
+	const narration = useNarration(chatId, problemCallId, state?.narration ?? null, state?.active ?? false);
+	const [asking, setAsking] = useState(false);
 
 	// The live files (the editors own their documents; this mirrors them for
 	// saving) and the save machinery.
@@ -157,6 +162,8 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 			setRunning(mode);
 			setRunError(null);
 			try {
+				// What they just said belongs before the Run in the trace.
+				await narration.record();
 				await save();
 				const res = await fetch(`${url(chatId, problemCallId)}/run`, {
 					method: "POST",
@@ -173,20 +180,40 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 				setRunning(null);
 			}
 		},
-		[busy, chatId, onSubmitted, problemCallId, running, save, state?.active],
+		[busy, chatId, narration, onSubmitted, problemCallId, running, save, state?.active],
 	);
+
+	// Ask (plan step 5): finish any dictation so the last words land, then
+	// send the draft (maybe empty) as the request; the server adds the trace.
+	const ask = useCallback(async () => {
+		if (asking || busy || running || !state?.active) return;
+		setAsking(true);
+		try {
+			await finishDictation();
+			const text = narration.takeDraft();
+			await save().catch(() => {});
+			onAsk(problemCallId, text);
+		} finally {
+			setAsking(false);
+		}
+	}, [asking, busy, narration, onAsk, problemCallId, running, save, state?.active]);
 
 	// The hotkeys (registry actions; rebindable).
 	const runRef = useRef(run);
 	runRef.current = run;
+	const askRef = useRef(ask);
+	askRef.current = ask;
 	useEffect(() => {
 		const onRun = () => void runRef.current("run");
 		const onSubmit = () => void runRef.current("submit");
+		const onAskKey = () => void askRef.current();
 		window.addEventListener(kbdEventForAction("workspace-run"), onRun);
 		window.addEventListener(kbdEventForAction("workspace-submit"), onSubmit);
+		window.addEventListener(kbdEventForAction("workspace-ask"), onAskKey);
 		return () => {
 			window.removeEventListener(kbdEventForAction("workspace-run"), onRun);
 			window.removeEventListener(kbdEventForAction("workspace-submit"), onSubmit);
+			window.removeEventListener(kbdEventForAction("workspace-ask"), onAskKey);
 		};
 	}, []);
 
@@ -215,6 +242,7 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 	];
 	const runKey = formatBinding(bindingForAction("workspace-run"));
 	const submitKey = formatBinding(bindingForAction("workspace-submit"));
+	const askKey = formatBinding(bindingForAction("workspace-ask"));
 
 	return (
 		<Shell
@@ -255,6 +283,17 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 					>
 						{running === "submit" ? <LoaderCircleIcon className="size-3 animate-spin" /> : <SendIcon className="size-3" />}
 						Submit
+					</Button>
+					<Button
+						size="xs"
+						variant="outline"
+						data-testid="workspace-ask"
+						disabled={!state.active || running !== null || busy || asking}
+						onClick={() => void ask()}
+						title={busy ? "Wait for the agent to finish" : `Ask the agent — sends what you've typed or said, with your work since it last looked (${askKey})`}
+					>
+						<HandIcon className="size-3" />
+						Ask
 					</Button>
 				</>
 			}
@@ -302,6 +341,7 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onHide
 				</p>
 			)}
 			<ResultPanel result={result} running={running} error={runError} />
+			<NarrationStrip narration={narration} active={state.active} />
 		</Shell>
 	);
 }

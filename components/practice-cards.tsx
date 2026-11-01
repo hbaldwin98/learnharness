@@ -2,7 +2,18 @@
 
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
-import { fenceFile, type ArtifactPartProps, type CodeFile, type SubmissionDetails } from "@/src/core";
+import {
+	clockTime,
+	describeRunResult,
+	fenceFile,
+	traceIsEmpty,
+	type ArtifactPartProps,
+	type AskDetails,
+	type CodeFile,
+	type CodingOutcome,
+	type SubmissionDetails,
+	type TraceBundle,
+} from "@/src/core";
 import { ChevronDownIcon } from "lucide-react";
 
 /**
@@ -21,7 +32,7 @@ import { ChevronDownIcon } from "lucide-react";
  *   language in a faint user-side shell, never collapsible.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { ThinkingBlock } from "@/components/thinking-block";
@@ -56,6 +67,8 @@ export interface PracticeThinkingData {
 	text: string;
 	/** The learner's code at the time (coding problems, plan step 3). */
 	code?: CodeFile[];
+	/** What happened since the agent last looked (plan step 5). */
+	trace?: TraceBundle;
 }
 
 export function ProblemCard({ part }: ArtifactPartProps) {
@@ -108,6 +121,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 	const verdict = typeof input.verdict === "string" ? input.verdict : "";
 	const reveal =
 		typeof part.reveal === "string" ? part.reveal : typeof input.solutionReveal === "string" ? input.solutionReveal : "";
+	const coding = (part.codingOutcome ?? null) as CodingOutcome | null;
 
 	// The dismissal synthesis: no verdict, no reveal — one muted line (the
 	// learner clicked; the record needs only the fact).
@@ -139,6 +153,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 					<ToolContentResponse>{verdict}</ToolContentResponse>
 				</div>
 			)}
+			{coding && <CodingOutcomeRow outcome={coding} />}
 			{/* Then the divider, then the labeled model solution (Slice G: the
 			    hero is the pose's commitment, verbatim). */}
 			{reveal.length > 0 && (
@@ -166,6 +181,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 			<MetadataPopover
 				concludeInput={input}
 				problemInput={(part.problemInput ?? {}) as { mode?: unknown; target?: unknown }}
+				coding={coding}
 			/>
 		</div>
 	);
@@ -187,9 +203,11 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 function MetadataPopover({
 	concludeInput,
 	problemInput,
+	coding,
 }: {
 	concludeInput: { outcome?: string; rung?: unknown; missClass?: unknown; retest?: unknown };
 	problemInput: { mode?: unknown; target?: unknown };
+	coding: CodingOutcome | null;
 }) {
 	const [open, setOpen] = useState(false);
 	const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -295,6 +313,13 @@ function MetadataPopover({
 						<dd className="font-mono">{miss || "none"}</dd>
 						<dt className="text-muted-foreground">Retest</dt>
 						<dd className="font-mono">{retest === undefined ? "—" : retest ? "yes" : "no"}</dd>
+						{coding &&
+							codingFacts(coding).map(([label, value]) => (
+								<Fragment key={label}>
+									<dt className="text-muted-foreground">{label}</dt>
+									<dd className="font-mono">{value}</dd>
+								</Fragment>
+							))}
 					</dl>
 					</div>,
 					document.body,
@@ -310,12 +335,13 @@ export function ThinkingCard({ data }: { data: PracticeThinkingData }) {
 	// 2026-10-07): full-width band + rail, arriving expanded.
 	const code = thinkingCode(data);
 	const block = <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen />;
-	if (code.length === 0) return block;
+	if (code.length === 0 && !data.trace) return block;
 	return (
 		<div>
 			{block}
 			<div className="pl-[3ch]">
 				<CodeFilesDisclosure label="Your code" files={code} testId="thinking-code" />
+				<TraceDisclosure trace={data.trace} />
 			</div>
 		</div>
 	);
@@ -386,6 +412,128 @@ export function SubmissionCard({ data }: { data: SubmissionDetails }) {
 				</div>
 			)}
 			<CodeFilesDisclosure label="Code" files={data.files} testId="submission-code" />
+			<TraceDisclosure trace={data.trace} />
+		</div>
+	);
+}
+
+/** A coding problem's Ask (plan step 5): the learner's request, user-side,
+ *  in the thinking rows' register; the trace behind a disclosure. */
+export function AskCard({ data }: { data: AskDetails }) {
+	return (
+		<div data-testid="ask-card">
+			<ThinkingBlock testId="ask-text" label="YOU ASKED" text={data.text.trim() || "(Asked for help)"} defaultOpen />
+			<div className="pl-[3ch]">
+				<TraceDisclosure trace={data.trace} />
+			</div>
+		</div>
+	);
+}
+
+/** A file change as markdown: unified hunks in a diff fence, or the file. */
+function changeMarkdown(c: { path: string; text: string; full?: boolean }): string {
+	if (c.full) return fenceFile({ path: c.path, content: c.text });
+	const fence = "```";
+	return `${c.path}:\n${fence}diff\n${c.text}\n${fence}`;
+}
+
+/** What went to the agent with a delivery (plan step 5), collapsed: the
+ *  narration, the Runs, the code changes and the editor's problems. */
+export function TraceDisclosure({ trace }: { trace: TraceBundle | undefined }) {
+	const [open, setOpen] = useState(false);
+	if (!trace || traceIsEmpty(trace)) return null;
+	const changes = trace.changes ?? [];
+	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+	const summary = [
+		trace.narration.length > 0 && plural(trace.narration.length, "note"),
+		trace.runs.length > 0 && plural(trace.runs.length, "run"),
+		changes.length > 0 && `${plural(changes.length, "file")} changed`,
+		trace.diagnostics.length > 0 && plural(trace.diagnostics.length, "problem"),
+	]
+		.filter(Boolean)
+		.join(" · ");
+	return (
+		<div data-testid="trace-disclosure" className="mt-2">
+			<button
+				type="button"
+				onClick={() => setOpen((v) => !v)}
+				aria-expanded={open}
+				className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+			>
+				<ChevronDownIcon className={cn("size-3 transition-transform", !open && "-rotate-90")} />
+				Trace
+				<span className="normal-case tracking-normal text-muted-foreground/70">({summary})</span>
+			</button>
+			{open && (
+				<div className="mt-1 flex flex-col gap-2 text-[13px]">
+					{trace.narration.length > 0 && (
+						<ul className="flex flex-col gap-0.5">
+							{trace.narration.map((n, i) => (
+								<li key={i}>
+									<span className="font-mono text-xs text-muted-foreground">{clockTime(n.at)}</span> {n.text}
+								</li>
+							))}
+						</ul>
+					)}
+					{trace.runs.map((r, i) => (
+						<pre key={i} className="whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+							{`Run ${clockTime(r.at)} — ${describeRunResult(r)}`}
+						</pre>
+					))}
+					{changes.length > 0 && (
+						<div className="lh-prose">
+							<ToolContentResponse>{changes.map(changeMarkdown).join("\n\n")}</ToolContentResponse>
+						</div>
+					)}
+					{trace.diagnostics.length > 0 && (
+						<ul className="flex flex-col gap-0.5 font-mono text-xs text-muted-foreground">
+							{trace.diagnostics.map((d, i) => (
+								<li key={i}>
+									{d.path}:{d.line + 1} {d.severity}: {d.message}
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
+
+/** "35 s", "4 min", "1 h 12 min". */
+function formatDuration(ms: number): string {
+	const s = Math.round(ms / 1000);
+	if (s < 60) return `${s} s`;
+	const m = Math.round(s / 60);
+	if (m < 60) return `${m} min`;
+	return `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
+/** The coding outcome's facts as label/value pairs (card row + info box). */
+function codingFacts(o: CodingOutcome): Array<[string, string]> {
+	const tests = !o.lastSubmit
+		? "not submitted"
+		: !o.lastSubmit.built
+			? "build failed"
+			: `visible ${o.lastSubmit.visible.passed}/${o.lastSubmit.visible.total}` +
+				(o.lastSubmit.hidden ? ` · hidden ${o.lastSubmit.hidden.passed}/${o.lastSubmit.hidden.total}` : "");
+	return [
+		["Last submit", tests],
+		["Time to pass", o.timeToPassMs === null ? "—" : formatDuration(o.timeToPassMs)],
+		["Asks", String(o.asks)],
+		["Hints", String(o.hints)],
+	];
+}
+
+/** The conclude card's coding row (plan step 5): app-computed, quiet. */
+function CodingOutcomeRow({ outcome }: { outcome: CodingOutcome }) {
+	return (
+		<div data-testid="coding-outcome" className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-xs text-muted-foreground">
+			{codingFacts(outcome).map(([label, value]) => (
+				<span key={label}>
+					{label.toLowerCase()} <span className="text-foreground/70">{value}</span>
+				</span>
+			))}
 		</div>
 	);
 }

@@ -12,7 +12,7 @@ import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
-import { availableWorkspaceModules, lastSubmission, reconcileWorkspaces, refreshWorkspaceAvailability, workspaceSnapshot } from "./workspaces.ts";
+import { availableWorkspaceModules, lastSubmission, pendingTrace, reconcileWorkspaces, refreshWorkspaceAvailability, workspaceSnapshot } from "./workspaces.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
 import type { ModelRole } from "../../config.ts";
@@ -331,6 +331,7 @@ export async function handleChatInput(
 	// input is the only steer appender; in-run delivery rides pi's own
 	// follow-up queue and never builds an input event at all.
 	let appends;
+	const traceCommits: Array<() => void> = [];
 	try {
 		appends =
 			input.type === "steers"
@@ -338,6 +339,14 @@ export async function handleChatInput(
 				: inputAppends(record, input, {
 						snapshot: (callId) => workspaceSnapshot(chatId, callId),
 						submission: (callId) => lastSubmission(chatId, callId),
+						// The trace (plan step 5): marked delivered only once the
+						// marker carrying it is saved (below).
+						trace: (callId, files) => {
+							const pending = pendingTrace(chatId, callId, files);
+							if (!pending) return null;
+							traceCommits.push(pending.commit);
+							return pending.bundle;
+						},
 					});
 	} catch (err) {
 		if (err instanceof ChatInputError) {
@@ -395,6 +404,15 @@ export async function handleChatInput(
 		console.error(`[chat ${chatId}] write-ahead persist failed:`, err);
 		endTurn(chatId);
 		return new Response("Your input could not be saved. Please try again.", { status: 500 });
+	}
+	// The coding trace those appends carry is now delivered (plan step 5):
+	// the next Ask, Submit or thinking starts after it. Never fails the turn.
+	for (const commit of traceCommits) {
+		try {
+			commit();
+		} catch (err) {
+			console.error(`[chat ${chatId}] marking the coding trace delivered failed:`, err);
+		}
 	}
 	// Visibility bookkeeping is not the canonical save. Its failure must
 	// neither misreport a saved input as lost nor prevent the turn running.

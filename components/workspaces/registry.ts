@@ -7,8 +7,9 @@ import { workspaceOf, type WorkspaceModuleId } from "@/src/core";
 /**
  * THE UI SIDE OF A PRACTICE WORKSPACE MODULE (docs/practice-workspaces.md;
  * plan steps 1 and 3): module id → the pane that opens beside the
- * transcript while one of its problems is active. The thinking dock stays
- * the talk channel (owner ruling, step 3). A problem with no workspace, or
+ * transcript while one of its problems is active. While the pane is open
+ * its narration strip is the talk channel and the dock is the problem bar
+ * (owner ruling, step 5); hidden, the thinking dock returns. A problem with no workspace, or
  * with a module this build doesn't know, gets no pane — the thinking dock
  * alone, so it can still be worked on or dismissed.
  */
@@ -22,6 +23,9 @@ export interface WorkspaceProps {
 	busy: boolean;
 	/** Tell the agent about the stored Submit (starts its turn). */
 	onSubmitted: (problemCallId: string) => void;
+	/** Ask the agent (plan step 5): the narration draft, maybe empty; the
+	 *  server attaches the trace. Starts its turn. */
+	onAsk: (problemCallId: string, text: string) => void;
 	/** Below lg the pane overlays the transcript: back to it. */
 	onHide?: () => void;
 }

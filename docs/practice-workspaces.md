@@ -87,13 +87,15 @@ Narration, code and runs fold into one timestamped trace per problem:
 
 Today's thinking submissions (`{ type: "thinking", problemCallId, text }` in `src/core/input-events.ts`) are the precedent: the trace generalizes them into structured, labeled messages the practice agent reads.
 
+**Delivery (ruled 2026-11-01): one bundle per delivery.** Narration and Run results collect in the workspace store; nothing reaches the record until the agent is told. Each Ask, Submit or thinking message carries ONE bundle of everything since the agent last looked — timestamped narration, each Run's result, a line diff of the code against what it last saw (the whole file when that is smaller), and the editor's current language-server errors and warnings. The store's cursor moves only once the marker is saved. While the pane is open the narration strip is the talk channel and the dock under the transcript is the problem bar alone; hiding the pane brings the thinking dock back.
+
 ### Dictation
 
 **(ruled: optional toggle.)** Dictation is a button/hotkey toggle in the workspace; it is never required. While on, it writes to the narration strip — the dictation target (`useDictationTarget`, `components/dictation.tsx:207`) is the strip, not the editor, so typing code and speaking don't collide. Long runs (15+ minutes) need a soak test on both dictation engines before this is relied on.
 
 ### Asking the agent
 
-**(ruled: Ask button / hotkey.)** Pressing Ask makes the next spoken or typed text a direct request; it starts a turn immediately with the trace since the agent last saw it.
+**(ruled: Ask button / hotkey.)** Pressing Ask sends the strip's current draft — typed or dictated, possibly empty — as a direct request (ruled 2026-11-01, replacing "the next spoken or typed text"); it starts a turn immediately with the trace since the agent last saw it.
 
 ### Listening
 

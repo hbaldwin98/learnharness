@@ -104,7 +104,16 @@ export function reconcileWorkspaces(chatId: string, messages: readonly LhMessage
 
 // ─── the learner's workspace (plan step 3) ───────────────────────────────────
 
-import type { CodeFile, WorkspaceRunResult, WorkspaceState } from "../core/contracts/workspaces.ts";
+import type {
+	CodeDiagnostic,
+	CodeFile,
+	FileChange,
+	NarrationEntry,
+	TraceBundle,
+	WorkspaceRunResult,
+	WorkspaceState,
+} from "../core/contracts/workspaces.ts";
+import { lineDiff } from "../core/line-diff.ts";
 import { PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
 import { runCode } from "../agent/workspaces/code/runner.ts";
 import type { CodePose } from "../agent/workspaces/code/module.ts";
@@ -151,7 +160,91 @@ export function loadWorkspace(chatId: string, problemCallId: string): WorkspaceS
 		active,
 		lastRun: record?.lastRun?.result ?? null,
 		lastSubmit: record?.lastSubmit?.result ?? null,
+		narration: record?.narration ?? [],
 	};
+}
+
+// ─── the learner trace (plan step 5) ─────────────────────────────────────────
+
+/** One narration line may be at most this long (a long dictation run). */
+const MAX_NARRATION_CHARS = 8000;
+/** A bundle carries at most this many Runs (the latest) … */
+const MAX_TRACE_RUNS = 5;
+/** … and at most this many language-server problems (errors first). */
+const MAX_TRACE_DIAGNOSTICS = 20;
+
+/** Record a piece of narration (active problems only). Returns every line. */
+export function appendNarration(chatId: string, problemCallId: string, text: unknown): NarrationEntry[] {
+	const { pose, active } = codeProblem(chatId, problemCallId);
+	if (!active) throw new WorkspaceError("The problem is no longer active", 409);
+	if (typeof text !== "string" || text.trim().length === 0) throw new WorkspaceError("text must be non-empty", 400);
+	const entry: NarrationEntry = { at: new Date().toISOString(), text: text.trim().slice(0, MAX_NARRATION_CHARS) };
+	const next = mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({ ...r, narration: [...(r.narration ?? []), entry] }));
+	return next.narration ?? [];
+}
+
+/**
+ * Everything since the agent last looked, and the commit that marks it
+ * delivered. The caller commits only once the marker carrying it is
+ * saved, so a refused send loses nothing. `files` (Submit) is the code the
+ * marker carries in full: no changes section, and it becomes the code the
+ * agent has seen. Null when the problem isn't a coding problem.
+ */
+export function pendingTrace(
+	chatId: string,
+	problemCallId: string,
+	files?: readonly CodeFile[],
+): { bundle: TraceBundle; commit: () => void } | null {
+	let pose: CodePose;
+	try {
+		pose = codeProblem(chatId, problemCallId).pose;
+	} catch {
+		return null;
+	}
+	const record = getWorkspace(chatId, problemCallId);
+	const narration = record?.narration ?? [];
+	const runs = record?.runs ?? [];
+	const delivered = record?.delivered ?? { narration: 0, runs: 0, files: pose.files };
+	const current = files ? [...files] : (record?.files ?? pose.files);
+	const bundle: TraceBundle = {
+		narration: narration.slice(delivered.narration),
+		runs: runs.slice(delivered.runs).slice(-MAX_TRACE_RUNS),
+		changes: files ? null : codeChanges(delivered.files, current),
+		diagnostics: traceDiagnostics(chatId, problemCallId),
+	};
+	const commit = () => {
+		mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({
+			...r,
+			delivered: { narration: narration.length, runs: runs.length, files: current },
+		}));
+	};
+	return { bundle, commit };
+}
+
+/** Each file's change since `seen` (the whole file when a diff wouldn't be smaller). */
+function codeChanges(seen: readonly CodeFile[], current: readonly CodeFile[]): FileChange[] {
+	const before = new Map(seen.map((f) => [f.path, f.content]));
+	const changes: FileChange[] = [];
+	for (const f of current) {
+		const diff = lineDiff(before.get(f.path) ?? "", f.content);
+		if (diff === "") continue;
+		if (diff === null || diff.length >= f.content.length) changes.push({ path: f.path, text: f.content, full: true });
+		else changes.push({ path: f.path, text: diff });
+	}
+	return changes;
+}
+
+/** The live language server's problems, errors first, capped. */
+function traceDiagnostics(chatId: string, problemCallId: string): CodeDiagnostic[] {
+	const session = sessions().get(sessionKey(chatId, problemCallId));
+	if (!session) return [];
+	const snapshot = session.snapshot();
+	if (snapshot.status !== "ready") return [];
+	const all = Object.values(snapshot.files).flat();
+	const rank = (d: CodeDiagnostic) => (d.severity === "error" ? 0 : 1);
+	return all
+		.sort((a, b) => rank(a) - rank(b) || a.path.localeCompare(b.path) || a.line - b.line)
+		.slice(0, MAX_TRACE_DIAGNOSTICS);
 }
 
 /** Save the learner's files: contents of the starter files only (owner
@@ -274,7 +367,10 @@ export async function runWorkspace(
 			...(built ? { hidden: { passed: hidden.filter((t) => t.status === "pass").length, total: hidden.length } } : {}),
 		};
 	}
-	mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => (mode === "run" ? { ...r, lastRun: { files, result } } : { ...r, lastSubmit: { files, result } }));
+	// A Run joins the trace (plan step 5); a Submit's result rides its own marker.
+	mutateWorkspace(chatId, problemCallId, () => pose.files, (r) =>
+		mode === "run" ? { ...r, lastRun: { files, result }, runs: [...(r.runs ?? []), result] } : { ...r, lastSubmit: { files, result } },
+	);
 	return result;
 }
 

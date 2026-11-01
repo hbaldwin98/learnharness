@@ -322,7 +322,7 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Step 5 — the narration trace and Ask (PLANNED)
+## Step 5 — the narration trace and Ask (BUILT 2026-11-01)
 
 **Goal:** the learner can think aloud into a narration strip in the coding pane without starting a turn; Ask, Submit and thinking deliver everything since the agent last looked as one trace bundle; the conclude card shows app-computed coding outcomes.
 
@@ -349,6 +349,19 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 - **Live check:** in the app, narrate (typed), Run, Ask with words, the agent answers from the trace, Submit, conclude, and the outcome row reads right.
 
 **Risks:** the 4 s auto-record is a guess to tune against real dictation; moving the dictation claim between the dock and the strip is the likeliest bug.
+
+**Built (2026-11-01).** `src/core/line-diff.ts` (LCS line diff, unified hunks with two lines of context, null past 4M cells); the trace contract (`NarrationEntry`, `FileChange`, `TraceBundle`, `describeTrace`, `AskDetails`) in `src/core/contracts/workspaces.ts`; the store's `narration`, `runs` and `delivered` cursor; `appendNarration` and `pendingTrace` (bundle + commit) in `src/server/workspaces.ts`, with the route `POST …/narration`; the `ask` input and `practice-ask` marker; the chat handler commits each bundle right after the write-ahead save; `codingOutcomeForConclude` folded onto the conclude part by the view; the Ask card, the Trace disclosure on Ask/Submit/thinking cards, and the conclude card's outcome row (also in its info box); the strip (`components/workspaces/code/narration.tsx`), Ask in the pane header with `Mod+;`; the dock's problem-bar variant while the pane is open; one line in the `problem` tool's workspace description.
+
+**Decided while building (recommended defaults):**
+- **A bundle carries at most the last 5 Runs** and 20 language-server problems (errors first); narration lines are capped at 8,000 characters.
+- **A failed narration save puts the text back** in front of the draft and shows "Not recorded"; nothing is lost.
+- **The strip's tests are the live check:** the auto-record timer is React state with no DOM in the unit suite, so it is exercised in the app (type, leave the field, see it recorded).
+
+**Fixed alongside (owner report, 2026-11-01):** the pane header now uses the session top bar's mechanics (60 px, drag band, the window-controls gutter), so Windows' native buttons no longer cover Run/Submit and the two header borders line up; the pane isolates its stacking context, so CodeMirror's panels (Vim's status line, z-index 300) no longer paint over Settings and other dialogs. The dock's scroll jumping in the narrow column came from the tall thinking dock folding and unfolding; with the pane open the dock is now the one-line problem bar.
+
+**Live check (2026-11-01, PASSED):** the worktree's dev server, the owner's model, headless Chromium. The agent posed a Python `rev(xs)` problem. The pane header's border sat at 60 px, level with the session header's; the dock showed the problem bar and no thinking field. Typed narration recorded on Enter; a second line, left in the field while editing the code, recorded itself about 3.3 s after the field lost focus. A Run of `xs[1:]` failed 0/2. Ask with "why does the first test fail?" cleared the field, showed the Ask card with "Trace (2 notes · 1 run · 1 file changed)", and the agent answered from the trace — "It isn't an off-by-one… xs[1:] only sets where the slice starts" — answering the narration it had just read. The fixed code's Submit passed 2/2 visible and 1/1 hidden; the agent concluded *solved with hints*, and the conclude card read "last submit visible 2/2 · hidden 1/1 · time to pass 28 s · asks 1 · hints 1". No containers were left afterwards.
+
+**Tests:** `tests/practice-trace.test.ts` (the diff, the trace text, narration and Runs recorded, bundling with the cursor moving only on commit, the full-file fallback, the ask input/marker/cause/projection, thinking's diff and submission's trace, the coding outcome and its projection).
 
 ---
 

@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PATHS } from "../../config.ts";
-import type { CodeFile, WorkspaceRunResult } from "../core/contracts/workspaces.ts";
+import type { CodeFile, NarrationEntry, WorkspaceRunResult } from "../core/contracts/workspaces.ts";
 
 export const CURRENT_WORKSPACE_VERSION = 1;
 
@@ -31,6 +31,13 @@ export interface WorkspaceRecord {
 	updatedAt: string;
 	lastRun?: StoredRun;
 	lastSubmit?: StoredRun;
+	/** The learner trace (plan step 5): every recorded narration line… */
+	narration?: NarrationEntry[];
+	/** …and every Run's result, in order. */
+	runs?: WorkspaceRunResult[];
+	/** What the agent has been given: counts into the two lists above, and
+	 *  the code it last saw (absent = nothing delivered; it saw the starter). */
+	delivered?: { narration: number; runs: number; files: CodeFile[] };
 }
 
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;

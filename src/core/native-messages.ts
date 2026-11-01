@@ -36,7 +36,15 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
-import { describeRunResult, fenceFile, type CodeFile, type SubmissionDetails } from "./contracts/workspaces.ts";
+import {
+	describeRunResult,
+	describeTrace,
+	fenceFile,
+	type AskDetails,
+	type CodeFile,
+	type SubmissionDetails,
+	type TraceBundle,
+} from "./contracts/workspaces.ts";
 import { CLAUDE_CODE_PROVIDER } from "./contracts/claude-code.ts";
 import {
 	CONCLUDE_ACK_TEXT,
@@ -76,6 +84,7 @@ export interface LhMarkerMessage {
 		| "plan-block"
 		| "practice-thinking"
 		| "practice-submission"
+		| "practice-ask"
 		| "practice-next"
 		| "problem-dismissed"
 		| "compaction"
@@ -316,32 +325,66 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
  *  content label is the single "Your thinking"; `details` keeps the raw
  *  payload for the transcript card. One problem may carry many
  *  submissions. */
-export function newThinkingMessage(problemCallId: string, text: string, code?: readonly CodeFile[]): LhMarkerMessage {
+export function newThinkingMessage(problemCallId: string, text: string, code?: readonly CodeFile[], trace?: TraceBundle): LhMarkerMessage {
 	// PRACTICE WORKSPACES (plan step 3): on a coding problem the server
-	// attaches the learner's current files (from the workspace store) —
-	// the model reads them after the thinking; the card shows them collapsed.
+	// attaches the learner's current files (from the workspace store) — the
+	// card shows them collapsed. Plan step 5: with a trace, the model reads
+	// the trace (narration, runs, the code DIFF since it last looked)
+	// instead of the full files.
 	const withCode = code !== undefined && code.length > 0;
-	const codeText = withCode ? `\n\nTheir current code:\n${code.map(fenceFile).join("\n\n")}` : "";
+	const traceText = trace ? describeTrace(trace) : "";
+	const codeText = trace
+		? traceText
+			? `\n\n${traceText}`
+			: ""
+		: withCode
+			? `\n\nTheir current code:\n${code.map(fenceFile).join("\n\n")}`
+			: "";
+	const details: Record<string, unknown> = { problemCallId, text };
+	if (withCode) details.code = [...code];
+	if (trace) details.trace = trace;
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-thinking",
 		content: `${THINKING_LABEL}:\n${text}${codeText}`,
 		display: true,
-		details: withCode ? { problemCallId, text, code: [...code] } : { problemCallId, text },
+		details,
 		timestamp: Date.now(),
 	};
 }
 
 /** A coding problem's Submit (plan step 3): the learner's files and the
  *  server-run results (hidden tests as counts). The model reads the
- *  results and the code; the card shows the counts. */
+ *  results and the code (plus the trace since it last looked, step 5);
+ *  the card shows the counts. */
 export function newSubmissionMessage(details: SubmissionDetails): LhMarkerMessage {
+	const traceText = details.trace ? describeTrace(details.trace) : "";
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-submission",
-		content: `The learner submitted their solution.\n${describeRunResult(details.result)}\n\nSubmitted code:\n${details.files.map(fenceFile).join("\n\n")}`,
+		content:
+			`The learner submitted their solution.\n${describeRunResult(details.result)}\n\nSubmitted code:\n${details.files.map(fenceFile).join("\n\n")}` +
+			(traceText ? `\n\nSince you last looked:\n${traceText}` : ""),
+		display: true,
+		details,
+		timestamp: Date.now(),
+	};
+}
+
+/** A coding problem's Ask (plan step 5): a direct request for help, with
+ *  the trace since the agent last looked. A wordless Ask still asks. */
+export function newAskMessage(details: AskDetails): LhMarkerMessage {
+	const request = details.text.trim()
+		? `The learner pressed Ask — a direct request for your help:\n${details.text.trim()}`
+		: "The learner pressed Ask without words — they want your help now.";
+	const traceText = details.trace ? describeTrace(details.trace) : "";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "practice-ask",
+		content: request + (traceText ? `\n\n${traceText}` : ""),
 		display: true,
 		details,
 		timestamp: Date.now(),
@@ -512,6 +555,75 @@ export function problemInputForConclude(
 		}
 	}
 	return undefined;
+}
+
+/** A coding conclusion's app-computed outcome (plan step 5; owner ruling):
+ *  never authored by the agent and never shown to it — the card's. */
+export interface CodingOutcome {
+	/** The last Submit's counts, or null when the learner never submitted. */
+	lastSubmit: { built: boolean; visible: { passed: number; total: number }; hidden: { passed: number; total: number } | null } | null;
+	/** Pose → the first Submit that passed every test; null when none did. */
+	timeToPassMs: number | null;
+	/** Ask presses on this problem. */
+	asks: number;
+	/** Learner turns during the problem that got a visible agent reply,
+	 *  excluding the pose turn and the concluding turn. */
+	hints: number;
+}
+
+/** The outcome for a conclude call whose problem was a coding problem;
+ *  undefined otherwise. Pure fold over the record. */
+export function codingOutcomeForConclude(messages: readonly LhMessage[], concludeCallId: string): CodingOutcome | undefined {
+	const ci = messages.findIndex(
+		(m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.id === concludeCallId),
+	);
+	if (ci < 0) return undefined;
+	const clean = cleanToolCallIds(messages);
+	let pose: { index: number; id: string; at: number } | null = null;
+	for (let mi = ci; mi >= 0 && !pose; mi--) {
+		const m = messages[mi]!;
+		if (m.role !== "assistant") continue;
+		for (let bi = m.content.length - 1; bi >= 0; bi--) {
+			const block = m.content[bi]!;
+			if (block.type !== "toolCall" || block.name !== PRACTICE_PROBLEM_TOOL || !clean.has(block.id)) continue;
+			const moduleId = (block.arguments as { workspace?: { module?: unknown } } | undefined)?.workspace?.module;
+			if (moduleId !== "code") return undefined;
+			pose = { index: mi, id: block.id, at: m.timestamp };
+			break;
+		}
+	}
+	if (!pose) return undefined;
+	const poseId = pose.id;
+	const forProblem = (m: LhMessage, type: string) =>
+		m.role === "custom" && m.customType === type && (m.details as { problemCallId?: unknown } | null)?.problemCallId === poseId;
+
+	let lastSubmit: CodingOutcome["lastSubmit"] = null;
+	let timeToPassMs: number | null = null;
+	let asks = 0;
+	// Learner inputs between the pose and the conclusion, and whether each
+	// drew a visible reply before the next one.
+	const replied: boolean[] = [];
+	for (let mi = pose.index + 1; mi < ci; mi++) {
+		const m = messages[mi]!;
+		if (forProblem(m, "practice-submission")) {
+			const r = (m as LhMarkerMessage).details as SubmissionDetails;
+			const built = !(r.result.phase === "build" && !r.result.ok);
+			lastSubmit = {
+				built,
+				visible: { passed: r.result.visible.filter((t) => t.status === "pass").length, total: r.result.visible.length },
+				hidden: r.result.hidden ? { ...r.result.hidden } : null,
+			};
+			if (r.result.ok && timeToPassMs === null) timeToPassMs = Math.max(0, m.timestamp - pose.at);
+		}
+		if (forProblem(m, "practice-ask")) asks++;
+		const learnerInput =
+			m.role === "user" || forProblem(m, "practice-thinking") || forProblem(m, "practice-submission") || forProblem(m, "practice-ask");
+		if (learnerInput) replied.push(false);
+		else if (m.role === "assistant" && replied.length > 0 && userFacingTextOf(m.content).length > 0) replied[replied.length - 1] = true;
+	}
+	// The last input started the concluding turn: its reply is the conclusion.
+	const hints = replied.slice(0, -1).filter(Boolean).length;
+	return { lastSubmit, timeToPassMs, asks, hints };
 }
 
 export function activeProblemOf(
@@ -882,7 +994,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-submission", "practice-next"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-submission", "practice-ask", "practice-next"].includes(message.customType)) return "learner";
 		// reading-discussion: a held note riding a run it never starts (docs/readings.md §14).
 		return ["graph-context", "plan-block", "problem-dismissed", "compaction", "reading-discussion"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}

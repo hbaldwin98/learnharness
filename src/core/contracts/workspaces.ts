@@ -50,6 +50,8 @@ export interface WorkspaceState {
 	active: boolean;
 	lastRun: WorkspaceRunResult | null;
 	lastSubmit: WorkspaceRunResult | null;
+	/** Every recorded narration line for this problem (plan step 5). */
+	narration: NarrationEntry[];
 }
 
 /** The submission marker's details (transcript card + model text). */
@@ -57,6 +59,16 @@ export interface SubmissionDetails {
 	problemCallId: string;
 	files: CodeFile[];
 	result: WorkspaceRunResult;
+	/** What happened since the agent last looked (plan step 5). */
+	trace?: TraceBundle;
+}
+
+/** The ask marker's details (plan step 5). */
+export interface AskDetails {
+	problemCallId: string;
+	/** The learner's request; "" for a wordless Ask. */
+	text: string;
+	trace?: TraceBundle;
 }
 
 /** Fence a file for model-facing text (language from the extension). */
@@ -78,6 +90,78 @@ export function describeRunResult(result: WorkspaceRunResult): string {
 	}
 	if (!result.ok && result.output && (result.phase === "build" || result.visible.length === 0)) lines.push("Output:\n" + result.output);
 	return lines.join("\n");
+}
+
+// ─── the learner trace (plan step 5) ─────────────────────────────────────────
+
+/** One recorded piece of narration (typed or dictated), timestamped. */
+export interface NarrationEntry {
+	at: string;
+	text: string;
+}
+
+/** One file's change since the code the agent last saw. */
+export interface FileChange {
+	path: string;
+	/** Unified hunks, or the whole file when `full`. */
+	text: string;
+	full?: boolean;
+}
+
+/**
+ * Everything since the agent last looked, delivered once with an Ask, a
+ * Submit or a thinking message (owner ruling: one bundle per delivery).
+ */
+export interface TraceBundle {
+	narration: NarrationEntry[];
+	/** The Runs since the last delivery, as the learner saw them. */
+	runs: WorkspaceRunResult[];
+	/** The code changes, or null when the marker carries the full code. */
+	changes: FileChange[] | null;
+	/** Current language-server errors and warnings (capped). */
+	diagnostics: CodeDiagnostic[];
+}
+
+/** A wall-clock time for model text and the strip ("14:03"). */
+export function clockTime(iso: string): string {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "";
+	return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Is there nothing in the bundle worth a section? */
+export function traceIsEmpty(t: TraceBundle): boolean {
+	return t.narration.length === 0 && t.runs.length === 0 && (t.changes?.length ?? 0) === 0 && t.diagnostics.length === 0;
+}
+
+/** The bundle as model-facing text ("" when there is nothing to say). */
+export function describeTrace(t: TraceBundle): string {
+	const parts: string[] = [];
+	if (t.narration.length > 0) {
+		parts.push(
+			"Their narration since you last looked (thinking aloud, often dictated):\n" +
+				t.narration.map((n) => `[${clockTime(n.at)}] ${n.text}`).join("\n"),
+		);
+	}
+	for (const r of t.runs) parts.push(`They ran the visible tests at ${clockTime(r.at)}:\n${describeRunResult(r)}`);
+	if (t.changes !== null) {
+		if (t.changes.length === 0) parts.push("Their code is unchanged since you last saw it.");
+		else {
+			parts.push(
+				"Their code changes since you last saw it:\n" +
+					t.changes
+						.map((c) => (c.full ? fenceFile({ path: c.path, content: c.text }) : `${c.path}:\n\`\`\`diff\n${c.text}\n\`\`\``))
+						.join("\n\n"),
+			);
+		}
+	}
+	if (t.diagnostics.length > 0) {
+		parts.push(
+			"The editor currently shows these language-server problems:\n" +
+				t.diagnostics.map((d) => `${d.path}:${d.line + 1}:${d.column + 1} ${d.severity}: ${d.message}`).join("\n"),
+		);
+	}
+	return parts.join("\n\n");
 }
 
 // ─── language-server diagnostics (plan step 4) ───────────────────────────────

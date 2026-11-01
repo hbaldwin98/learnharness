@@ -338,6 +338,9 @@ export interface ArtifactPartProps {
 		 * arguments joined onto the conclude part by projectView — the
 		 * observability drawer's data. */
 		problemInput?: unknown;
+		/** A coding conclusion's app-computed outcome (plan step 5), folded
+		 *  on by projectView (native-messages.ts CodingOutcome). */
+		codingOutcome?: unknown;
 		/** The view-seam join for conclude cards (owner round, 2026-10-05):
 		 *  the modelSolution committed at POSE time, folded onto the part by
 		 *  projectView — the reveal is never re-authored. */

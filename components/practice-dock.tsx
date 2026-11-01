@@ -49,9 +49,32 @@ export interface PracticeDockProps {
 	 *  and say so in the hint row. The server registry is the real gate;
 	 *  this is the affordance. */
 	compactionRunning?: boolean;
+	/** A workspace pane is open beside the transcript (plan step 5, owner
+	 *  ruling): the pane's narration strip is the talk channel, so the dock
+	 *  is the problem bar alone — no field, no dictation claim, no Enter. */
+	barOnly?: boolean;
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onEscape, compactionRunning = false }: PracticeDockProps) {
+export function PracticeDock(props: PracticeDockProps) {
+	// Separate components, so switching remounts instead of toggling hooks.
+	return props.barOnly ? <ProblemBar statement={props.input.statement} /> : <ThinkingDock {...props} />;
+}
+
+/** The problem bar beside an open workspace: the statement, one line. The
+ *  full statement is the problem card in the transcript. */
+function ProblemBar({ statement }: { statement: string }) {
+	return (
+		<div
+			data-testid="practice-problem-bar"
+			className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-muted-foreground"
+		>
+			<span className="font-medium">Problem</span>
+			<span className="min-w-0 flex-1 truncate">{statement}</span>
+		</div>
+	);
+}
+
+function ThinkingDock({ problemCallId, input, expanded, onExpand, onSubmit, onEscape, compactionRunning = false }: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
 	// Ref MIRRORS the field ("nothing gets lost", the question-dock
 	// discipline): a submit resuming after `await finishDictation()` reads
