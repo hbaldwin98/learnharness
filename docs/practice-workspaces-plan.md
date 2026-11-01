@@ -322,9 +322,38 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Steps 5–10 — outline (detailed one at a time)
+## Step 5 — the narration trace and Ask (PLANNED)
 
-5. **Trace + Ask.** The narration strip as the dictation target; trace markers (snapshots and diffs, run and submit results, asks) in the record; the Ask button and hotkey; the computed outcome fields.
+**Goal:** the learner can think aloud into a narration strip in the coding pane without starting a turn; Ask, Submit and thinking deliver everything since the agent last looked as one trace bundle; the conclude card shows app-computed coding outcomes.
+
+**Owner rulings (2026-11-01):**
+- **The strip is in the pane; the dock goes.** While the coding pane is open, the dock under the transcript shows only the problem bar, and the narration strip in the pane is the talk channel and the dictation target. With the pane hidden (the Code chip), the full thinking dock returns.
+- **Ask sends the strip's draft now** as a direct request, with the trace since the agent last looked; an empty Ask sends the trace alone ("the learner asked for help"). It starts a turn.
+- **One bundle per delivery.** Narration and Run results collect in the workspace store; when something reaches the agent (Ask, Submit, thinking), ONE bundle rides that marker. The record changes only when the agent is told.
+- **Outcome fields:** hints = learner turns during the problem (thinking, Ask, Submit, typed message) that got a visible agent reply, excluding the pose and concluding turns; time = pose → first Submit that passed every test (blank if none); asks = Ask presses; tests at the last Submit. Shown on the conclude card and its info box only; never given to the agent.
+- **The remaining choices: the recommended defaults** ("recommended for all").
+
+**Defaulted (recommended):**
+- **The trace store.** The workspace record gains `narration: { at, text }[]`, `runs: { at, result }[]` and a delivery cursor (`delivered: { narration, runs, files }`; `files` starts as the starter). The narration log comes back on reload; the unsent draft is kept on this device (localStorage, per problem).
+- **The bundle:** the undelivered narration (timestamped), each undelivered Run's short result, a line diff of the code against the code the agent last saw (the full file when the diff would be larger), and the current language-server errors and warnings (capped at 20; step 4 deferred them here). The cursor advances only after the marker persists, so a refused send loses nothing.
+- **Markers:** a new `ask` chat input appends a `practice-ask` marker (the request, then the bundle) and starts a turn; refused with no active problem, disabled while the agent is talking (like Submit). Submit keeps its full submitted code (it is what gets graded) and carries the bundle without a diff, then resets the seen code to the submitted files. Thinking on a coding problem (pane hidden) carries the bundle's diff to the model instead of the full files; its card still shows the full files.
+- **The diff** is a small line diff in core — no new dependency.
+- **The strip:** a scrolling narration log (`12:01 so I'll use a map`) and a one-line input above Run / Submit / Ask. Narration is recorded on Enter; dictated text records itself after 4 s without change unless the input has focus; Run and Submit record a pending draft first. Ask finishes dictation first, then sends the draft. The dock releases the dictation claim while the pane is open, so dictation never reaches the editor.
+- **Ask hotkey `Mod+;`** in the rebindable registry (beside Run's `Mod+'`; `Mod+Shift+A` is Chrome's tab search).
+- **Cards:** an Ask card with the request; the Ask, Submit and thinking cards each gain a collapsed "Trace" disclosure (narration, runs, diff). The conclude card gains the coding outcome row, computed from the record by one pure function.
+- **Doctrine:** the coding module's prompt segment and tool text gain one factual line — asks and submits arrive with a trace; an Ask is a direct request for help. Coaching wording is step 10's.
+- **Out of scope:** listening cues and `stay_quiet` (step 6). Until then Run results reach the agent only with the next Ask, Submit or thinking.
+
+**Tests:**
+- **Unit:** the line diff; bundling and the cursor (a refused send doesn't advance it); the `ask` input and marker; the outcome function; the narration route; the strip's auto-record; the card projection.
+- **Live check:** in the app, narrate (typed), Run, Ask with words, the agent answers from the trace, Submit, conclude, and the outcome row reads right.
+
+**Risks:** the 4 s auto-record is a guess to tune against real dictation; moving the dictation claim between the dock and the strip is the likeliest bug.
+
+---
+
+## Steps 6–10 — outline (detailed one at a time)
+
 6. **Listening.** The four cues, the cap and coalescing, the `stay_quiet` tool and its faint transcript line, the global setting; delivery through the existing wake path.
 7. **Annotations.** The agent tool; anchors that follow edits; the outdated list.
 8. **Settings.** The Coding section: default language, listening, Docker status and image management.
