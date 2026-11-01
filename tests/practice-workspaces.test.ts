@@ -11,7 +11,7 @@ import { describe, it } from "node:test";
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 
-import { createPracticeGate, problemInputObject, problemInputSchema, problemTool, practiceTools } from "../src/agent/tools/practice.ts";
+import { concludeTool, createPracticeGate, problemInputObject, problemInputSchema, problemTool, practiceTools } from "../src/agent/tools/practice.ts";
 import { composeInstructions } from "../src/agent/teacher-agent.ts";
 import type { AgentWorkspaceModule } from "../src/agent/workspaces/registry.ts";
 import { activeProblemOf, PRACTICE_PROBLEM_TOOL, type LhMessage } from "../src/core/native-messages.ts";
@@ -135,6 +135,45 @@ describe("reading a workspace off a problem", () => {
 		assert.equal(workspaceComponentFor({ ...POSE, workspace: { module: "ghost" } }, { fake: Fake }), null);
 		assert.equal(workspaceComponentFor({ ...POSE, workspace: { module: "fake" } }, { fake: Fake }), Fake);
 		assert.equal(workspaceComponentFor({ ...POSE, workspace: { module: "constructor" } }, { fake: Fake }), null);
+	});
+});
+
+describe("a workspace problem is solved only after a passing Submit", () => {
+	const CONCLUDE = (outcome: string) => ({ outcome, verdict: "v", rung: null, missClass: null, retest: false });
+	const posed = (callId: string): LhMessage[] => [
+		{ id: "a1", role: "assistant", content: [{ type: "toolCall", id: callId, name: PRACTICE_PROBLEM_TOOL, arguments: { ...POSE, workspace: { module: "fake" } } }], stopReason: "toolUse", timestamp: 1 } as unknown as LhMessage,
+		{ id: "r1", role: "toolResult", toolCallId: callId, toolName: PRACTICE_PROBLEM_TOOL, content: [{ type: "text", text: "ok" }], isError: false, timestamp: 2 } as unknown as LhMessage,
+	];
+	const submission = (callId: string, ok: boolean): LhMessage =>
+		({ id: `s_${ok}`, role: "custom", customType: "practice-submission", content: "", display: true, details: { problemCallId: callId, files: [], result: { ok } }, timestamp: 3 }) as unknown as LhMessage;
+	const gateFor = (messages: LhMessage[]) => createPracticeGate({ chatId: "c1", chatStore: { getChat: () => ({ messages, kind: "practice" }) } });
+	const refused = (r: { content: unknown[] }) => /no Submit that passed every test/.test(textOf(r as never));
+
+	it("refuses solved and solvedWithHints with no Submit, or only a failing one", async () => {
+		for (const messages of [posed("p1"), [...posed("p1"), submission("p1", false)], [...posed("p1"), submission("other", true)]]) {
+			for (const outcome of ["solved", "solvedWithHints"]) {
+				assert.ok(refused(await concludeTool(gateFor(messages)).execute("c", CONCLUDE(outcome) as never)), outcome);
+			}
+		}
+	});
+
+	it("allows movedOn/surrendered any time, and solved after a passing Submit", async () => {
+		assert.ok(!refused(await concludeTool(gateFor(posed("p1"))).execute("c", CONCLUDE("movedOn") as never)));
+		assert.ok(!refused(await concludeTool(gateFor(posed("p1"))).execute("c", CONCLUDE("surrendered") as never)));
+		const passed = [...posed("p1"), submission("p1", false), submission("p1", true)];
+		assert.ok(!refused(await concludeTool(gateFor(passed)).execute("c", CONCLUDE("solved") as never)));
+	});
+
+	it("a problem without a workspace concludes solved as before", async () => {
+		const plain = posed("p1").map((m, i) => (i === 0 ? ({ ...m, content: [{ type: "toolCall", id: "p1", name: PRACTICE_PROBLEM_TOOL, arguments: POSE }] } as unknown as LhMessage) : m));
+		assert.ok(!refused(await concludeTool(gateFor(plain)).execute("c", CONCLUDE("solved") as never)));
+	});
+
+	it("a workspace problem posed this turn can't be solved in the same turn", async () => {
+		const gate = gateFor([]);
+		const pose = await problemTool(gate, undefined, [fakeModule()], "c1").execute("p1", { ...POSE, workspace: { module: "fake", language: "x" } } as never);
+		assert.equal(pose.isError ?? false, false);
+		assert.ok(refused(await concludeTool(gate).execute("c", CONCLUDE("solved") as never)));
 	});
 });
 

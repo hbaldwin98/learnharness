@@ -46,7 +46,7 @@ function descriptorSchema(module: AgentWorkspaceModule): TObject {
 export function workspaceFieldSchema(modules: readonly AgentWorkspaceModule[]): TSchema | null {
 	if (modules.length === 0) return null;
 	const description =
-		"OPTIONAL — a workspace for this problem instead of the thinking field. OMIT for an ordinary problem.";
+		"OPTIONAL — a workspace for this problem (opens beside the thinking field). OMIT for an ordinary problem.";
 	const schemas = modules.map(descriptorSchema);
 	return Type.Optional(
 		schemas.length === 1 ? { ...schemas[0]!, description } : Type.Union(schemas, { description }),

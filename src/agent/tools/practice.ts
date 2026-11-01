@@ -23,7 +23,7 @@ import { findTool } from "./find.ts";
 import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
 import { proberGraphTools, type GraphToolContext } from "./graph.ts";
-import { activeProblemOf } from "../../core/native-messages.ts";
+import { activeProblemOf, passingSubmissionOf } from "../../core/native-messages.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
@@ -64,14 +64,26 @@ export interface PracticeToolContext {
  *  this closure — the intra-turn truth the record cannot hold yet. */
 export interface PracticeGate {
 	problemActive: boolean;
+	/** The active problem has a workspace and no Submit that passed every
+	 *  test yet (owner ruling 2026-11-01: a workspace problem is solved only
+	 *  after a passing Submit). */
+	needsPassingSubmit: boolean;
 }
 
 /** Seed the turn's gate from the record (result-aware activeProblemOf —
  *  only a cleanly-posed problem counts). */
 export function createPracticeGate(ctx: PracticeToolContext): PracticeGate {
 	const record = ctx.chatStore.getChat(ctx.chatId);
-	return { problemActive: record ? activeProblemOf(record.messages) !== null : false };
+	const active = record ? activeProblemOf(record.messages) : null;
+	return {
+		problemActive: active !== null,
+		needsPassingSubmit:
+			active !== null && workspaceOf(active.input) !== null && !passingSubmissionOf(record!.messages, active.toolCallId),
+	};
 }
+
+/** The outcomes that need a passing Submit on a workspace problem. */
+const SOLVED_OUTCOMES: ReadonlySet<string> = new Set(["solved", "solvedWithHints"]);
 
 // ─── problem: the pose ───────────────────────────────────────────────────────
 
@@ -115,7 +127,7 @@ const PROBLEM_DESCRIPTION =
 	"reveal needs no new field). Only one problem may be active — conclude it before posing the next.";
 
 const WORKSPACE_DESCRIPTION_SUFFIX =
-	" A `workspace` gives the learner a workspace instead of the thinking field; the pose is verified before it goes through.";
+	" A `workspace` gives the learner a workspace beside the thinking field; the pose is verified before it goes through. A workspace problem concludes solved only after the learner's Submit passes every test.";
 
 export function problemTool(
 	gate: PracticeGate,
@@ -199,6 +211,7 @@ export function problemTool(
 				if (errors.length > 0) return invalidInputResult("problem", errors);
 			}
 			gate.problemActive = true;
+			gate.needsPassingSubmit = workspace !== undefined;
 			return problemResult();
 		},
 	};
@@ -253,11 +266,18 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 		parameters: concludeInputObject,
 		prepareArguments: (args: unknown) => healEncodedArguments(args, concludeInputObject) as never,
 		executionMode: "sequential",
-		execute: async (_toolCallId, _input) => {
+		execute: async (_toolCallId, input) => {
 			if (!gate.problemActive) {
 				return invalidInputResult("conclude", ["no active problem to conclude — pose one first"]);
 			}
+			if (gate.needsPassingSubmit && SOLVED_OUTCOMES.has(input.outcome)) {
+				return invalidInputResult("conclude", [
+					"this workspace problem has no Submit that passed every test (visible and hidden) — it can't be solved yet. " +
+						"Ask the learner to Submit, and conclude after the submission arrives; or conclude as movedOn or surrendered",
+				]);
+			}
 			gate.problemActive = false;
+			gate.needsPassingSubmit = false;
 			return concludeResult();
 		},
 	};

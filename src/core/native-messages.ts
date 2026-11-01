@@ -348,6 +348,19 @@ export function newSubmissionMessage(details: SubmissionDetails): LhMarkerMessag
 	};
 }
 
+/** Has the problem a Submit that passed every test (visible and hidden)?
+ *  The conclude gate reads this (owner ruling 2026-11-01: a workspace
+ *  problem is solved only after a passing Submit). */
+export function passingSubmissionOf(messages: readonly LhMessage[], problemCallId: string): boolean {
+	return messages.some((m) => {
+		if ((m as { role?: string }).role !== "custom") return false;
+		const marker = m as LhMarkerMessage;
+		if (marker.customType !== "practice-submission") return false;
+		const details = marker.details as Partial<SubmissionDetails> | undefined;
+		return details?.problemCallId === problemCallId && details.result?.ok === true;
+	});
+}
+
 /** The learner's explicit move-on signal (owner round 16): appended by
  *  the next input (the composer band's chip, or Enter on an empty
  *  composer during the between-problems pause). The content is the
