@@ -365,9 +365,41 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Steps 6–10 — outline (detailed one at a time)
+## Step 6 — listening (PLANNED)
 
-6. **Listening.** The four cues, the cap and coalescing, the `stay_quiet` tool and its faint transcript line, the global setting; delivery through the existing wake path.
+**Goal:** while the learner works a coding problem, the agent looks in on its own at the ruled cues, and either says something useful or stays quiet — a quiet look is recorded but costs the learner nothing on screen beyond one faint line.
+
+**Owner rulings (2026-11-01):**
+- **Only while the pane is open.** The server detects the cues from the learner's activity, but listening runs only while a coding pane is open and its window is visible (the pane sends a heartbeat). Closing the app or switching away pauses it.
+- **Ask and Submit interrupt a listening turn.** They stay enabled during a turn the app started; pressing one stops that turn (what it wrote stays) and sends at once. Turns the learner started still disable them.
+- **One faint line per look:** "Agent looked · after your Run" (the cue), with the Trace disclosure; a quiet look adds "· nothing to add"; a reply follows the line.
+- **Earlier rulings (design doc §6):** all four cues; listening on by default with a global opt-out; an explicit `stay_quiet` tool, never inferred from an empty reply; delivery through the existing wake path.
+
+**Defaulted (recommended):**
+- **The cues** (server-side, one ticker per process, every 5 s):
+  - **Run** — each Run.
+  - **Silence** — 90 s with no edit, narration or Run, measured from the later of the last activity and the agent's last turn; fires once per quiet stretch and re-arms on the next activity.
+  - **Interval** — 5 min since the agent last looked, with some activity in that time.
+  - **Struggle** — a recorded narration line matching a phrase list (case-insensitive): "I'm stuck", "I am stuck", "I don't know why", "I don't understand", "this isn't working", "this doesn't work", "no idea", "what am I missing", "I'm lost", "I give up", "why isn't this", "why is this not".
+- **The cap:** at most one listening turn in flight; at least 60 s between listening updates; cues that arrive meanwhile (or while any turn runs, a question dangles, or presence lapsed) coalesce into one pending update naming every cue, fired when the gates open. Ask and Submit bypass it (they are the learner's).
+- **Delivery:** the wake pipeline's turn runner (the same server-side turn the idle wake fires, admission and write-ahead included) with a new server-origin input `{ type: "listen", problemCallId, cues }`. It appends a `practice-listen` marker — the cues plus the step 5 trace bundle (the cursor commits as for Ask) — and runs as a **background** turn, so it honours each connection's background-use permission. When background use isn't allowed, nothing fires and the pane shows "Listening paused — background use is off for this connection".
+- **Presence:** the pane POSTs `…/presence` every 20 s while mounted and the document is visible; presence lasts 45 s. Activity is noted from the existing saves, narration and Runs.
+- **`stay_quiet`:** a practice tool, accepted only in a turn that answers a `practice-listen` marker (refused otherwise: "the learner asked you directly — answer them"). It ends the turn (`terminate`), with an optional private `note` for the agent's own record.
+- **Interrupting:** the client knows a listening turn is running (the record's last input is a `practice-listen` marker). Ask/Submit then abort it through the existing abort and send once it has settled.
+- **The setting:** `agent.coding.listening` (default on). Settings gets a new **Coding** section with this one row now; step 8 fills in the rest. The pane header shows a small listening indicator (on / paused / off).
+- **Doctrine:** the `stay_quiet` description and one factual line on the problem tool (listening updates arrive with a cue and a trace; reply only when it helps now, else `stay_quiet`). Coaching wording stays step 10's.
+- **Cost:** each look is a model turn. With the 60 s floor, a 20-minute problem can't exceed 20 looks; with these cues a typical one is a handful.
+
+**Tests:**
+- **Unit:** the cue engine as a pure decision over an injected clock (each cue, the 60 s floor, coalescing, presence lapse, re-arming silence, setting off, background disallowed); the `listen` input and marker; the `stay_quiet` gate and termination; the projection (the faint line, quiet join); the presence route.
+- **Live check:** a Run cue produces a look; a quiet look shows "nothing to add"; Ask during a listening turn interrupts it and is answered; closing the pane stops the looks.
+
+**Risks:** the abort-then-send handoff is the likeliest race; quiet looks on the CLI provider still cost a turn; the struggle list will need tuning against real narration.
+
+---
+
+## Steps 7–10 — outline (detailed one at a time)
+
 7. **Annotations.** The agent tool; anchors that follow edits; the outdated list.
 8. **Settings.** The Coding section: default language, listening, Docker status and image management.
 9. **Teacher exercises.** The teaching tool and its Tools toggle; an inline split view in the lesson; a quiz-style result back to the teacher.
