@@ -229,7 +229,7 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 **Measured after the switch (Windows, Docker Desktop):** a warm Python Run fell from ~3.6 s to ~0.95 s; pure Docker overhead per run from 1,953 ms to 201 ms; the real-Docker suite from 370 s to 205 s, all 33 cases passing in all eight languages. An API image build, the superseded-tag deletion and the standalone payload loading dockerode were each checked directly.
 
-## Step 3 — the editor and workspace UI (IN PROGRESS)
+## Step 3 — the editor and workspace UI (BUILT 2026-11-01)
 
 **Goal:** a coding problem opens a code workspace beside the transcript; the learner edits, runs the visible tests, talks to the agent through the thinking dock, and submits. Ends with the deferred live check from step 2: a real practice turn poses a coding problem and the whole loop runs in the app.
 
@@ -257,7 +257,11 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 - **Submit while the agent is talking:** disabled until its turn ends (the button says why).
 - **Results panel:** the last Run or Submit (whichever is newer) restores on load.
 
-**Built (2026-11-01):** the store, routes and server run path; the `submission` input and marker; the thinking snapshot; the cards; the pane (CodeMirror, tabs with read-only tests, Run/Submit, results, autosave with flush, Vim toggle); the split view and Code chip; the two registry hotkeys; the Settings → Keyboard Vim row. Tests: `tests/code-workspace-ui.test.ts` (store, Run/Submit against a fake runner with hidden counts, inputs, projection, absorption). **Live check: pending.**
+**Built (2026-11-01):** the store, routes and server run path; the `submission` input and marker; the thinking snapshot; the cards; the pane (CodeMirror, tabs with read-only tests, Run/Submit, results, autosave with flush, Vim toggle); the split view and Code chip; the two registry hotkeys; the Settings → Keyboard Vim row. Tests: `tests/code-workspace-ui.test.ts` (store, Run/Submit against a fake runner with hidden counts, inputs, projection, absorption).
+
+**Live check (2026-11-01, PASSED):** the worktree's dev server on a fresh data dir, the owner's model (Claude Code CLI, opus), headless Chromium driven by puppeteer. In one practice session: (1) the agent posed a Python `rev(xs)` problem; the pane opened with `solution.py` and the read-only `test_solution.py`; Run on the starter showed 0/2 with the pytest failures; a Vim edit (`ggdG`, insert), with the status line reading `--NORMAL--` and Esc leaving the problem active; Ctrl+' ran 2/2; thinking sent with the code snapshot (the "Your code" disclosure); the agent concluded *solved* from the snapshot; the pane closed and the conclude card revealed the reference and all tests. (2) A second problem (`total(xs)`) went straight to Submit: the submission card read "All tests pass · visible 2/2 · hidden 1/1", the agent got the marker and concluded *solved*. Both containers were gone once each turn settled; the saved files sat in `data/workspaces/<chatId>/`.
+
+**Noted, not fixed:** Python auto-indent leaves a whitespace-only last line in typed code (cosmetic); in run (1) the agent concluded on the thinking alone without asking for a Submit, so the hidden tests never ran (its claim that they passed was its own inference). That is doctrine for step 10 (whether a coding problem must be submitted before *solved*).
 
 ---
 
