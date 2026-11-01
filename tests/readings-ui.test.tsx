@@ -2,7 +2,8 @@
  * READINGS UI pins (docs/readings.md §6/§8) — static renders: the
  * teacher's offer card (outside a session it renders the offer without
  * controls; a refused call renders nothing), the chain table's Deep dive
- * action (only beside the delete fence, never in practice-pick mode), the
+ * action (beside the delete fence for selected sources, beside Done in
+ * practice-pick mode for ticked propositions), the
  * overview's sections with their live plan-node chips, the portable
  * markdown export, and Discuss (docs/readings.md §14): passage threads
  * sit after their block, unplaceable ones fall back to the side chat,
@@ -74,9 +75,11 @@ describe("the chain table's Deep dive", () => {
 		assert.match(html, /data-testid="chain-deep-dive"/);
 	});
 
-	it("is absent in practice-pick mode", () => {
+	it("sits beside Done in practice-pick mode when propositions are ticked", () => {
 		const html = renderToStaticMarkup(React.createElement(ChainTableBody, { ...base, onDeepDive: () => {}, selectMode: true, onSelect: () => {} }));
-		assert.doesNotMatch(html, /chain-deep-dive/);
+		assert.match(html, /data-testid="chain-deep-dive"/);
+		assert.match(html, /data-testid="chain-practice-done"/);
+		assert.ok(html.indexOf("chain-deep-dive") < html.indexOf("chain-practice-done"));
 	});
 
 	it("is absent when the selected sources hold no propositions", () => {

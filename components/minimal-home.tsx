@@ -86,6 +86,7 @@ export function MinimalHome({
 	practiceSelection,
 	onPracticeSelectionChange,
 	onChainSelectClose,
+	onBeforeDeepDive,
 }: {
 	/** The lifted pick set drives the overlay's select mode (Done instead
 	 * of the delete fence); the chip in home's composer reflects it. */
@@ -93,6 +94,8 @@ export function MinimalHome({
 	practiceSelection?: ReadonlySet<string>;
 	onPracticeSelectionChange?: (nodes: { id: string; name: string; statement: string }[]) => void;
 	onChainSelectClose?: () => void;
+	/** Pick mode: save the host's draft before a Deep dive navigates away. */
+	onBeforeDeepDive?: () => void;
 }) {
 	const [snapshot, setSnapshot] = useState<GraphSnapshot | null>(null);
 	const [costs, setCosts] = useState<GraphCostSummary | null>(null);
@@ -193,6 +196,7 @@ export function MinimalHome({
 				}}
 				selectMode={chainSelectOpen}
 				controlledSelection={practiceSelection}
+				onBeforeDeepDive={onBeforeDeepDive}
 				onSelectionChange={(ids) => {
 					// Resolve ids → nodes against the live snapshot; the
 					// caller holds the pick set (count + seed).

@@ -16,6 +16,7 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { PathInput } from "@/components/path-input";
 import { AttachFilesButton } from "@/components/attach-files-button";
 import { SessionStarter } from "@/components/start-session";
+import { HOME_RETURN_KEY, saveDeepDiveReturn, takeDeepDiveReturn } from "@/components/deep-dive-return";
 import type { TurnUsage } from "@/src/core";
 
 /**
@@ -99,6 +100,16 @@ export function Home({
 	const [chainSelectOpen, setChainSelectOpen] = useState(false);
 	// The chain table is CONTROLLED off this id set (the lifted pick).
 	const pickedIds = useMemo(() => new Set(practiceProps.map((p) => p.id)), [practiceProps]);
+	// Back from a pick-mode Deep dive: restore the draft it interrupted, once.
+	useEffect(() => {
+		const saved = takeDeepDiveReturn(HOME_RETURN_KEY);
+		if (!saved) return;
+		topicRef.current = saved.text;
+		setTopic(saved.text);
+		if (saved.mode) setMode(saved.mode);
+		setPracticeProps(saved.picks);
+	}, []);
+	const saveForDeepDive = () => saveDeepDiveReturn(HOME_RETURN_KEY, { text: topicRef.current, picks: practiceProps, mode });
 
 	/* FINISH DICTATION FIRST (owner, 2026-10-01): Enter may arrive while a
 	 * run is live with the topic still deferred in the run's buffer — stop
@@ -183,6 +194,7 @@ export function Home({
 				{rendering ? (
 					<GraphView
 						chainSelectOpen={chainSelectOpen}
+						onBeforeDeepDive={saveForDeepDive}
 						practiceSelection={pickedIds}
 						onPracticeSelectionChange={setPracticeProps}
 						onChainSelectClose={() => setChainSelectOpen(false)}
@@ -190,6 +202,7 @@ export function Home({
 				) : (
 					<MinimalHome
 						chainSelectOpen={chainSelectOpen}
+						onBeforeDeepDive={saveForDeepDive}
 						practiceSelection={pickedIds}
 						onPracticeSelectionChange={setPracticeProps}
 						onChainSelectClose={() => setChainSelectOpen(false)}

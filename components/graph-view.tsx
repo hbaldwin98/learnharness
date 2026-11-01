@@ -930,6 +930,7 @@ export function GraphView({
 	practiceSelection,
 	onPracticeSelectionChange,
 	onChainSelectClose,
+	onBeforeDeepDive,
 }: {
 	/** PRACTICE SELECT (owner vision, 2026-10-04): the LIFTED, persistent
 	 *  pick set — every check/clear in the chain table (however opened)
@@ -940,6 +941,8 @@ export function GraphView({
 	practiceSelection?: ReadonlySet<string>;
 	onPracticeSelectionChange?: (nodes: { id: string; name: string; statement: string }[]) => void;
 	onChainSelectClose?: () => void;
+	/** Pick mode: save the host's draft before a Deep dive navigates away. */
+	onBeforeDeepDive?: () => void;
 }) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1687,6 +1690,7 @@ export function GraphView({
 				}}
 				selectMode={chainSelectOpen}
 				controlledSelection={practiceSelection}
+				onBeforeDeepDive={onBeforeDeepDive}
 				onSelectionChange={(ids) => {
 					// Resolve ids → nodes against the live snapshot; the
 					// caller holds the pick set (count + seed).

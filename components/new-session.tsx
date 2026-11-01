@@ -16,6 +16,7 @@ import { MapIcon, NotebookTextIcon } from "lucide-react";
 import { requestReading, useReadingMode } from "@/components/readings/api";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
+import { newSessionReturnKey, saveDeepDiveReturn, takeDeepDiveReturn } from "@/components/deep-dive-return";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
@@ -282,6 +283,13 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 		setPicks(next);
 	};
 	const [pickerOpen, setPickerOpen] = useState(false);
+	// Back from a pick-mode Deep dive: restore the draft it interrupted, once.
+	useEffect(() => {
+		const saved = takeDeepDiveReturn(newSessionReturnKey(mode));
+		if (!saved) return;
+		applyText(saved.text);
+		applyPicks(saved.picks);
+	}, []);
 	const [snapshot, setSnapshot] = useState<GraphSnapshot | null>(null);
 	const openPicker = () => {
 		if (snapshot) {
@@ -407,6 +415,7 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 						onClose={() => setPickerOpen(false)}
 						selectMode
 						controlledSelection={new Set(picks.map((p) => p.id))}
+						onBeforeDeepDive={() => saveDeepDiveReturn(newSessionReturnKey(mode), { text: textRef.current, picks: picksRef.current })}
 						onSelectionChange={(ids) => {
 							const byId = new Map((snapshot?.propositions ?? []).map((n) => [n.id, n]));
 							const next: DraftPick[] = [];

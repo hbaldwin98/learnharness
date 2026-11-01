@@ -165,7 +165,7 @@ Not machine-checkable, so stated in the prompts: no pre-teaching of upcoming nod
 ## 6. Entry points
 
 ### 6.1 Learner-initiated (all v1 except where marked)
-
+- **Graph → node / chain-table selection → "Deep dive"** — in the chain table, browse mode deep-dives every proposition in the selected sources and folders; practice-pick mode (graph view, minimal home, new-session composer) deep-dives the ticked propositions in tick order. Over `MAX_NODE_PICKS` (64) the learner confirms, and the reading covers the first 64. Pick mode saves the interrupted draft (picks, typed text, Teach/Practice mode) to sessionStorage and restores it once on return (v2).
 - **Plan map → node → "Read deeper"** (plan popup and plan window). Optional request text, mode toggle. The reading card lands in the **session's readings tray**, not in the transcript flow — the lesson continues undisturbed.
 - **Session top bar → "Recap"**. Sessions have no end event, so a recap is requested whenever the learner wants one; re-requesting later produces a new version covering more (`supersedes`).
 - **Plan presentation → "Primer: key terms"** — offered on the plan block once the plan is presented (the moment the terms are known and the probe has shown which are unfamiliar).

@@ -68,7 +68,7 @@ import {
 	SearchIcon,
 	XIcon,
 } from "lucide-react";
-import { chainsForSelection, chainSourceDirectory, folderEntryCheck, toggleSourceEntries, formatChainLine, fuzzyScore, sourceFileLabel } from "@/src/core";
+import { MAX_NODE_PICKS, chainsForSelection, chainSourceDirectory, folderEntryCheck, toggleSourceEntries, formatChainLine, fuzzyScore, sourceFileLabel } from "@/src/core";
 import type { GraphChain, GraphNode, SourceDirectory, SourceEntry, SourceFolder, SourceEntrySelection } from "@/src/core";
 import { EditableSourceName, SourceDragRow, sourceNameMatches, SourceFolderTree, type OrganizationChange } from "./source-folder-tree";
 import { chainRow, useChainNavigation } from "./chain-navigation";
@@ -77,6 +77,7 @@ import { TopBar } from "@/components/top-bar";
 import { DeleteSourceDialog } from "@/components/delete-source-dialog";
 import { LatexGlyph } from "@/components/latex-glyph";
 import { useNodeDeepDive } from "@/components/readings/node-readings";
+import { DeepDiveLimitDialog } from "@/components/deep-dive-limit-dialog";
 
 /** The sortable columns (owner ruling: all three — consistency). */
 export type ChainSortCol = "name" | "props" | "created";
@@ -166,7 +167,8 @@ export function ChainTableBody({
 	selectMode?: boolean;
 	onSelect?: () => void;
 	/** Readings (docs/readings.md §6.1): a deep dive on every proposition
-	 *  in the selected sources (folders select their contained sources). */
+	 *  in the selected sources (folders select their contained sources),
+	 *  or in pick mode on the ticked propositions. */
 	onDeepDive?: (nodeIds: string[]) => void;
 	deepDiveError?: string | null;
 }) {
@@ -211,7 +213,24 @@ export function ChainTableBody({
 		}
 		return membership;
 	}, [sourceChains, byId]);
-	const deepDiveIds = [...new Set([...selectedSources].flatMap((birth) => [...(allSourceNodes.get(birth) ?? [])]))];
+	// Pick mode deep-dives the ticked propositions in tick order; browse
+	// mode, every proposition in the selected sources.
+	const deepDiveIds = selectMode ? [...selection]
+		: [...new Set([...selectedSources].flatMap((birth) => [...(allSourceNodes.get(birth) ?? [])]))];
+	const deepDiveControls = <>
+		{onDeepDive && deepDiveIds.length > 0 && (
+			<button
+				type="button"
+				data-testid="chain-deep-dive"
+				onClick={() => onDeepDive(deepDiveIds)}
+				className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+			>
+				<BookOpenIcon aria-hidden="true" className="size-3.5 text-primary" />
+				Deep dive
+			</button>
+		)}
+		{deepDiveError && <span className="max-w-[16rem] truncate text-xs text-destructive" title={deepDiveError}>{deepDiveError}</span>}
+	</>;
 
 	// The fuzzy filter: a chain is visible when ANY member matches on
 	// name, aliases, or statement; chains rank by best member score.
@@ -604,6 +623,8 @@ export function ChainTableBody({
 							Clear
 						</button>
 						{selectMode ? (
+							<>
+							{deepDiveControls}
 							<button
 								type="button"
 								data-testid="chain-practice-done"
@@ -614,20 +635,10 @@ export function ChainTableBody({
 								<DumbbellIcon aria-hidden="true" className="size-3.5" />
 								Done
 							</button>
+							</>
 						) : (
 							<>
-							{onDeepDive && deepDiveIds.length > 0 && (
-								<button
-									type="button"
-									data-testid="chain-deep-dive"
-									onClick={() => onDeepDive(deepDiveIds)}
-									className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-								>
-									<BookOpenIcon aria-hidden="true" className="size-3.5 text-primary" />
-									Deep dive
-								</button>
-							)}
-							{deepDiveError && <span className="max-w-[16rem] truncate text-xs text-destructive" title={deepDiveError}>{deepDiveError}</span>}
+							{deepDiveControls}
 							{/* The danger fence (owner ruling): a divider quarantines
 								    the destructive action at the bar's right end — the
 								    safe actions and the kill switch never blend. The
@@ -702,6 +713,12 @@ function RowCheckbox({
 	);
 }
 
+/** What a Deep dive request covers: the first MAX_NODE_PICKS ids, in the
+ *  order given, and whether the learner must confirm the cut first. */
+export function deepDiveScope(nodeIds: readonly string[]): { nodeIds: string[]; overLimit: boolean } {
+	return { nodeIds: nodeIds.slice(0, MAX_NODE_PICKS), overLimit: nodeIds.length > MAX_NODE_PICKS };
+}
+
 /** The graph view's overlay wrapper: owns query + sort + selection +
  *  expansion; mounts ABSOLUTE INSIDE the
  *  graph area, full-bleed (owner ruling: the translucent blurred surface
@@ -723,6 +740,7 @@ export function ChainTableOverlay({
 	selectMode,
 	controlledSelection,
 	onSelectionChange,
+	onBeforeDeepDive,
 }: {
 	open: boolean;
 	nodes: GraphNode[];
@@ -733,6 +751,9 @@ export function ChainTableOverlay({
 	selectMode?: boolean;
 	controlledSelection?: ReadonlySet<string>;
 	onSelectionChange?: (next: ReadonlySet<string>) => void;
+	/** Pick mode only: runs just before a Deep dive navigates away, so the
+	 *  host can save its draft (picks, text, mode) for the way back. */
+	onBeforeDeepDive?: () => void;
 }) {
 	const [query, setQuery] = useState("");
 	const [sort, setSort] = useState<ChainSort>({ col: "name", dir: 1 });
@@ -807,6 +828,19 @@ export function ChainTableOverlay({
 		if (visibleDirectory) setEntrySelection((previous) => toggleSourceEntries(visibleDirectory, previous, kind, id, checked));
 	};
 	const deepDive = useNodeDeepDive();
+	// Over MAX_NODE_PICKS the learner confirms first; the reading then
+	// covers the first MAX_NODE_PICKS (never a silent server-side cut).
+	const [overLimit, setOverLimit] = useState<string[] | null>(null);
+	const runDeepDive = (nodeIds: string[]) => {
+		setOverLimit(null);
+		if (selectMode) onBeforeDeepDive?.();
+		void deepDive.start(deepDiveScope(nodeIds).nodeIds);
+	};
+	const requestDeepDive = (nodeIds: string[]) => {
+		if (deepDiveScope(nodeIds).overLimit) setOverLimit(nodeIds);
+		else runDeepDive(nodeIds);
+	};
+	const cancelOverLimit = useCallback(() => setOverLimit(null), []);
 
 	// Controlled when the caller lifts the selection (the practice pick
 	// set); internal (uncontrolled) otherwise — the delete flow's own.
@@ -819,7 +853,7 @@ export function ChainTableOverlay({
 	// Esc dismisses (unless a dialog has focus — each dialog's own Esc
 	// owns its layer; all listen on window, so the guards are explicit).
 	useEffect(() => {
-		if (!open || deleteOpen) return;
+		if (!open || deleteOpen || overLimit) return;
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
 				// App Router delegates React events on document too: a child's
@@ -835,7 +869,7 @@ export function ChainTableOverlay({
 		};
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [open, deleteOpen, onClose]);
+	}, [open, deleteOpen, overLimit, onClose]);
 
 	if (!open) return null;
 
@@ -862,7 +896,7 @@ export function ChainTableOverlay({
 			>
 				{directoryFailure && <p role="alert" className="px-3 py-1 text-xs text-red-400">{directoryFailure}</p>}
 				<ChainTableBody
-					keyboardActive={!deleteOpen}
+					keyboardActive={!deleteOpen && !overLimit}
 					directory={directory}
 					onOrganizationChange={directory ? changeOrganization : undefined}
 					selectedFolders={selectedFolders}
@@ -898,10 +932,11 @@ export function ChainTableOverlay({
 					onClose={onClose}
 					selectMode={selectMode}
 					onSelect={onClose}
-					onDeepDive={deepDive.busy ? undefined : (nodeIds) => void deepDive.start(nodeIds)}
+					onDeepDive={deepDive.busy ? undefined : requestDeepDive}
 					deepDiveError={deepDive.error}
 				/>
 			</div>
+			<DeepDiveLimitDialog total={overLimit?.length ?? null} onCancel={cancelOverLimit} onConfirm={() => { if (overLimit) runDeepDive(overLimit); }} />
 			{!selectMode && <DeleteSourceDialog open={deleteOpen}
 				sources={deletion?.sources ?? []}
 				folders={deletion?.folders ?? []}
