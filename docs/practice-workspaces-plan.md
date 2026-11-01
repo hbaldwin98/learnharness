@@ -318,6 +318,8 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 **Tests:** `tests/code-lsp.test.ts` (framing, normalization, the client against a fake server, the session over a fake runner including restart-then-crashed, the table, position mapping); `tests/code-workspace-ui.test.ts` (the diagnostics status served and stopped by reconcile); `tests/code-lsp-docker.test.ts` (opt-in, all eight languages: a syntax error appears and clears, hidden tests absent from `/work/lsp`).
 
+**Live check (2026-11-01, PASSED):** the worktree's dev server on a fresh data dir, the owner's model, headless Chromium. The agent posed a Python problem, then a Go problem. Each time the pane showed "Starting the … language server…" and then cleared it. A typed error was underlined about 0.8 s later in Python (`"undefined_name" is not defined`, basedpyright) and 0.5 s later in Go (`undefined: undefinedName`, gopls), with the red gutter marker, the tab's red dot ("1 error") and a themed hover. The fix cleared the error about as fast. Clearing was judged by the server's answer (the tab dot), not by the edit removing the underline. The live sessions' containers were removed afterwards.
+
 ---
 
 ## Steps 5–10 — outline (detailed one at a time)
