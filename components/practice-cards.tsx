@@ -4,6 +4,7 @@ import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
 import {
 	clockTime,
+	cueLabel,
 	describeRunResult,
 	fenceFile,
 	traceIsEmpty,
@@ -11,6 +12,7 @@ import {
 	type AskDetails,
 	type CodeFile,
 	type CodingOutcome,
+	type ListenDetails,
 	type SubmissionDetails,
 	type TraceBundle,
 } from "@/src/core";
@@ -435,6 +437,19 @@ function changeMarkdown(c: { path: string; text: string; full?: boolean }): stri
 	if (c.full) return fenceFile({ path: c.path, content: c.text });
 	const fence = "```";
 	return `${c.path}:\n${fence}diff\n${c.text}\n${fence}`;
+}
+
+/** A listening look (plan step 6; owner ruling): one faint line naming
+ *  the cue, "nothing to add" when the agent stayed quiet, and the trace. */
+export function ListenLine({ data }: { data: ListenDetails & { quiet?: boolean } }) {
+	return (
+		<div data-testid="listen-line" data-quiet={data.quiet ? "" : undefined} className="my-2 text-xs text-muted-foreground/60">
+			<span className="font-mono uppercase tracking-wide">Agent looked</span>
+			<span> · {cueLabel(data.cues ?? [])}</span>
+			{data.quiet && <span data-testid="listen-quiet"> · nothing to add</span>}
+			<TraceDisclosure trace={data.trace} />
+		</div>
+	);
 }
 
 /** What went to the agent with a delivery (plan step 5), collapsed: the

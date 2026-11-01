@@ -50,6 +50,7 @@ import { KeysSection } from "./keys-section.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
+import { CodingSection } from "./coding-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
@@ -61,6 +62,7 @@ const SECTIONS = [
 	{ id: "agent", label: "Agent" },
 	{ id: "appearance", label: "Appearance" },
 	{ id: "graph", label: "Graph" },
+	{ id: "coding", label: "Coding" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
 	{ id: "general", label: "General" },
 ] as const;
@@ -409,6 +411,11 @@ export function SettingsDialogBody({
 											void write("appearance", next)
 										}
 									/>
+								</SettingsSection>
+							)}
+							{active === "coding" && (
+								<SettingsSection title="Coding" testid="section-coding">
+									<CodingSection agent={record.agent} onAgentChange={(next) => void write("agent", next)} />
 								</SettingsSection>
 							)}
 							{active === "graph" && (

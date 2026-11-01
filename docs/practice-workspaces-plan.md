@@ -365,7 +365,7 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Step 6 — listening (PLANNED)
+## Step 6 — listening (BUILT 2026-11-01)
 
 **Goal:** while the learner works a coding problem, the agent looks in on its own at the ruled cues, and either says something useful or stays quiet — a quiet look is recorded but costs the learner nothing on screen beyond one faint line.
 
@@ -395,6 +395,14 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 - **Live check:** a Run cue produces a look; a quiet look shows "nothing to add"; Ask during a listening turn interrupts it and is answered; closing the pane stops the looks.
 
 **Risks:** the abort-then-send handoff is the likeliest race; quiet looks on the CLI provider still cost a turn; the struggle list will need tuning against real narration.
+
+**Built (2026-11-01).** `src/core/listening.ts` (the cue engine, phrases, labels); `src/server/listening.ts` (listeners per problem, injectable deps, a 5 s ticker, firing through `runServerTurn` in `jobs.ts`); the presence route; activity fed from saves, narration and Runs; the `listen` input and `practice-listen` marker (cause: automatic; a background turn, staged on subscription connections with its trace committed when the stage commits); `stay_quiet` (registered whenever a workspace module is, so the tool list stays stable for caching, refused outside listening turns, terminating and in the stop hook); the handler stops a listening turn before an Ask or Submit; the faint `ListenLine`; Settings → Coding → Listening (`agent.listening`); the pane's heartbeat and ear indicator.
+
+**Decided while building:** a quiet look's own text is hidden — the live check caught the agent writing "I'm not saying anything…" before calling `stay_quiet`, so the view drops text from turns that ended quiet and the tool tells the agent to write nothing. Settings' page-order test now pins the new Coding page.
+
+**Live check (2026-11-01, PASSED):** the owner's model (Claude Code CLI, background use on), headless Chromium. The indicator read "on". A Run fired look A 54 ms later; the agent stayed quiet ("Agent looked · after your Run · nothing to add"). After the 60 s floor, "I'm stuck, why is the order wrong" fired look B ("you sounded stuck"); Ask was enabled during it, interrupted it, and was answered with a hint. A later Run fired look C, quiet again. Submit passed and the conclusion read "time to pass 3 min · asks 1 · hints 1". No containers were left.
+
+**Tests:** `tests/practice-listening.test.ts` (the engine's cues and gates, the listener over fake deps, the marker and input, stay_quiet, the projection including hidden quiet text, the setting).
 
 ---
 

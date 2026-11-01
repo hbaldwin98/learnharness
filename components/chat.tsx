@@ -61,14 +61,15 @@ import { PracticeDock } from "@/components/practice-dock";
 import { workspaceComponentFor } from "@/components/workspaces/registry";
 import { WorkspaceSide } from "@/components/workspaces/split";
 import { flushWorkspace } from "@/components/workspaces/flush";
-import { AskCard, SubmissionCard, ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
+import { AskCard, ListenLine, SubmissionCard, ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import { ReadingsTray, useReadingsTray } from "@/components/readings/readings-tray";
 import { SessionReadingsContext } from "@/components/readings/api";
 import { PassageReadDeeper } from "@/components/readings/passage-action";
 import { ReadingDiscussedLine } from "@/components/readings/discussed-line";
-import type { AskDetails, ReadingDiscussionMarkerDetails, SubmissionDetails } from "@/src/core";
+import type { AskDetails, ListenDetails, ReadingDiscussionMarkerDetails, SubmissionDetails } from "@/src/core";
+import { lastInputIsListen } from "@/src/core";
 import type { ArtifactPartProps, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { LhViewMessage } from "@/src/core";
 import { PhaseChip, PhaseDivider } from "@/components/phase-divider";
@@ -526,19 +527,32 @@ export function Chat({
 
 	// The coding workspace's Submit (plan step 3): the result is already
 	// stored server-side; this tells the agent and starts its turn.
+	// A listening turn (plan step 6) is the app's, not the learner's: Ask
+	// and Submit stay enabled during it and interrupt it (owner ruling) —
+	// detach locally, and the server stops the turn before taking theirs.
+	const listeningTurn = busy && lastInputIsListen(nativeMessages);
+	const listeningTurnRef = useRef(listeningTurn);
+	listeningTurnRef.current = listeningTurn;
+	const sendPastListening = useCallback(
+		(input: Parameters<typeof send>[0]) => {
+			if (listeningTurnRef.current) stop();
+			void send(input);
+		},
+		[send, stop],
+	);
 	const submitWorkspace = useCallback(
 		(problemCallId: string) => {
-			void send({ type: "submission", problemCallId });
+			sendPastListening({ type: "submission", problemCallId });
 		},
-		[send],
+		[sendPastListening],
 	);
 	// The coding workspace's Ask (plan step 5): the strip's draft (maybe
 	// empty) as a direct request; the server attaches the trace.
 	const askWorkspace = useCallback(
 		(problemCallId: string, text: string) => {
-			void send({ type: "ask", problemCallId, text });
+			sendPastListening({ type: "ask", problemCallId, text });
 		},
-		[send],
+		[sendPastListening],
 	);
 
 	// Teach-phase check (W5, vision §2): a pending QUIZ that lands once a
@@ -1529,6 +1543,8 @@ export function Chat({
 												return <SubmissionCard key={pi} data={part.data as SubmissionDetails} />;
 											case "data-practice-ask":
 												return <AskCard key={pi} data={part.data as AskDetails} />;
+											case "data-practice-listen":
+												return <ListenLine key={pi} data={part.data as ListenDetails & { quiet?: boolean }} />;
 											case "data-reading-discussion":
 												return <ReadingDiscussedLine key={pi} data={part.data as ReadingDiscussionMarkerDetails} />;
 											case "data-practice-next":
@@ -1897,7 +1913,7 @@ export function Chat({
 						chatId={chatId}
 						problemCallId={activeProblem.toolCallId}
 						input={activeProblem.input as { statement: string }}
-						busy={busy}
+						busy={busy && !listeningTurn}
 						onSubmitted={submitWorkspace}
 						onAsk={askWorkspace}
 						onHide={() => setWorkspaceHiddenFor(activeProblem.toolCallId)}

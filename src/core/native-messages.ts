@@ -42,9 +42,11 @@ import {
 	fenceFile,
 	type AskDetails,
 	type CodeFile,
+	type ListenDetails,
 	type SubmissionDetails,
 	type TraceBundle,
 } from "./contracts/workspaces.ts";
+import { cueText } from "./listening.ts";
 import { CLAUDE_CODE_PROVIDER } from "./contracts/claude-code.ts";
 import {
 	CONCLUDE_ACK_TEXT,
@@ -85,6 +87,7 @@ export interface LhMarkerMessage {
 		| "practice-thinking"
 		| "practice-submission"
 		| "practice-ask"
+		| "practice-listen"
 		| "practice-next"
 		| "problem-dismissed"
 		| "compaction"
@@ -272,6 +275,8 @@ export function newPlanBlockMessage(
  *  vocabulary — the tool-execute layer owns the tools themselves). */
 export const PRACTICE_PROBLEM_TOOL = "problem";
 export const PRACTICE_CONCLUDE_TOOL = "conclude";
+/** The listening turn's silence (practice workspaces, plan step 6). */
+export const PRACTICE_STAY_QUIET_TOOL = "stay_quiet";
 
 /** One picked proposition of the graph-context marker (the learner's map
  *  pick — name + statement as the learner SAW them at pick time). */
@@ -371,6 +376,38 @@ export function newSubmissionMessage(details: SubmissionDetails): LhMarkerMessag
 		details,
 		timestamp: Date.now(),
 	};
+}
+
+/** A listening update (plan step 6): the app looked in on its own — the
+ *  cues and the trace since the agent last looked. Automatic, never the
+ *  learner's words; the agent replies only if it helps now, else calls
+ *  stay_quiet. */
+export function newListenMessage(details: ListenDetails): LhMarkerMessage {
+	const traceText = details.trace ? describeTrace(details.trace) : "";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "practice-listen",
+		content:
+			`Listening update — the learner did not ask; you are looking in on their work (${cueText(details.cues)}). ` +
+			`Speak only if it helps them right now; otherwise call ${PRACTICE_STAY_QUIET_TOOL}.` +
+			(traceText ? `\n\n${traceText}` : "\n\nNothing has changed since you last looked."),
+		display: true,
+		details,
+		timestamp: Date.now(),
+	};
+}
+
+/** Is a listening update the input the current turn answers? The last
+ *  record input (skipping the agent's own messages) is a practice-listen
+ *  marker. */
+export function lastInputIsListen(messages: readonly LhMessage[]): boolean {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role === "assistant" || m.role === "toolResult") continue;
+		return m.role === "custom" && m.customType === "practice-listen";
+	}
+	return false;
 }
 
 /** A coding problem's Ask (plan step 5): a direct request for help, with
@@ -993,7 +1030,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "user") return "learner";
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
-		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
+		if (["probe-handoff", "subagent-steer", "subagent-abort", "practice-listen"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "practice-submission", "practice-ask", "practice-next"].includes(message.customType)) return "learner";
 		// reading-discussion: a held note riding a run it never starts (docs/readings.md §14).
 		return ["graph-context", "plan-block", "problem-dismissed", "compaction", "reading-discussion"].includes(message.customType) ? "neutral" : "unrecognizable";

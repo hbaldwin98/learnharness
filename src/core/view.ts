@@ -34,7 +34,7 @@
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
-import { codingOutcomeForConclude, modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
+import { codingOutcomeForConclude, modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, PRACTICE_STAY_QUIET_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
@@ -130,6 +130,7 @@ function lastSuccessfulPlanInit(parts: LhViewPart[]): number {
  *  view messages. Pure: the same input always projects to the same list. */
 export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
 	const out: LhViewMessage[] = [];
+	const { looks: quietLooks, silenced } = quietLooksOf(messages);
 	// Output calls become text rather than tool parts, so read settled
 	// failures up front: a failed call must retain the normal error path.
 	const outputErrors = new Map<string, ToolResultMessage>();
@@ -195,7 +196,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 		}
 
 		if (role === "custom") {
-			projectMarker(m as LhMarkerMessage, out);
+			projectMarker(m as LhMarkerMessage, out, quietLooks);
 			continue;
 		}
 
@@ -227,6 +228,8 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
+					// A quiet look's text is not for the learner (plan step 6).
+					if (silenced.has(m.id)) continue;
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });
@@ -236,6 +239,8 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 						part.sourceMessageId = m.id;
 						part.sourceContentIndex = contentIndex;
 					}
+					// stay_quiet renders as its look's "nothing to add" (plan step 6).
+					if (block.name === PRACTICE_STAY_QUIET_TOOL) continue;
 					if (block.name === SEND_TO_USER_TOOL) {
 						// Failed/aborted generations never execute their calls;
 						// the provider error/abort UI already owns that outcome.
@@ -382,7 +387,34 @@ function applyResultTo(part: LhViewPart | undefined, result: ToolResultMessage):
 }
 
 /** A marker's projected message (handoff/steers) or splice (plan block). */
-function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
+/** The listening updates the agent answered with stay_quiet (plan step 6):
+ *  a clean stay_quiet call before the next input marks the look quiet. */
+export function quietListenIds(messages: readonly LhMessage[]): Set<string> {
+	return quietLooksOf(messages).looks;
+}
+
+/** The quiet looks, and the agent messages of those turns — whose text is
+ *  never shown (a quiet look shows only its faint line). */
+export function quietLooksOf(messages: readonly LhMessage[]): { looks: Set<string>; silenced: Set<string> } {
+	const quiet = new Set<string>();
+	const turnOf = new Map<string, string[]>();
+	const clean = new Set<string>();
+	for (const m of messages) if (m.role === "toolResult" && m.toolName === PRACTICE_STAY_QUIET_TOOL && !m.isError) clean.add(m.toolCallId);
+	let listen: string | null = null;
+	for (const m of messages) {
+		if (m.role === "custom" && m.customType === "practice-listen") listen = m.id;
+		else if (m.role === "user" || (m.role === "custom" && m.customType !== "practice-listen")) listen = null;
+		else if (listen && m.role === "assistant") {
+			turnOf.set(listen, [...(turnOf.get(listen) ?? []), m.id]);
+			for (const b of m.content) if (b.type === "toolCall" && b.name === PRACTICE_STAY_QUIET_TOOL && clean.has(b.id)) quiet.add(listen);
+		}
+	}
+	const silenced = new Set<string>();
+	for (const id of quiet) for (const a of turnOf.get(id) ?? []) silenced.add(a);
+	return { looks: quiet, silenced };
+}
+
+function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[], quietLooks: ReadonlySet<string> = new Set()): void {
 	switch (marker.customType) {
 		case "graph-context": {
 			// The session's map context (owner, 2026-10-04): user-side —
@@ -454,6 +486,17 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-practice-submission", id: `ps_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "practice-listen": {
+			// A listening look (plan step 6; owner ruling): one faint line per
+			// look naming the cue, with the trace; "nothing to add" when the
+			// agent answered with stay_quiet.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-practice-listen", id: `pl_${marker.id}`, data: { ...(marker.details as object), quiet: quietLooks.has(marker.id) } }],
 			});
 			return;
 		}

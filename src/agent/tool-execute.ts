@@ -250,6 +250,16 @@ export function problemResult(): AgentToolResult<null> {
 	};
 }
 
+/** The listening turn's silence (practice workspaces, plan step 6): ends
+ *  the turn with nothing said to the learner. */
+export function stayQuietResult(): AgentToolResult<null> {
+	return {
+		content: [{ type: "text", text: "Staying quiet — the turn ends here; nothing is shown to the learner." }],
+		details: null,
+		terminate: true,
+	};
+}
+
 /** The conclude ack: NOT terminate — the turn continues so the same reply
  *  can reveal + pose the next problem. Text single-sourced in contracts
  *  (CONCLUDE_ACK_TEXT — shared with the dismissal-synthesized pair). */

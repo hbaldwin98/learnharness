@@ -25,7 +25,7 @@ import { jobTools, type JobToolContext } from "./jobs.ts";
 import { proberGraphTools, type GraphToolContext } from "./graph.ts";
 import { activeProblemOf, passingSubmissionOf } from "../../core/native-messages.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
-import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
+import { concludeResult, invalidInputResult, problemResult, stayQuietResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
 import { workspaceOf } from "../../core/workspaces.ts";
 import { moduleFor, workspaceFieldSchema, type AgentWorkspaceModule } from "../workspaces/registry.ts";
@@ -50,6 +50,9 @@ export interface PracticeToolContext {
 	 *  the server decides (src/server/workspaces.ts). Absent/empty = none:
 	 *  the problem schema, description and prompt are today's exactly. */
 	workspaceModules?: readonly AgentWorkspaceModule[];
+	/** This turn answers a listening update (plan step 6): the only turn
+	 *  in which stay_quiet is accepted. */
+	listening?: boolean;
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
@@ -128,6 +131,7 @@ const PROBLEM_DESCRIPTION =
 
 const WORKSPACE_DESCRIPTION_SUFFIX =
 	" A `workspace` gives the learner a workspace beside the transcript; the pose is verified before it goes through. A workspace problem concludes solved only after the learner's Submit passes every test." +
+	" The app also looks in on its own while they work (a listening update, with the cue and the trace): reply only if it helps right now, else call stay_quiet." +
 	" While working they narrate aloud into the workspace without reaching you; their narration, Runs, code changes since you last looked and the editor's errors arrive together as a trace with their next Ask (a direct request for your help), Submit, or thinking message.";
 
 export function problemTool(
@@ -284,6 +288,35 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 	};
 }
 
+// ─── stay_quiet: a listening turn's silence (plan step 6) ───────────────────
+
+export const stayQuietInputObject = Type.Object({
+	note: Type.Optional(
+		Type.String({ description: "Optional, private — what you noticed, for your own later reference. Never shown to the learner." }),
+	),
+});
+
+/** Registered whenever a workspace module is available, so the tool list
+ *  stays the same from turn to turn; accepted only in a listening turn. */
+export function stayQuietTool(listening: boolean): AgentTool<typeof stayQuietInputObject> {
+	return {
+		name: "stay_quiet",
+		label: "stay_quiet",
+		description:
+			"Only for a listening update (the app looked in on the learner's coding work; they did not ask): end your turn " +
+			"WITHOUT saying anything, because nothing would help them right now — write no text in that turn (anything you write is discarded). Never inferred from an empty reply — call it. " +
+			"Refused when the learner asked, submitted or wrote to you.",
+		parameters: stayQuietInputObject,
+		executionMode: "sequential",
+		execute: async () => {
+			if (!listening) {
+				return invalidInputResult("stay_quiet", ["the learner asked you directly — answer them; stay_quiet is only for listening updates"]);
+			}
+			return stayQuietResult();
+		},
+	};
+}
+
 /** The practice toolset (the practice agent's whole registry). */
 export function practiceTools(ctx: PracticeToolContext): Record<string, AgentTool<any>> {
 	// ONE gate per turn, shared by both tools — the intra-turn truth.
@@ -313,5 +346,6 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 		...(jobs ? { pdf: jobs.pdf! } : {}),
 		...(ctx.graph ? proberGraphTools(ctx.graph) : {}),
 		...moduleTools,
+		...(modules.length > 0 ? { stay_quiet: stayQuietTool(ctx.listening === true) } : {}),
 	});
 }

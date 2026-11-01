@@ -88,6 +88,8 @@ export interface EffectiveSettings {
 		/** Prober graph tools (wave 7): passthrough delta as stored —
 		 * absent/undefined enabled = ON; consumers use graphToolsEnabled. */
 		graphTools: { enabled?: boolean };
+		/** Coding listening (plan step 6): passthrough; absent = ON. */
+		listening: { enabled?: boolean };
 	};
 	/** The resolved strong/cheap/vision slots: each tier's concrete model or
 	 *  NULL when the tier holds no model (no factory floor — BYOK all the
@@ -195,6 +197,7 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 			prompts: agent.prompts ?? {},
 			search: agent.search ?? {},
 			graphTools: agent.graphTools ?? {},
+			listening: agent.listening ?? {},
 		},
 		models: {
 			strong: resolveSlot(modelsSection.strong),

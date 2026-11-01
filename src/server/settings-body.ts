@@ -221,6 +221,15 @@ export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentS
 		}
 		settings.fileAccess = parsed.settings;
 	}
+	// Coding listening (plan step 6): the graphTools shape. Absent = ON.
+	if (raw.listening !== undefined) {
+		const listening = asRecord(raw.listening);
+		if (!listening) return { ok: false, error: "listening must be an object" };
+		if (listening.enabled !== undefined && typeof listening.enabled !== "boolean") {
+			return { ok: false, error: "listening.enabled must be a boolean" };
+		}
+		settings.listening = listening.enabled === undefined ? {} : { enabled: listening.enabled };
+	}
 	return { ok: true, settings };
 }
 

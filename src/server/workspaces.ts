@@ -114,6 +114,7 @@ import type {
 	WorkspaceState,
 } from "../core/contracts/workspaces.ts";
 import { lineDiff } from "../core/line-diff.ts";
+import { noteCodingActivity, processListening, type ListeningStatus } from "./listening.ts";
 import { PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
 import { runCode } from "../agent/workspaces/code/runner.ts";
 import type { CodePose } from "../agent/workspaces/code/module.ts";
@@ -180,6 +181,7 @@ export function appendNarration(chatId: string, problemCallId: string, text: unk
 	if (typeof text !== "string" || text.trim().length === 0) throw new WorkspaceError("text must be non-empty", 400);
 	const entry: NarrationEntry = { at: new Date().toISOString(), text: text.trim().slice(0, MAX_NARRATION_CHARS) };
 	const next = mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({ ...r, narration: [...(r.narration ?? []), entry] }));
+	noteCodingActivity(chatId, problemCallId, "narration", entry.text);
 	return next.narration ?? [];
 }
 
@@ -266,6 +268,7 @@ export function saveWorkspace(chatId: string, problemCallId: string, files: unkn
 	mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({ ...r, files: next }));
 	// The saves feed the language server (plan step 4: one write path).
 	sessions().get(sessionKey(chatId, problemCallId))?.update(next);
+	noteCodingActivity(chatId, problemCallId, "edit");
 }
 
 // ─── language-server diagnostics (plan step 4) ───────────────────────────────
@@ -371,7 +374,15 @@ export async function runWorkspace(
 	mutateWorkspace(chatId, problemCallId, () => pose.files, (r) =>
 		mode === "run" ? { ...r, lastRun: { files, result }, runs: [...(r.runs ?? []), result] } : { ...r, lastSubmit: { files, result } },
 	);
+	if (mode === "run") noteCodingActivity(chatId, problemCallId, "run");
 	return result;
+}
+
+/** The pane's heartbeat (plan step 6): keeps listening present while the
+ *  pane is open and visible; returns what the pane's indicator shows. */
+export async function workspacePresence(chatId: string, problemCallId: string, visible: unknown): Promise<ListeningStatus> {
+	codeProblem(chatId, problemCallId);
+	return (await processListening()).presence(chatId, problemCallId, visible === true);
 }
 
 /** Session deletion: the chat's saved workspaces and containers. */

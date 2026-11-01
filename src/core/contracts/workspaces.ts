@@ -63,6 +63,13 @@ export interface SubmissionDetails {
 	trace?: TraceBundle;
 }
 
+/** The listening marker's details (plan step 6). */
+export interface ListenDetails {
+	problemCallId: string;
+	cues: import("../listening.ts").ListenCue[];
+	trace?: TraceBundle;
+}
+
 /** The ask marker's details (plan step 5). */
 export interface AskDetails {
 	problemCallId: string;

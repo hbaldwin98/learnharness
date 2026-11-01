@@ -21,7 +21,7 @@ import { makeNarrationGuard, narrationGuardApplies, SEND_TO_USER_DELIVERY_RULE }
 import { createReadTool, readTool } from "./tools/read.ts";
 import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
-import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
+import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL, PRACTICE_STAY_QUIET_TOOL } from "../core/native-messages.ts";
 import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
 import { usageWasAdmitted } from "./subscription-request-cycle.ts";
 
@@ -167,7 +167,7 @@ function makeQuestionStopper(kind: AgentKind) {
 			context.message.content
 				.filter((c) => c.type === "toolCall" && c.name !== undefined && (
 					(QUESTION_TOOLS as readonly string[]).includes(c.name) ||
-					(kind === "practice" && c.name === PRACTICE_PROBLEM_TOOL)
+					(kind === "practice" && (c.name === PRACTICE_PROBLEM_TOOL || c.name === PRACTICE_STAY_QUIET_TOOL))
 				))
 				.map((c) => c.id!),
 		);

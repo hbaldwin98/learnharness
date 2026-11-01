@@ -396,6 +396,10 @@ export interface AgentSettings {
 	 *  tool-toggles map. Absent = enabled (the toggle discipline); the
 	 *  effective gate composes graph.enabled AND this switch. */
 	graphTools?: { enabled?: boolean };
+	/** Coding listening (practice workspaces, plan step 6; owner ruling:
+	 *  on by default, a global opt-out): the agent looks in on the
+	 *  learner's coding work at the cues. Absent = enabled. */
+	listening?: { enabled?: boolean };
 	/** System-prompt override SWITCHES keyed by segment path (absent key =
 	 *  off). Switch-on requires the override file to exist (enforced by the
 	 *  route); the switch is explicit so users keep a file on disk but run
@@ -770,6 +774,12 @@ function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
 	if (raw.fileAccess !== undefined) {
 		const parsed = parseFileAccessSettings(raw.fileAccess);
 		out.fileAccess = parsed.ok ? parsed.settings : { restricted: true, folders: [] };
+	}
+	// Coding listening (plan step 6): same lenient read as graphTools.
+	if (raw.listening !== null && typeof raw.listening === "object" && !Array.isArray(raw.listening)) {
+		const enabled = (raw.listening as Record<string, unknown>).enabled;
+		if (enabled === undefined) out.listening = {};
+		else if (typeof enabled === "boolean") out.listening = { enabled };
 	}
 	return out;
 }

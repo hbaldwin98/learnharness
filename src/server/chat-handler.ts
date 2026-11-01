@@ -44,11 +44,11 @@ import {
 	resolveRoleSpec,
 } from "../core/settings-resolution.ts";
 import { modelsNotConfigured, providerKeyMissing as providerKeyMissingEnvelope, ROLE_SLOT, type ModelSlotName, type ProviderKeyMissing } from "../core/settings.ts";
-import { beginTurn, endTurn } from "./turn-liveness.ts";
+import { beginTurn, endTurn, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
-import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
+import { abortTurn, registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
-import { hasProbeDone, hasUnresolvedQuestion } from "../core/native-messages.ts";
+import { hasProbeDone, hasUnresolvedQuestion, lastInputIsListen } from "../core/native-messages.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
@@ -216,6 +216,17 @@ export async function handleChatInput(
 		return Response.json({ error: "Unknown chat" }, { status: 404 });
 	}
 
+	// ASK AND SUBMIT INTERRUPT LISTENING (owner ruling 2026-11-01, plan step
+	// 6): a listening turn is speculative — the learner's Ask or Submit stops
+	// it (what it wrote stays) and goes through once it has settled.
+	if ((input.type === "ask" || input.type === "submission") && isTurnRunning(chatId) && lastInputIsListen(record.messages)) {
+		abortTurn(chatId);
+		const deadline = Date.now() + 20_000;
+		while (isTurnRunning(chatId) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+		record = stores.chatStore.getChat(chatId);
+		if (!record) return Response.json({ error: "Unknown chat" }, { status: 404 });
+	}
+
 	// Refuse an ineligible Retry before catalog refresh, compaction, or any
 	// turn/write effects. Revalidate after the awaited gates below too.
 	if (input.type === "retry") {
@@ -262,7 +273,7 @@ export async function handleChatInput(
 	// (a chat.model override still resolves through it).
 	if (isSubscriptionProvider(conversation.provider)) {
 		await refreshConnectionCatalog(conversation.provider);
-		if (input.type === "steers" && !connectionBackgroundAllowed(conversation.provider)) {
+		if ((input.type === "steers" || input.type === "listen") && !connectionBackgroundAllowed(conversation.provider)) {
 			return Response.json({ error: "Background use is off for this connection. Automatic follow-up remains deferred in its queue." }, { status: 403 });
 		}
 	}
@@ -281,7 +292,7 @@ export async function handleChatInput(
 	// placement mirrors the BYOK/key gates — BEFORE appends and
 	// beginTurn, no liveness effects — and the record re-reads after
 	// because compaction appends the marker.
-	const callPurpose = { background: input.type === "steers" || (input.type === "continue" && reconstructRequestCause(record.messages) !== "foreground") };
+	const callPurpose = { background: input.type === "steers" || input.type === "listen" || (input.type === "continue" && reconstructRequestCause(record.messages) !== "foreground") };
 	let requestCycle: SubscriptionRequestCycle | undefined;
 	const lifecycle: SubscriptionDispatchLifecycle = {
 		captured: (scope) => requestCycle?.captured(scope),
@@ -396,7 +407,7 @@ export async function handleChatInput(
 	// failures only. Count that SAME temporary prefix at settlement, or the
 	// retained failures would make persistTurn skip genuinely new output.
 	const agentMessages = input.type === "retry" ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
-	const stagedAutomatic = isSubscriptionProvider(conversation.provider) && input.type === "steers";
+	const stagedAutomatic = isSubscriptionProvider(conversation.provider) && (input.type === "steers" || input.type === "listen");
 	let persistBaseCount = stagedAutomatic ? record.messages.length : agentMessages.length;
 	try {
 		if (!stagedAutomatic) stores.chatStore.saveMessages(chatId, merged);
@@ -407,13 +418,18 @@ export async function handleChatInput(
 	}
 	// The coding trace those appends carry is now delivered (plan step 5):
 	// the next Ask, Submit or thinking starts after it. Never fails the turn.
-	for (const commit of traceCommits) {
-		try {
-			commit();
-		} catch (err) {
-			console.error(`[chat ${chatId}] marking the coding trace delivered failed:`, err);
+	// A staged automatic turn (a listening update on a subscription
+	// connection) commits when its appends are saved, in commitStaged.
+	const commitTraces = () => {
+		for (const commit of traceCommits.splice(0)) {
+			try {
+				commit();
+			} catch (err) {
+				console.error(`[chat ${chatId}] marking the coding trace delivered failed:`, err);
+			}
 		}
-	}
+	};
+	if (!stagedAutomatic) commitTraces();
 	// Visibility bookkeeping is not the canonical save. Its failure must
 	// neither misreport a saved input as lost nor prevent the turn running.
 	try {
@@ -473,6 +489,7 @@ export async function handleChatInput(
 			stores.chatStore.saveMessages(chatId, merged);
 			persistBaseCount = merged.length;
 			noteSteersDurable(chatId, merged);
+			commitTraces();
 		},
 		restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
 	});
@@ -525,6 +542,8 @@ export async function handleChatInput(
 						// PRACTICE WORKSPACES (plan step 1): the modules available
 						// this turn — none until step 2 registers the coding module.
 						workspaceModules: availableWorkspaceModules(),
+						// Plan step 6: stay_quiet is accepted only answering a listening update.
+						listening: input.type === "listen",
 					},
 					agentOpts,
 				)

@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HandIcon, LoaderCircleIcon, PlayIcon, SendIcon, XIcon, LockIcon } from "lucide-react";
+import { EarIcon, EarOffIcon, HandIcon, LoaderCircleIcon, PlayIcon, SendIcon, XIcon, LockIcon } from "lucide-react";
 import {
 	bindingForAction,
 	formatBinding,
@@ -71,6 +71,7 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk,
 	const diagnostics = useDiagnostics(chatId, problemCallId, state !== null);
 	const narration = useNarration(chatId, problemCallId, state?.narration ?? null, state?.active ?? false);
 	const [asking, setAsking] = useState(false);
+	const listening = useListeningPresence(chatId, problemCallId, state?.active ?? false);
 
 	// The live files (the editors own their documents; this mirrors them for
 	// saving) and the save machinery.
@@ -250,6 +251,7 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk,
 			title={`Coding · ${LANGUAGE_LABEL[state.language] ?? state.language}`}
 			actions={
 				<>
+					<ListeningIndicator status={listening} />
 					<button
 						type="button"
 						data-testid="workspace-vim-toggle"
@@ -513,6 +515,61 @@ function useDiagnostics(chatId: string, problemCallId: string, loaded: boolean):
 		if (p.chatId === chatId && p.problemCallId === problemCallId) refetch();
 	});
 	return snapshot;
+}
+
+type ListeningStatus = "on" | "paused" | "off";
+
+/** The pane's heartbeat (plan step 6; owner ruling: listening only while
+ *  the pane is open and visible): every 20 s while visible, at once on a
+ *  visibility change, and "gone" on unmount. Returns the indicator state. */
+function useListeningPresence(chatId: string, problemCallId: string, active: boolean): ListeningStatus | null {
+	const [status, setStatus] = useState<ListeningStatus | null>(null);
+	useEffect(() => {
+		if (!active) return;
+		let alive = true;
+		const beat = (visible: boolean, keepalive = false) =>
+			fetch(`${url(chatId, problemCallId)}/presence`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ visible }),
+				keepalive,
+			})
+				.then((res) => (res.ok ? (res.json() as Promise<{ listening?: ListeningStatus }>) : null))
+				.then((body) => {
+					if (alive && body?.listening) setStatus(body.listening);
+				})
+				.catch(() => {});
+		const visibleNow = () => document.visibilityState === "visible";
+		void beat(visibleNow());
+		const timer = setInterval(() => {
+			if (visibleNow()) void beat(true);
+		}, 20_000);
+		const onVisibility = () => void beat(visibleNow());
+		document.addEventListener("visibilitychange", onVisibility);
+		return () => {
+			alive = false;
+			clearInterval(timer);
+			document.removeEventListener("visibilitychange", onVisibility);
+			void beat(false, true);
+		};
+	}, [active, chatId, problemCallId]);
+	return status;
+}
+
+/** A quiet header mark: is the agent looking in on this work? */
+function ListeningIndicator({ status }: { status: ListeningStatus | null }) {
+	if (!status) return null;
+	const title =
+		status === "on"
+			? "Listening — the agent looks in after a Run, a quiet stretch, every few minutes, or when you sound stuck"
+			: status === "paused"
+				? "Listening paused — background use is off for this connection"
+				: "Listening is off (Settings → Coding)";
+	return (
+		<span data-testid="workspace-listening" data-status={status} title={title} className="flex items-center text-muted-foreground">
+			{status === "on" ? <EarIcon className="size-3.5" /> : <EarOffIcon className="size-3.5 opacity-60" />}
+		</span>
+	);
 }
 
 /** A tab's marker: red for errors, amber for warnings only. */

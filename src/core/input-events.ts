@@ -29,6 +29,7 @@
  */
 
 import type { QuestionAnswerData } from "./question-core.ts";
+import type { ListenCue } from "./listening.ts";
 import type { LhMessage } from "./native-messages.ts";
 import {
 	activeProblemOf,
@@ -40,6 +41,7 @@ import {
 	newThinkingMessage,
 	newSubmissionMessage,
 	newAskMessage,
+	newListenMessage,
 	newUserMessage,
 	newMessageId,
 	questionCallsOf,
@@ -83,8 +85,14 @@ export type ChatInput =
  *  follow-up queue instead, so it never builds an input event). */
 export type SteerInput = { type: "steers"; steers: LhMessage[] };
 
+/** A listening update (practice workspaces, plan step 6): server-origin,
+ *  fired by the listening module when a cue is due and the gates are open
+ *  — never parsed off a client request. Appends a practice-listen marker
+ *  with the trace; a background turn. */
+export type ListenInput = { type: "listen"; problemCallId: string; cues: ListenCue[] };
+
 /** Every input the turn composition accepts. */
-export type TurnInput = ChatInput | SteerInput;
+export type TurnInput = ChatInput | SteerInput | ListenInput;
 
 /** The dismissal event (owner design 2026-10-03, "A2"): NEVER composes a
  *  turn — the silent route appends + persists and wakes nothing. The
@@ -250,7 +258,7 @@ export interface WorkspaceLookups {
 
 export function inputAppends(
 	record: { messages: LhMessage[]; kind?: string },
-	input: ChatInput,
+	input: ChatInput | ListenInput,
 	workspace?: WorkspaceLookups,
 ): LhMessage[] {
 	switch (input.type) {
@@ -309,6 +317,17 @@ export function inputAppends(
 				...dismissalConclusion(record),
 				newAskMessage({ problemCallId: input.problemCallId, text: input.text, ...(trace ? { trace } : {}) }),
 			];
+		}
+		case "listen": {
+			// Server-origin: the listening module checked the gates, but the
+			// record may have moved on since (a conclude, a dismissal).
+			const active = activeProblemOf(record.messages);
+			if (!active || active.toolCallId !== input.problemCallId) {
+				throw new ChatInputError("listen input targets no active problem");
+			}
+			if (!workspace?.snapshot(input.problemCallId)) throw new ChatInputError("listen input targets no coding problem");
+			const trace = workspace.trace?.(input.problemCallId) ?? undefined;
+			return [newListenMessage({ problemCallId: input.problemCallId, cues: [...input.cues], ...(trace ? { trace } : {}) })];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a

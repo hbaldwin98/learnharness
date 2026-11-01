@@ -144,6 +144,13 @@ export function setTurnRunner(run: TurnRunner): void {
 	state().turnRunner = run;
 }
 
+/** Fire one server-side turn through the wake pipeline's runner (the
+ *  listening module's vehicle, plan step 6). -1 when no runner is wired. */
+export function runServerTurn(chatId: string, input: TurnInput): Promise<number> {
+	const run = state().turnRunner;
+	return run ? run(chatId, input) : Promise.resolve(-1);
+}
+
 /** chat-handler wires this at module init: its job runner's runJob. */
 export function setJobRespawn(respawn: JobRespawn): void {
 	state().respawn = respawn;
