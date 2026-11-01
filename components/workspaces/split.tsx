@@ -70,7 +70,9 @@ export function WorkspaceSide({ children }: { children: React.ReactNode }) {
 			ref={rootRef}
 			data-testid="workspace-side"
 			style={{ "--lh-workspace-w": `${fraction * 100}%` } as React.CSSProperties}
-			className="relative flex h-full shrink-0 max-lg:fixed max-lg:inset-0 max-lg:z-40 lg:w-(--lh-workspace-w)"
+			// isolate: CodeMirror's panels, gutters and tooltips carry
+			// z-index 200–500; contained here, they never paint over dialogs.
+			className="relative isolate flex h-full shrink-0 max-lg:fixed max-lg:inset-0 max-lg:z-40 lg:w-(--lh-workspace-w)"
 		>
 			<div
 				role="separator"

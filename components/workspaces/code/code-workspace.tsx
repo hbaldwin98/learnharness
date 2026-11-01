@@ -319,7 +319,11 @@ function Shell({
 }) {
 	return (
 		<div data-testid="code-workspace" className="flex h-full min-h-0 flex-col bg-background">
-			<div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/70 px-3">
+			{/* The session top bar's mechanics (top-bar.tsx): h-15 so the border
+			    continues the session header's line, a window-drag band, and the
+			    window-controls gutter — on Windows/Linux the native buttons sit
+			    over this pane's top-right corner. */}
+			<div className="lh-drag lh-wco-gutter flex h-15 shrink-0 select-none items-center gap-2 border-b border-border px-3">
 				<span className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
 				<span className="ml-auto flex items-center gap-1.5">{actions}</span>
 				{onHide && (
