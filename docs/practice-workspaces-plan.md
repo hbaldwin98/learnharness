@@ -455,6 +455,10 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Step 10 — doctrine (outline)
+## Step 10 — doctrine (DRAFT 2026-11-01 — owner to rewrite)
 
-10. **Doctrine.** Owner-authored interview-style, coding and teacher-exercise sections.
+Owner-authored by ruling; built as a marked draft on the owner's instruction to build every step on the recommended defaults.
+
+- **Coding doctrine:** `src/agent/prompts/workspace-code/10-doctrine.md` — composes into the practice prompt while the coding module is available (and is overridable in Settings like every segment). Sections: posing (interview style, small, hidden tests as decision points), while they work (narration as evidence, listening defaults to `stay_quiet`, Ask answered small, annotate rather than rewrite), concluding (solved only on a full pass; name the decision points).
+- **Teacher exercises:** no prompt fragment — the teacher's guidance rides the `coding_exercise` description, so nothing composes when the tool is absent. Move it into a `teacher/` fragment if the owner prefers.
+- **To do (owner):** rewrite the draft; decide on an interview-style section beyond what's here.
