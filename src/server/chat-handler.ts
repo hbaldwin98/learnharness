@@ -12,7 +12,7 @@ import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
-import { availableWorkspaceModules, reconcileWorkspaces, refreshWorkspaceAvailability } from "./workspaces.ts";
+import { availableWorkspaceModules, lastSubmission, reconcileWorkspaces, refreshWorkspaceAvailability, workspaceSnapshot } from "./workspaces.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
 import type { ModelRole } from "../../config.ts";
@@ -335,7 +335,10 @@ export async function handleChatInput(
 		appends =
 			input.type === "steers"
 				? input.steers.filter((s) => !steerDelivered(record.messages, s.id))
-				: inputAppends(record, input);
+				: inputAppends(record, input, {
+						snapshot: (callId) => workspaceSnapshot(chatId, callId),
+						submission: (callId) => lastSubmission(chatId, callId),
+					});
 	} catch (err) {
 		if (err instanceof ChatInputError) {
 			return Response.json({ error: err.message }, { status: 400 });

@@ -445,6 +445,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "practice-submission": {
+			// A coding problem's Submit (practice workspaces, plan step 3): a
+			// user-side card with the counts; the model reads the content.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-practice-submission", id: `ps_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "practice-next": {
 			// The learner's explicit move-on signal (owner round 16): a compact
 			// centered system line — the mono-caps chrome register, not prose.

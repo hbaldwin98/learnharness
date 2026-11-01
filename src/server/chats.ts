@@ -1,4 +1,5 @@
 import { abortExtraction, extractionStatuses } from "../agent/subagents/extraction.ts";
+import { forgetChatWorkspaces } from "./workspaces.ts";
 import { isJobLive } from "../agent/subagents/aborts.ts";
 import { coverageOf } from "../core/coverage.ts";
 import { deleteChatTraces, type ChatDeleteMode, type ChatDeletionStats } from "../core/graph-deletion.ts";
@@ -152,6 +153,8 @@ function finishChatRecordDeletion(chatId: string): number {
 	if (stores.chatStore.deleteChat(chatId)) {
 		discardChatDeliveries(chatId);
 		clearTurnFailure(chatId);
+		// Practice coding workspaces: the chat's saved files and containers go too.
+		forgetChatWorkspaces(chatId);
 	}
 	return jobsRemoved;
 }

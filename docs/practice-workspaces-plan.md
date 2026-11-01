@@ -197,6 +197,7 @@ The Dockerfiles join `outputFileTracingIncludes` in `next.config.ts` and the ass
 - **Unit (no Docker):** path validation; schema shape; each language's result parser on recorded fixtures; the run-command table; `verifyPose` against a fake runner (Docker not running, reference failing, starter not building, success); availability caching; container naming and teardown calls.
 - **Docker integration (skipped when Docker isn't running):** for each language, a small fixture problem (reverse a list) verifies end to end: the reference passes, a broken reference is refused, a starter with a syntax error is refused, an infinite loop times out, and the network is unreachable.
 - **Live check:** with Docker running, a real practice turn poses a coding problem; the pose goes through and the container exists, then conclude removes it.
+  **Deferred to step 3 (owner, 2026-11-01)**, where the live check covers the whole loop with the editor in place.
 
 ---
 
@@ -228,9 +229,40 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 **Measured after the switch (Windows, Docker Desktop):** a warm Python Run fell from ~3.6 s to ~0.95 s; pure Docker overhead per run from 1,953 ms to 201 ms; the real-Docker suite from 370 s to 205 s, all 33 cases passing in all eight languages. An API image build, the superseded-tag deletion and the standalone payload loading dockerode were each checked directly.
 
-## Steps 3–10 — outline (detailed one at a time)
+## Step 3 — the editor and workspace UI (IN PROGRESS)
 
-3. **Editor + workspace UI.** Split view, CodeMirror 6, multi-file tree, output panel, Run/Submit, the `data/workspaces/` autosave store, restore on reload.
+**Goal:** a coding problem opens a code workspace beside the transcript; the learner edits, runs the visible tests, talks to the agent through the thinking dock, and submits. Ends with the deferred live check from step 2: a real practice turn poses a coding problem and the whole loop runs in the app.
+
+**Owner rulings (2026-11-01):**
+- **Talk channel:** the transcript side keeps today's thinking dock; each thinking message also carries a snapshot of the current code.
+- **Submit:** runs visible and hidden tests, shows results (hidden as counts), and sends the agent a submission message with the code and results, starting its turn.
+- **Run:** builds and runs the visible tests only; nothing goes to the agent.
+- **Files:** the learner edits the starter files' contents only — no add/rename/delete. Visible tests show read-only.
+- **Hotkeys:** Run `Mod+'`, Submit `Mod+Shift+Enter`, both in the rebindable registry.
+- **Split view:** workspace on the right with a resizable divider remembered on this device; below `lg` it overlays the transcript with a toggle back; while it's open the readings tray opens as an overlay.
+- **Vim mode:** `@replit/codemirror-vim`, **on by default**, toggled in the workspace toolbar and in Settings → Keyboard, stored on this device (localStorage, like the keymap). A mode indicator shows NORMAL/INSERT/VISUAL. **While the editor has focus, Esc belongs to the editor** — it never dismisses the problem or stops dictation.
+
+**Defaulted (recommended, owner 2026-11-01: "go with the recommended for minor questions"):**
+- **Trusted server state.** The client never sends test results or tests. Live files autosave (debounced) to `data/workspaces/<chatId>/<problemCallId>.json`; Run/Submit and the thinking snapshot read the files from that store (the client flushes before acting) and the tests from the pose in the record.
+- **Routes:** `GET`/`PUT /api/workspaces/[chatId]/[problemCallId]` (load — starter files when nothing saved — and save, paths limited to the starter set and size-capped); `POST …/run` with `{ mode: "run" | "submit" }` returning the normalized result.
+- **Submit → agent:** Submit stores its result in the workspace store, then the client sends a new chat input `{ type: "submission", problemCallId }`; the server appends a `practice-submission` marker (files + results) from the stored result and starts the turn through the normal admission path.
+- **Hidden counts:** Submit runs the visible tests and the full set; tests not in the visible run are the hidden ones (language-agnostic, at the cost of a second run).
+- **Thinking snapshot:** the `practice-thinking` marker gains an optional `code` (the stored files); the model sees the files as fenced blocks after the thinking text.
+- **Transcript cards:** the thinking card shows a collapsed "code" section; a submission card shows passed/failed counts and failing visible tests; the conclusion card also reveals the reference files and all tests.
+- **Editor packages:** CodeMirror 6 with the official language packages (JS/TS, Python, Java, C++, Rust, Go) and C# through `@codemirror/legacy-modes`; theme from the app's CSS variables; versions pinned exactly (`@lezer/highlight` 1.2.5 pinned directly for the token colours).
+- **The pane, not the dock (built 2026-11-01):** the step 1 registry now maps a module to the pane beside the transcript (loaded on demand, never prerendered); the dock is always the thinking dock. An unknown module gets no pane — the thinking dock alone, as step 1 ruled.
+- **Editor keys:** with the editor focused, Esc, Tab (indents) and any key the editor itself handled (Vim's Ctrl-D, the editor's own find) stay in the editor; Run, Submit and dictation still reach the app's shortcuts. The mode indicator is Vim's own status line at the bottom of the editor (it also carries `:` commands and `/` search).
+- **Split:** the divider stores a fraction (25–75 %, default 50 %, double-click resets) under `lh:workspace-split`; a header **Code** chip hides and shows the pane (a new problem opens it again). Below `lg` the pane is a full-screen overlay with a back button.
+- **Readings tray:** practice sessions have no readings today, so the tray rule has nothing to act on yet; it applies when step 9 brings workspaces into lessons.
+- **Submit while the agent is talking:** disabled until its turn ends (the button says why).
+- **Results panel:** the last Run or Submit (whichever is newer) restores on load.
+
+**Built (2026-11-01):** the store, routes and server run path; the `submission` input and marker; the thinking snapshot; the cards; the pane (CodeMirror, tabs with read-only tests, Run/Submit, results, autosave with flush, Vim toggle); the split view and Code chip; the two registry hotkeys; the Settings → Keyboard Vim row. Tests: `tests/code-workspace-ui.test.ts` (store, Run/Submit against a fake runner with hidden counts, inputs, projection, absorption). **Live check: pending.**
+
+---
+
+## Steps 4–10 — outline (detailed one at a time)
+
 4. **Language servers.** A stdio ↔ browser relay through the server; diagnostics-only client capabilities; a server per language.
 5. **Trace + Ask.** The narration strip as the dictation target; trace markers (snapshots and diffs, run and submit results, asks) in the record; the Ask button and hotkey; the computed outcome fields.
 6. **Listening.** The four cues, the cap and coalescing, the `stay_quiet` tool and its faint transcript line, the global setting; delivery through the existing wake path.

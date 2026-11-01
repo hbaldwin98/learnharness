@@ -26,7 +26,8 @@ import {
 	type KeyAction,
 	type KeyScope,
 } from "@/src/core";
-import { SettingsRow } from "./controls.tsx";
+import { SettingsRow, Toggle } from "./controls.tsx";
+import { setVimEnabled, useVimEnabled } from "@/components/workspaces/vim-preference";
 
 const SCOPES: { scope: KeyScope; label: string }[] = [
 	{ scope: "global", label: "Global" },
@@ -96,6 +97,7 @@ export function KeyboardSection() {
 
 	return (
 		<>
+			<VimRow />
 			{SCOPES.map(({ scope, label }) => {
 				const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
 				if (!actions.length) return null;
@@ -166,5 +168,15 @@ export function KeyboardSection() {
 				</button>
 			</div>
 		</>
+	);
+}
+/** Vim mode for the coding workspace's editor (practice workspaces, plan
+ *  step 3): the same device-local preference as the workspace toolbar. */
+function VimRow() {
+	const on = useVimEnabled();
+	return (
+		<SettingsRow label="Vim mode in the code editor" hint="Stored on this device. Also in the coding workspace's toolbar." testid="kbd-vim-mode">
+			<Toggle checked={on} label="Vim mode in the code editor" onChange={setVimEnabled} />
+		</SettingsRow>
 	);
 }

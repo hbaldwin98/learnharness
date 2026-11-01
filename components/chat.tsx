@@ -52,21 +52,23 @@ import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
 import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
-import { ArrowRightIcon, BookOpenIcon, DumbbellIcon, WaypointsIcon } from "lucide-react";
+import { ArrowRightIcon, BookOpenIcon, CodeIcon, DumbbellIcon, WaypointsIcon } from "lucide-react";
 import type { PlanBlockData } from "@/src/core";
 import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
 import { workspaceComponentFor } from "@/components/workspaces/registry";
-import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
+import { WorkspaceSide } from "@/components/workspaces/split";
+import { flushWorkspace } from "@/components/workspaces/flush";
+import { SubmissionCard, ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import { ReadingsTray, useReadingsTray } from "@/components/readings/readings-tray";
 import { SessionReadingsContext } from "@/components/readings/api";
 import { PassageReadDeeper } from "@/components/readings/passage-action";
 import { ReadingDiscussedLine } from "@/components/readings/discussed-line";
-import type { ReadingDiscussionMarkerDetails } from "@/src/core";
+import type { ReadingDiscussionMarkerDetails, SubmissionDetails } from "@/src/core";
 import type { ArtifactPartProps, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { LhViewMessage } from "@/src/core";
 import { PhaseChip, PhaseDivider } from "@/components/phase-divider";
@@ -475,6 +477,12 @@ export function Chat({
 	const busy = localStream || turnInFlight;
 	const busyRef = useRef(busy);
 	busyRef.current = busy;
+	// PRACTICE WORKSPACES (plan step 3): a coding problem's pane opens beside
+	// the transcript (the thinking dock stays the talk channel). Hidden only
+	// when the learner hides it; a new problem opens it again.
+	const WorkspacePane = activeProblem ? workspaceComponentFor(activeProblem.input) : null;
+	const [workspaceHiddenFor, setWorkspaceHiddenFor] = useState<string | null>(null);
+	const workspaceOpen = !!WorkspacePane && workspaceHiddenFor !== activeProblem?.toolCallId;
 	// The attach handoff (stream-reattach wave): the moment a resumed
 	// stream takes over the rendering — the SDK left "ready", so
 	// submitted/streaming means chunks are flowing — localStream covers
@@ -507,7 +515,19 @@ export function Chat({
 		(text: string) => {
 			const problem = activeProblemRef.current;
 			if (!problem) return;
-			void send({ type: "thinking", problemCallId: problem.toolCallId, text });
+			// A coding problem's snapshot is read server-side: save first.
+			void flushWorkspace(problem.toolCallId).then(() =>
+				send({ type: "thinking", problemCallId: problem.toolCallId, text }),
+			);
+		},
+		[send],
+	);
+
+	// The coding workspace's Submit (plan step 3): the result is already
+	// stored server-side; this tells the agent and starts its turn.
+	const submitWorkspace = useCallback(
+		(problemCallId: string) => {
+			void send({ type: "submission", problemCallId });
 		},
 		[send],
 	);
@@ -1388,6 +1408,23 @@ export function Chat({
 						</button>
 </Hint>
 					)}
+					{WorkspacePane && activeProblem && (
+						<Hint label={workspaceOpen ? "Hide the code workspace" : "Show the code workspace"} side="bottom">
+							<button
+								type="button"
+								data-testid="workspace-chip"
+								aria-pressed={workspaceOpen}
+								onClick={(e) => {
+									blurAfterPointerClick(e);
+									setWorkspaceHiddenFor(workspaceOpen ? activeProblem.toolCallId : null);
+								}}
+								className="lh-no-drag flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border/80 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+							>
+								<CodeIcon className="size-3.5 text-primary" aria-hidden />
+								Code
+							</button>
+						</Hint>
+					)}
 					{planTree && (
 						<Hint label="Open the full plan" side="bottom">
 <button
@@ -1479,6 +1516,8 @@ export function Chat({
 												return <CompactionCutDivider key={pi} data={part.data as CompactionDividerData} />;
 											case "data-practice-thinking":
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
+											case "data-practice-submission":
+												return <SubmissionCard key={pi} data={part.data as SubmissionDetails} />;
 											case "data-reading-discussion":
 												return <ReadingDiscussedLine key={pi} data={part.data as ReadingDiscussionMarkerDetails} />;
 											case "data-practice-next":
@@ -1837,6 +1876,21 @@ export function Chat({
 				{readingsEnabled && <PassageReadDeeper rootRef={sessionFindScopeRef} />}
 				</div>
 			</div>
+			{/* The coding workspace (practice workspaces, plan step 3): the
+			    right side of the split view; it overlays the session below lg. */}
+			{WorkspacePane && activeProblem && workspaceOpen && (
+				<WorkspaceSide>
+					<WorkspacePane
+						key={activeProblem.toolCallId}
+						chatId={chatId}
+						problemCallId={activeProblem.toolCallId}
+						input={activeProblem.input as { statement: string }}
+						busy={busy}
+						onSubmitted={submitWorkspace}
+						onHide={() => setWorkspaceHiddenFor(activeProblem.toolCallId)}
+					/>
+				</WorkspaceSide>
+			)}
 			{/* The readings tray (owner ruling 2026-10-27: a side tray beside
 			    the lesson — the transcript stays untouched). A full-height
 			    sibling of the column, like the sidebar on the left; it
@@ -2377,9 +2431,6 @@ function DockOverlay({
 	// practice (owner fix, 2026-10-06). Typing growth keeps the key and
 	// never animates; the fold/unfold morphs like teaching always has.
 	const stateKey = dockStateKey(mode, !!pending || !!practice, expanded);
-	// PRACTICE WORKSPACES (plan step 1): a problem's workspace module UI
-	// replaces the thinking dock; none / unknown → the thinking dock.
-	const Workspace = practice ? workspaceComponentFor(practice.input) : null;
 	const prevRef = useRef<{ key: string; height: number } | null>(null);
 	useIsoLayoutEffect(() => {
 		const el = shellRef.current;
@@ -2467,18 +2518,6 @@ function DockOverlay({
 									onSaveDraft={onSaveQuestionDraft}
 									onEscape={dictationCancel}
 									dictationClaim={!revealPending}
-									compactionRunning={compactionRunning}
-								/>
-							) : practice && Workspace ? (
-								<Workspace
-									problemCallId={practice.toolCallId}
-									input={practice.input as { statement: string }}
-									expanded={expanded}
-									onExpand={() => {
-										setExpanded(true);
-										void suppressFoldDuringReveal();
-									}}
-									onEscape={dictationCancel}
 									compactionRunning={compactionRunning}
 								/>
 							) : practice ? (

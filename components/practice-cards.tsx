@@ -2,7 +2,8 @@
 
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
-import type { ArtifactPartProps } from "@/src/core";
+import { fenceFile, type ArtifactPartProps, type CodeFile, type SubmissionDetails } from "@/src/core";
+import { ChevronDownIcon } from "lucide-react";
 
 /**
  * The practice transcript cards (practice sessions, owner design
@@ -53,6 +54,8 @@ export interface PracticeThinkingData {
 	/** Legacy records (pre 2026-10-05) carry the old two-lane flag; ignored. */
 	commit?: boolean;
 	text: string;
+	/** The learner's code at the time (coding problems, plan step 3). */
+	code?: CodeFile[];
 }
 
 export function ProblemCard({ part }: ArtifactPartProps) {
@@ -149,6 +152,17 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 					</div>
 				</>
 			)}
+			{(() => {
+				const code = codeReveal(part.problemInput);
+				if (!code) return null;
+				return (
+					<>
+						<div className="my-3 border-t" />
+						<CodeFilesDisclosure label="Reference solution" files={code.reference} testId="reveal-reference" />
+						<CodeFilesDisclosure label="All tests" files={code.tests} testId="reveal-tests" />
+					</>
+				);
+			})()}
 			<MetadataPopover
 				concludeInput={input}
 				problemInput={(part.problemInput ?? {}) as { mode?: unknown; target?: unknown }}
@@ -294,5 +308,95 @@ export function ThinkingCard({ data }: { data: PracticeThinkingData }) {
 	// 50%-italic quote block on expand. Legacy records' commit flag is
 	// deliberately unread (one lane now). A TRANSCRIPT row (owner round,
 	// 2026-10-07): full-width band + rail, arriving expanded.
-	return <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen />;
+	const code = thinkingCode(data);
+	const block = <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen />;
+	if (code.length === 0) return block;
+	return (
+		<div>
+			{block}
+			<div className="pl-[3ch]">
+				<CodeFilesDisclosure label="Your code" files={code} testId="thinking-code" />
+			</div>
+		</div>
+	);
+}
+
+/* ── CODING WORKSPACE CARDS (practice workspaces, plan step 3) ─────────── */
+
+/** Files as fenced markdown, behind a quiet disclosure (collapsed by
+ *  default: the record, not the working surface). */
+export function CodeFilesDisclosure({
+	label,
+	files,
+	testId,
+	defaultOpen = false,
+}: {
+	label: string;
+	files: readonly CodeFile[];
+	testId?: string;
+	defaultOpen?: boolean;
+}) {
+	const [open, setOpen] = useState(defaultOpen);
+	if (files.length === 0) return null;
+	return (
+		<div data-testid={testId} className="mt-2">
+			<button
+				type="button"
+				onClick={() => setOpen((v) => !v)}
+				aria-expanded={open}
+				className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+			>
+				<ChevronDownIcon className={cn("size-3 transition-transform", !open && "-rotate-90")} />
+				{label}
+				<span className="normal-case tracking-normal text-muted-foreground/70">
+					({files.length} {files.length === 1 ? "file" : "files"})
+				</span>
+			</button>
+			{open && (
+				<div className="lh-prose mt-1 text-[13px]">
+					<ToolContentResponse>{files.map(fenceFile).join("\n\n")}</ToolContentResponse>
+				</div>
+			)}
+		</div>
+	);
+}
+
+/** The thinking marker's code snapshot, when the problem had a workspace. */
+function thinkingCode(data: PracticeThinkingData): CodeFile[] {
+	return Array.isArray(data.code) ? data.code : [];
+}
+
+export function SubmissionCard({ data }: { data: SubmissionDetails }) {
+	const r = data.result;
+	const passed = r.visible.filter((t) => t.status === "pass").length;
+	const builtOk = !(r.phase === "build" && !r.ok);
+	return (
+		<div data-testid="submission-card" className="lh-card-enter my-1 rounded-xl border bg-card p-4">
+			<div className="flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				Submitted
+				<span className={cn("rounded px-1.5 py-0.5", r.ok ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500")}>
+					{r.ok ? "All tests pass" : builtOk ? "Tests failing" : "Build failed"}
+				</span>
+			</div>
+			{builtOk && (
+				<div className="mt-1 font-mono text-xs text-muted-foreground">
+					visible {passed}/{r.visible.length}
+					{r.hidden && ` · hidden ${r.hidden.passed}/${r.hidden.total}`}
+					{r.timedOut && " · timed out"}
+				</div>
+			)}
+			<CodeFilesDisclosure label="Code" files={data.files} testId="submission-code" />
+		</div>
+	);
+}
+
+/** A coding problem's pose-side reveal (reference + every test), read off
+ *  the problem call's workspace — shown once the problem concluded. */
+function codeReveal(problemInput: unknown): { reference: CodeFile[]; tests: CodeFile[] } | null {
+	const ws = (problemInput as { workspace?: { module?: unknown; reference?: unknown; tests?: unknown } } | null)?.workspace;
+	if (!ws || ws.module !== "code") return null;
+	const files = (v: unknown): CodeFile[] =>
+		Array.isArray(v) ? v.filter((f): f is CodeFile => typeof f?.path === "string" && typeof f?.content === "string") : [];
+	const tests = ws.tests as { visible?: unknown; hidden?: unknown } | undefined;
+	return { reference: files(ws.reference), tests: [...files(tests?.visible), ...files(tests?.hidden)] };
 }

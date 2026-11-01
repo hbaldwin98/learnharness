@@ -18,18 +18,8 @@ export type CodeLanguage = (typeof CODE_LANGUAGES)[number];
 export const CODE_IMAGES = ["node", "python", "dotnet", "java", "go", "rust", "cpp"] as const;
 export type CodeImage = (typeof CODE_IMAGES)[number];
 
-export interface CodeFile {
-	path: string;
-	content: string;
-}
-
-export type TestStatus = "pass" | "fail" | "error";
-
-export interface TestCaseResult {
-	name: string;
-	status: TestStatus;
-	message?: string;
-}
+import type { CodeFile, TestCaseResult } from "../../../core/contracts/workspaces.ts";
+export type { CodeFile, TestCaseResult, TestStatus } from "../../../core/contracts/workspaces.ts";
 
 export interface LanguageSpec {
 	id: CodeLanguage;

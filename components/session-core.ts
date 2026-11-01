@@ -165,10 +165,19 @@ export function absorbed(m: LhMessage, record: readonly LhMessage[]): boolean {
 			(r) =>
 				(r as { role?: string }).role === "custom" &&
 				(r as LhMarkerMessage).customType === marker.customType &&
-				sameDetails((r as LhMarkerMessage).details, marker.details),
+				sameDetails(withoutServerFields((r as LhMarkerMessage).details), withoutServerFields(marker.details)),
 		);
 	}
 	return false;
+}
+
+/** The server adds the learner's code snapshot to a thinking marker
+ *  (practice workspaces, plan step 3); the optimistic copy can't know it,
+ *  so identity ignores it. */
+function withoutServerFields(details: unknown): unknown {
+	if (typeof details !== "object" || details === null || !("code" in details)) return details;
+	const { code: _code, ...rest } = details as Record<string, unknown>;
+	return rest;
 }
 
 /** Structural deep-equal for marker details (JSON-stable payloads — the

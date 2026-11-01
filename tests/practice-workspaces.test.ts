@@ -129,7 +129,7 @@ describe("reading a workspace off a problem", () => {
 		assert.deepEqual(activeProblemOf(messages), { toolCallId: "call_p", input });
 	});
 
-	it("the dock: no workspace or an unknown module → the thinking dock (null)", () => {
+	it("the pane: no workspace or an unknown module → no pane (null)", () => {
 		const Fake = () => null;
 		assert.equal(workspaceComponentFor(POSE, { fake: Fake }), null);
 		assert.equal(workspaceComponentFor({ ...POSE, workspace: { module: "ghost" } }, { fake: Fake }), null);

@@ -36,6 +36,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
 import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
+import { describeRunResult, fenceFile, type CodeFile, type SubmissionDetails } from "./contracts/workspaces.ts";
 import { CLAUDE_CODE_PROVIDER } from "./contracts/claude-code.ts";
 import {
 	CONCLUDE_ACK_TEXT,
@@ -74,6 +75,7 @@ export interface LhMarkerMessage {
 		| "subagent-abort"
 		| "plan-block"
 		| "practice-thinking"
+		| "practice-submission"
 		| "practice-next"
 		| "problem-dismissed"
 		| "compaction"
@@ -314,14 +316,34 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
  *  content label is the single "Your thinking"; `details` keeps the raw
  *  payload for the transcript card. One problem may carry many
  *  submissions. */
-export function newThinkingMessage(problemCallId: string, text: string): LhMarkerMessage {
+export function newThinkingMessage(problemCallId: string, text: string, code?: readonly CodeFile[]): LhMarkerMessage {
+	// PRACTICE WORKSPACES (plan step 3): on a coding problem the server
+	// attaches the learner's current files (from the workspace store) —
+	// the model reads them after the thinking; the card shows them collapsed.
+	const withCode = code !== undefined && code.length > 0;
+	const codeText = withCode ? `\n\nTheir current code:\n${code.map(fenceFile).join("\n\n")}` : "";
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-thinking",
-		content: `${THINKING_LABEL}:\n${text}`,
+		content: `${THINKING_LABEL}:\n${text}${codeText}`,
 		display: true,
-		details: { problemCallId, text },
+		details: withCode ? { problemCallId, text, code: [...code] } : { problemCallId, text },
+		timestamp: Date.now(),
+	};
+}
+
+/** A coding problem's Submit (plan step 3): the learner's files and the
+ *  server-run results (hidden tests as counts). The model reads the
+ *  results and the code; the card shows the counts. */
+export function newSubmissionMessage(details: SubmissionDetails): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "practice-submission",
+		content: `The learner submitted their solution.\n${describeRunResult(details.result)}\n\nSubmitted code:\n${details.files.map(fenceFile).join("\n\n")}`,
+		display: true,
+		details,
 		timestamp: Date.now(),
 	};
 }
@@ -847,7 +869,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-submission", "practice-next"].includes(message.customType)) return "learner";
 		// reading-discussion: a held note riding a run it never starts (docs/readings.md §14).
 		return ["graph-context", "plan-block", "problem-dismissed", "compaction", "reading-discussion"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}

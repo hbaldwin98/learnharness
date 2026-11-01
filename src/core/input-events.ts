@@ -38,12 +38,14 @@ import {
 	newNextMessage,
 	newProblemDismissedMarker,
 	newThinkingMessage,
+	newSubmissionMessage,
 	newUserMessage,
 	newMessageId,
 	questionCallsOf,
 	pendingProblemDismissalOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
+import type { CodeFile, WorkspaceRunResult } from "./contracts/workspaces.ts";
 
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
@@ -59,6 +61,10 @@ export type ChatInput =
 	 *  whether it claims an answer is read from the text. One
 	 *  problem may carry many submissions; each is its own turn. */
 	| { type: "thinking"; problemCallId: string; text: string }
+	/** A coding problem's Submit (practice workspaces, plan step 3): the
+	 *  results were produced and stored server-side by the run route; this
+	 *  input appends them as a marker and starts the agent's turn. */
+	| { type: "submission"; problemCallId: string }
 	/** The practice move-on signal (owner round 16): the learner's
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
@@ -195,6 +201,11 @@ export function parseChatInput(input: unknown): ChatInput {
 				throw new ChatInputError("thinking input requires non-empty text");
 			}
 			return { type: "thinking", problemCallId: i.problemCallId, text: i.text };
+		case "submission":
+			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
+				throw new ChatInputError("submission input requires problemCallId");
+			}
+			return { type: "submission", problemCallId: i.problemCallId };
 		case "next":
 			return { type: "next" };
 		default:
@@ -211,9 +222,20 @@ export function parseChatInput(input: unknown): ChatInput {
  * else 400s honestly instead of silently interrupting a question or
  * double-answering.
  */
+/** Server-side lookups into the coding workspace store (practice
+ *  workspaces, plan step 3) — injected so this stays pure. Absent (tests,
+ *  non-coding paths) = no code snapshots and no submissions. */
+export interface WorkspaceLookups {
+	/** The learner's current files, or null when not a coding problem. */
+	snapshot(problemCallId: string): CodeFile[] | null;
+	/** The stored last Submit, or null when there is none. */
+	submission(problemCallId: string): { files: CodeFile[]; result: WorkspaceRunResult } | null;
+}
+
 export function inputAppends(
 	record: { messages: LhMessage[]; kind?: string },
 	input: ChatInput,
+	workspace?: WorkspaceLookups,
 ): LhMessage[] {
 	switch (input.type) {
 		case "text":
@@ -238,7 +260,20 @@ export function inputAppends(
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("thinking input targets no active problem");
 			}
-			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text)];
+			const code = workspace?.snapshot(input.problemCallId) ?? undefined;
+			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, code)];
+		}
+		case "submission": {
+			const active = activeProblemOf(record.messages);
+			if (!active || active.toolCallId !== input.problemCallId) {
+				throw new ChatInputError("submission input targets no active problem");
+			}
+			const submitted = workspace?.submission(input.problemCallId);
+			if (!submitted) throw new ChatInputError("submission input has no stored submit result — submit first");
+			return [
+				...dismissalConclusion(record),
+				newSubmissionMessage({ problemCallId: input.problemCallId, files: submitted.files, result: submitted.result }),
+			];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a
