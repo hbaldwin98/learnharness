@@ -27,6 +27,7 @@ declare module "dockerode" {
 		interface ImageInfo {
 			Id: string;
 			RepoTags: string[] | null;
+			Size: number;
 		}
 
 		interface ContainerInfo {

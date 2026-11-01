@@ -90,6 +90,8 @@ export interface EffectiveSettings {
 		graphTools: { enabled?: boolean };
 		/** Coding listening (plan step 6): passthrough; absent = ON. */
 		listening: { enabled?: boolean };
+		/** The default coding language (plan step 8); null = the agent chooses. */
+		codingLanguage: string | null;
 	};
 	/** The resolved strong/cheap/vision slots: each tier's concrete model or
 	 *  NULL when the tier holds no model (no factory floor — BYOK all the
@@ -198,6 +200,7 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 			search: agent.search ?? {},
 			graphTools: agent.graphTools ?? {},
 			listening: agent.listening ?? {},
+			codingLanguage: agent.codingLanguage ?? null,
 		},
 		models: {
 			strong: resolveSlot(modelsSection.strong),

@@ -424,8 +424,21 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Steps 8–10 — outline (detailed one at a time)
+## Step 8 — Settings → Coding (BUILT 2026-11-01)
 
-8. **Settings.** The Coding section: default language, listening, Docker status and image management.
+**Built on the recommended defaults (owner instruction, 2026-11-01).** Earlier ruling: a default language in settings, overridable per request; Coding gets its own Settings section.
+
+**Defaulted (recommended):**
+- **Default language:** `agent.codingLanguage` (one of the module's eight languages; unset = "Agent chooses"). It reaches the agent as one sentence on the `problem` tool's description ("The learner's default coding language is Rust: pose coding problems in it unless they ask for another") — it changes only when the setting does, so prompt caching holds.
+- **Listening:** the step 6 switch, unchanged.
+- **Docker:** a status row (running / stopped / missing, with what to do) and the coding images on this machine — the languages each serves, size, "outdated" for a leftover tag — each with Remove, plus Remove all (with the total size). Removing skips images a running problem uses; every image rebuilds on first use. No "build now" button: first use already builds with progress.
+- **Routes:** `GET /api/workspaces/docker` and `POST { remove: image | "all" }`; the Docker runner gains `images()` and `removeImages()`.
+
+**Tests:** `tests/practice-coding-settings.test.ts` (validation and clearing, resolution, composition, the option list matching the module, the problem tool's sentence).
+
+---
+
+## Steps 9–10 — outline (detailed one at a time)
+
 9. **Teacher exercises.** The teaching tool and its Tools toggle; an inline split view in the lesson; a quiz-style result back to the teacher.
 10. **Doctrine.** Owner-authored interview-style, coding and teacher-exercise sections.

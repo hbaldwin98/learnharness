@@ -13,6 +13,7 @@
 
 import path from "node:path";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import { CODE_LANGUAGES } from "../agent/workspaces/code/languages.ts";
 import { isHexColor, type ChatSettings } from "../core";
 import type {
 	AgentSettings,
@@ -220,6 +221,14 @@ export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentS
 			return { ok: false, error: "fileAccess.folders must be absolute on the server filesystem (or start with ~/)" };
 		}
 		settings.fileAccess = parsed.settings;
+	}
+	// The default coding language (plan step 8): one of the coding module's
+	// languages, or "" / null to clear.
+	if (raw.codingLanguage !== undefined && raw.codingLanguage !== null && raw.codingLanguage !== "") {
+		if (typeof raw.codingLanguage !== "string" || !(CODE_LANGUAGES as readonly string[]).includes(raw.codingLanguage)) {
+			return { ok: false, error: `codingLanguage must be one of ${CODE_LANGUAGES.join(", ")}` };
+		}
+		settings.codingLanguage = raw.codingLanguage;
 	}
 	// Coding listening (plan step 6): the graphTools shape. Absent = ON.
 	if (raw.listening !== undefined) {

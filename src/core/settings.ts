@@ -400,6 +400,9 @@ export interface AgentSettings {
 	 *  on by default, a global opt-out): the agent looks in on the
 	 *  learner's coding work at the cues. Absent = enabled. */
 	listening?: { enabled?: boolean };
+	/** The default coding language (plan step 8; ruled: a default in
+	 *  settings, overridable per request). Absent = the agent chooses. */
+	codingLanguage?: string;
 	/** System-prompt override SWITCHES keyed by segment path (absent key =
 	 *  off). Switch-on requires the override file to exist (enforced by the
 	 *  route); the switch is explicit so users keep a file on disk but run
@@ -775,6 +778,7 @@ function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
 		const parsed = parseFileAccessSettings(raw.fileAccess);
 		out.fileAccess = parsed.ok ? parsed.settings : { restricted: true, folders: [] };
 	}
+	if (typeof raw.codingLanguage === "string" && raw.codingLanguage) out.codingLanguage = raw.codingLanguage;
 	// Coding listening (plan step 6): same lenient read as graphTools.
 	if (raw.listening !== null && typeof raw.listening === "object" && !Array.isArray(raw.listening)) {
 		const enabled = (raw.listening as Record<string, unknown>).enabled;

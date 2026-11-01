@@ -25,7 +25,7 @@ import path from "node:path";
 import { PassThrough, Readable, Writable } from "node:stream";
 import Docker from "dockerode";
 import { PATHS } from "../../../config.ts";
-import type { CodeImage } from "../../agent/workspaces/code/languages.ts";
+import { CODE_IMAGES, type CodeImage } from "../../agent/workspaces/code/languages.ts";
 import {
 	OUTPUT_CAP_BYTES,
 	capOutput,
@@ -181,6 +181,8 @@ export interface DockerRunnerOptions {
 export function createDockerRunner(options: DockerRunnerOptions = {}): CodeRunner & {
 	reapAll(): Promise<void>;
 	retainOnly(chatId: string, activeProblemCallId: string | null): Promise<void>;
+	images(): Promise<CodeImageInfo[]>;
+	removeImages(only?: CodeImage): Promise<number>;
 } {
 	let client: Docker | null = null;
 	/** The engine client; re-resolved after a failed ping (the context may change). */
@@ -455,5 +457,46 @@ export function createDockerRunner(options: DockerRunnerOptions = {}): CodeRunne
 				await docker().getContainer(c.Id).remove({ force: true }).catch(() => {});
 			}
 		},
+
+		/** The coding images on this machine (plan step 8: Settings → Coding). */
+		async images() {
+			const list = await docker().listImages({ filters: { label: [`${WORKSPACE_LABEL}=${LABEL_VALUE}`] } });
+			const out: CodeImageInfo[] = [];
+			for (const i of list) {
+				for (const tag of i.RepoTags ?? []) {
+					const m = /^learnharness-code-([a-z]+):/.exec(tag);
+					if (!m || !(CODE_IMAGES as readonly string[]).includes(m[1]!)) continue;
+					const image = m[1] as CodeImage;
+					out.push({ image, tag, sizeBytes: i.Size, current: tag === imageTag(image) });
+				}
+			}
+			return out.sort((a, b) => a.image.localeCompare(b.image));
+		},
+
+		/** Remove coding images (all, or one image's tags). Images a running
+		 *  container uses are skipped; they rebuild on first use. */
+		async removeImages(only?: CodeImage) {
+			const images = await this.images();
+			let removed = 0;
+			for (const i of images) {
+				if (only && i.image !== only) continue;
+				try {
+					await docker().getImage(i.tag).remove();
+					removed++;
+				} catch {
+					// in use by a running problem: kept
+				}
+			}
+			return removed;
+		},
 	};
+}
+
+/** One coding image, for Settings → Coding (plan step 8). */
+export interface CodeImageInfo {
+	image: CodeImage;
+	tag: string;
+	sizeBytes: number;
+	/** Built from this app's current Dockerfile (else a leftover). */
+	current: boolean;
 }

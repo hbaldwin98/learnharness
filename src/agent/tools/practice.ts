@@ -53,6 +53,8 @@ export interface PracticeToolContext {
 	/** This turn answers a listening update (plan step 6): the only turn
 	 *  in which stay_quiet is accepted. */
 	listening?: boolean;
+	/** The learner's default coding language (plan step 8), e.g. "Python". */
+	defaultCodeLanguage?: string;
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
@@ -139,12 +141,18 @@ export function problemTool(
 	graphNodes?: PracticeToolContext["graphNodes"],
 	modules: readonly AgentWorkspaceModule[] = [],
 	chatId = "",
+	defaultCodeLanguage?: string,
 ): AgentTool<typeof problemInputObject> {
 	const parameters = problemInputSchema(modules);
 	return {
 		name: "problem",
 		label: "problem",
-		description: modules.length === 0 ? PROBLEM_DESCRIPTION : PROBLEM_DESCRIPTION + WORKSPACE_DESCRIPTION_SUFFIX,
+		description:
+			modules.length === 0
+				? PROBLEM_DESCRIPTION
+				: PROBLEM_DESCRIPTION +
+					WORKSPACE_DESCRIPTION_SUFFIX +
+					(defaultCodeLanguage ? ` The learner's default coding language is ${defaultCodeLanguage}: pose coding problems in it unless they ask for another.` : ""),
 		parameters,
 		executionMode: "sequential",
 		prepareArguments: (args: unknown) => {
@@ -336,7 +344,7 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 	// keep their own (target-normalizing) prepareArguments as the composed
 	// inner pass; the double heal is idempotent by construction.
 	return healToolRecord({
-		problem: problemTool(gate, ctx.graphNodes, modules, ctx.chatId),
+		problem: problemTool(gate, ctx.graphNodes, modules, ctx.chatId, ctx.defaultCodeLanguage),
 		conclude: concludeTool(gate),
 		read: readTool,
 		ls: lsTool,

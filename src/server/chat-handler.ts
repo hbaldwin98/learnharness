@@ -64,6 +64,12 @@ import {
 	type TurnInput,
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
+import { LANGUAGES } from "../agent/workspaces/code/languages.ts";
+
+/** A coding language id's label ("python" → "Python"), else the id. */
+function codeLanguageLabel(id: string): string {
+	return (LANGUAGES as Record<string, { label: string } | undefined>)[id]?.label ?? id;
+}
 import type {CallUsage} from "../core/contracts.ts";
 
 /** The source-prompt composition a record's agent runs (prompt-size
@@ -544,6 +550,8 @@ export async function handleChatInput(
 						workspaceModules: availableWorkspaceModules(),
 						// Plan step 6: stay_quiet is accepted only answering a listening update.
 						listening: input.type === "listen",
+						// Plan step 8: the default coding language, by its label.
+						...(effective.agent.codingLanguage ? { defaultCodeLanguage: codeLanguageLabel(effective.agent.codingLanguage) } : {}),
 					},
 					agentOpts,
 				)

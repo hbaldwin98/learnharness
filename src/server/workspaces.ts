@@ -16,7 +16,8 @@ import { workspaceOf } from "../core/workspaces.ts";
 import type { AgentWorkspaceModule } from "../agent/workspaces/registry.ts";
 import { CODE_MODULE_ID, createCodeModule } from "../agent/workspaces/code/module.ts";
 import type { DockerStatus } from "../agent/workspaces/code/runner.ts";
-import { createDockerRunner } from "./workspaces/docker-runner.ts";
+import { createDockerRunner, type CodeImageInfo } from "./workspaces/docker-runner.ts";
+import { CODE_IMAGES, type CodeImage } from "../agent/workspaces/code/languages.ts";
 import { emit } from "../core/events.ts";
 import { createDiagnosticsSession, unavailableSnapshot, type DiagnosticsSession, type DiagnosticsSnapshot } from "../agent/workspaces/code/diagnostics.ts";
 
@@ -446,6 +447,25 @@ export function dismissAnnotation(chatId: string, problemCallId: string, id: unk
 	const next = mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({ ...r, annotations: (r.annotations ?? []).filter((a) => a.id !== id) }));
 	emit("workspace-annotations", { chatId, problemCallId });
 	return next.annotations ?? [];
+}
+
+// ─── Settings → Coding (plan step 8) ─────────────────────────────────────────
+
+/** Docker's state and the coding images on this machine. */
+export async function codingDockerInfo(): Promise<{ status: DockerStatus; images: CodeImageInfo[] }> {
+	const s = state();
+	const status = await s.runner.status().catch(() => "missing" as const);
+	const images = status === "running" ? await s.runner.images().catch(() => []) : [];
+	return { status, images };
+}
+
+/** Remove coding images: one image's tags, or every one ("all"). */
+export async function removeCodingImages(which: unknown): Promise<number> {
+	const s = state();
+	if ((await s.runner.status()) !== "running") throw new WorkspaceError("Docker isn't running", 503);
+	if (which === "all") return s.runner.removeImages();
+	if (typeof which !== "string" || !(CODE_IMAGES as readonly string[]).includes(which)) throw new WorkspaceError("unknown image", 400);
+	return s.runner.removeImages(which as CodeImage);
 }
 
 /** The pane's heartbeat (plan step 6): keeps listening present while the
