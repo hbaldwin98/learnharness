@@ -267,9 +267,47 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Steps 4–10 — outline (detailed one at a time)
+## Step 4 — language servers (PLANNED, awaiting approval)
 
-4. **Language servers.** A stdio ↔ browser relay through the server; diagnostics-only client capabilities; a server per language.
+**Goal:** while the learner types, the editor underlines errors and warnings from a real language server for the problem's language. Nothing else from the server: no completion, hover, signature help or code actions.
+
+**Owner rulings (2026-11-01):**
+- **The server is the LSP client.** The server runs the language server in the problem's container, acts as its client, and gives the browser only diagnostics. The browser never speaks LSP and there is no new transport. *(This replaces the design doc's "stdio ↔ browser relay"; the doc is updated with the step.)*
+- **Same container, 2 GiB.** The language server lives in the problem's container (same lockdown, no network, removed with it). The container memory limit rises from 1 GiB to 2 GiB.
+- **The servers**, pinned and installed at image build:
+
+  | Languages | Server |
+  |---|---|
+  | JS/TS | typescript-language-server + typescript |
+  | Python | basedpyright (pip, bundles its own Node) |
+  | C# | csharp-ls (dotnet tool) |
+  | Java | Eclipse jdtls |
+  | Go | gopls |
+  | Rust | rust-analyzer (rustup component) |
+  | C++ | clangd |
+
+**Defaulted (recommended):**
+- **Layering.** A pure LSP client in the agent layer (`src/agent/workspaces/code/lsp-client.ts`: JSON-RPC framing, initialize with diagnostics-only client capabilities, didOpen/didChange, publishDiagnostics → normalized `{ path, line, column, endLine, endColumn, severity: "error" | "warning", message, source }`; info and hints dropped). The language table gains each language's server command, init options and file language ids. The Docker runner gains one long-lived exec per problem with stdin/stdout attached; the server module owns its lifecycle.
+- **Its own directory.** The server works in `/work/lsp` (scaffold + the learner's files + the **visible** tests), separate from the wiped `/work/run`. **Hidden tests are never given to it**, since its diagnostics would leak them. `HOME` and caches live on the tmpfs.
+- **Fed by the saves.** The existing autosave is the only write path. Each successful PUT sends didChange for the changed files, and the debounce drops from 600 ms to 400 ms so errors appear about half a second after typing stops.
+- **Delivery: notify, then fetch.** When a file's diagnostics change, the server emits a bus event `workspace-diagnostics { chatId, problemCallId }`. The pane fetches `GET /api/workspaces/[chatId]/[problemCallId]/diagnostics`, which returns the latest set per file plus the server's status (`starting | ready | crashed | unavailable`).
+- **Lifecycle.** The server starts when the pane first loads the workspace (GET) and is stopped with the container (conclude, dismissal, 30 min idle, startup reap). If it crashes it restarts once, then the status stays `crashed` until the pane reloads. Run and Submit don't wait for it.
+- **Display.** `@codemirror/lint` (new, pinned): squiggly underlines, a gutter marker, and the message on hover. Each tab shows a red or amber dot when its file has errors or warnings. A quiet status line in the pane reads e.g. "Starting the Java language server…" while it warms up (jdtls takes ~15–30 s).
+- **Per-language setup:** jdtls opens the folder as an invisible project with the JUnit jar as a referenced library. csharp-ls uses the scaffold's `Solution.csproj`, with packages restored at image build. rust-analyzer uses the crate with the `rust-src` component for std. clangd gets a `compile_flags.txt` (`-std=c++20 -I/opt/lh/include`). gopls uses the provided `go.mod`. The JS/TS server uses a `tsconfig.json`/`jsconfig.json` written into `/work/lsp` (not visible to the learner) that matches Node's type stripping.
+- **The agent sees nothing new in this step.** Diagnostics reaching the agent belong to step 5's trace.
+- **Images grow** (jdtls, rust-analyzer and Node for basedpyright add the most). Image tags are content hashes, so the old images are deleted as superseded, as in step 2.
+
+**Tests:**
+- **Unit:** LSP framing (split and coalesced chunks), the diagnostics normalization (severity filter, 0-based → editor positions), the language table's server entries, the save → didChange path against a fake server, and the diagnostics route.
+- **Docker (opt-in, `LH_DOCKER_TESTS=1`):** per language, a fixture with one type or syntax error yields at least one error diagnostic on the right line, and the fixed file clears it. Hidden tests are absent from `/work/lsp`.
+- **Live check:** in the app, a type error in each of two languages (Python and one compiled language) underlines and clears.
+
+**Risks:** jdtls and csharp-ls are slow to start; the offline setups (Java's referenced library, C#'s restore) are the likeliest places to need fixing during the build; image build time grows.
+
+---
+
+## Steps 5–10 — outline (detailed one at a time)
+
 5. **Trace + Ask.** The narration strip as the dictation target; trace markers (snapshots and diffs, run and submit results, asks) in the record; the Ask button and hotkey; the computed outcome fields.
 6. **Listening.** The four cues, the cap and coalescing, the `stay_quiet` tool and its faint transcript line, the global setting; delivery through the existing wake path.
 7. **Annotations.** The agent tool; anchors that follow edits; the outdated list.
