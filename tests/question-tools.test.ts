@@ -260,7 +260,7 @@ describe("tool toggles (core/pending.ts + factories)", () => {
 		// are built on graded questions — the wedge danger), as are the
 		// learner-fs set, plan tools, and probe_done. The settings WRITE side
 		// validates against this list (settings-body).
-		assert.deepEqual(TOGGLEABLE_TOOLS, ["research", "demo", "visual", "pdf"]);
+		assert.deepEqual(TOGGLEABLE_TOOLS, ["research", "demo", "visual", "pdf", "coding_exercise"]);
 	});
 
 	it("createProberTools: absent record = full set; explicit false drops exactly that tool; probe_done survives everything", () => {

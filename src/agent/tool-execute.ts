@@ -252,6 +252,15 @@ export function problemResult(): AgentToolResult<null> {
 
 /** The listening turn's silence (practice workspaces, plan step 6): ends
  *  the turn with nothing said to the learner. */
+/** The coding exercise ack (plan step 9): terminate — the learner works. */
+export function exerciseResult(): AgentToolResult<null> {
+	return {
+		content: [{ type: "text", text: "Exercise posed — the turn ends here; the learner's Submit or skip arrives as a labeled message." }],
+		details: null,
+		terminate: true,
+	};
+}
+
 export function stayQuietResult(): AgentToolResult<null> {
 	return {
 		content: [{ type: "text", text: "Staying quiet — the turn ends here; nothing is shown to the learner." }],

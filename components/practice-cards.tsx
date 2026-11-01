@@ -563,3 +563,50 @@ function codeReveal(problemInput: unknown): { reference: CodeFile[]; tests: Code
 	const tests = ws.tests as { visible?: unknown; hidden?: unknown } | undefined;
 	return { reference: files(ws.reference), tests: [...files(tests?.visible), ...files(tests?.hidden)] };
 }
+
+/** A lesson's coding exercise (plan step 9): the statement while it is
+ *  open (the work happens in the pane); once a Submit or skip closes it,
+ *  the reference solution behind a disclosure. */
+export function ExerciseCard({ part }: ArtifactPartProps) {
+	const [open, setOpen] = useState(false);
+	const input = (part.input ?? {}) as { statement?: string; workspace?: { language?: string; reference?: Array<{ path: string; content: string }> } };
+	const statement = typeof input.statement === "string" ? input.statement : "";
+	if (part.state === "output-error") return null;
+	const reference = Array.isArray(input.workspace?.reference) ? input.workspace!.reference : [];
+	const closed = part.exerciseClosed === true;
+	return (
+		<div data-testid="exercise-card" className="lh-card-enter my-1 rounded-xl border bg-card p-4">
+			<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				Coding exercise{input.workspace?.language ? ` · ${input.workspace.language}` : ""}
+			</div>
+			<div className="lh-prose text-[15px]">
+				<ToolContentResponse>{statement}</ToolContentResponse>
+			</div>
+			{!closed && <p className="mt-2 text-xs text-muted-foreground">Work it in the code workspace — Submit when you&apos;re ready, or Skip.</p>}
+			{closed && reference.length > 0 && (
+				<div className="mt-2">
+					<button
+						type="button"
+						data-testid="exercise-reference-toggle"
+						onClick={() => setOpen((v) => !v)}
+						aria-expanded={open}
+						className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+					>
+						<ChevronDownIcon className={cn("size-3 transition-transform", !open && "-rotate-90")} />
+						Reference solution
+					</button>
+					{open && (
+						<div className="mt-1 flex flex-col gap-2">
+							{reference.map((f) => (
+								<div key={f.path}>
+									<div className="font-mono text-xs text-muted-foreground">{f.path}</div>
+									<pre className="mt-0.5 overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs">{f.content}</pre>
+								</div>
+							))}
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}

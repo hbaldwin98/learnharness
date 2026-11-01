@@ -60,7 +60,7 @@ async function readError(res: Response): Promise<string> {
 	return body?.error ?? `${res.status} ${res.statusText}`;
 }
 
-export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk, onHide }: WorkspaceProps) {
+export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk, onSkip, onHide }: WorkspaceProps) {
 	const [state, setState] = useState<WorkspaceState | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [activePath, setActivePath] = useState<string | null>(null);
@@ -299,6 +299,18 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk,
 						<HandIcon className="size-3" />
 						Ask
 					</Button>
+					{onSkip && (
+						<Button
+							size="xs"
+							variant="ghost"
+							data-testid="workspace-skip"
+							disabled={!state.active || running !== null || busy}
+							onClick={() => onSkip(problemCallId)}
+							title="Skip this exercise and go back to the lesson"
+						>
+							Skip
+						</Button>
+					)}
 				</>
 			}
 		>

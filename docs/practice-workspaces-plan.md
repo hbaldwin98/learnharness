@@ -438,7 +438,23 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Steps 9–10 — outline (detailed one at a time)
+## Step 9 — teacher coding exercises (BUILT 2026-11-01)
 
-9. **Teacher exercises.** The teaching tool and its Tools toggle; an inline split view in the lesson; a quiz-style result back to the teacher.
+**Built on the recommended defaults (owner instruction, 2026-11-01).** Outline: the teaching tool and its toggle; the split view in the lesson; a quiz-style result back to the teacher.
+
+**Defaulted (recommended):**
+- **The tool:** `coding_exercise { statement, workspace }` — `workspace` is exactly the code module's pose, verified by the same `verifyPose`. It ends the turn (terminate, and in the teacher's stop hook for mixed batches). One exercise open at a time.
+- **Availability:** in the teacher's registry only while the coding module is available (Docker refreshed before teaching turns) and `agent.tools.coding_exercise` isn't false. The switch is "Exercises in lessons" in Settings → Coding (not the Tools list — Coding owns its settings). The module's own tools (annotate) come with it. The default coding language rides its description, as with `problem`.
+- **Open/closed:** `activeExerciseOf` — the newest clean `coding_exercise` call, closed by a Submit (`practice-submission`) or a skip (`exercise-skipped`) for it. `activeWorkspaceOf` = the practice problem, else the open exercise; the workspace store, runs, Ask, Submit and annotations all key off it.
+- **Result:** any Submit closes the exercise (the quiz's one-shot shape) and starts the teacher's turn with the results and trace. **Skip** (pane header, lessons only) sends the `exercise-skip` input → `exercise-skipped` marker ("Exercise skipped" line).
+- **The pane:** the same coding pane opens in the lesson's split view; the composer stays (only practice problems own the dock). Containers are reconciled after the closing turn, as for practice.
+- **The card:** `ExerciseCard` — the statement and language while open; once closed, the reference solution behind a disclosure.
+- **Not in v1:** listening stays practice-only (lessons would need `stay_quiet` in the teacher's registry); no teacher-side doctrine yet (step 10).
+
+**Tests:** `tests/practice-exercise.test.ts` (the fold, skip parse/append, the tool's gate/verification/termination, the registry toggle, the projection).
+
+---
+
+## Step 10 — doctrine (outline)
+
 10. **Doctrine.** Owner-authored interview-style, coding and teacher-exercise sections.

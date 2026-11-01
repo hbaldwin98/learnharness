@@ -34,7 +34,7 @@
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
-import { codingOutcomeForConclude, modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, PRACTICE_STAY_QUIET_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
+import { activeExerciseOf, TEACH_CODING_EXERCISE_TOOL, codingOutcomeForConclude, modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, PRACTICE_STAY_QUIET_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
@@ -267,6 +267,9 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 						part.problemInput = problemInputForConclude(messages, block.id);
 						const coding = codingOutcomeForConclude(messages, block.id);
 						if (coding) part.codingOutcome = coding;
+					}
+					if (block.name === TEACH_CODING_EXERCISE_TOOL) {
+						part.exerciseClosed = activeExerciseOf(messages)?.toolCallId !== block.id;
 					}
 					rest.push(part);
 				}
@@ -507,6 +510,15 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[], quietLooks
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-practice-ask", id: `pa_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "exercise-skipped": {
+			// Plan step 9: a compact centered line, the move-on register.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-exercise-skipped", id: `xs_${marker.id}`, data: null }],
 			});
 			return;
 		}

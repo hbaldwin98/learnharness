@@ -341,6 +341,9 @@ export interface ArtifactPartProps {
 		/** A coding conclusion's app-computed outcome (plan step 5), folded
 		 *  on by projectView (native-messages.ts CodingOutcome). */
 		codingOutcome?: unknown;
+		/** A lesson coding exercise (plan step 9): its Submit or skip has
+		 *  arrived, so the card reveals the reference. Folded by projectView. */
+		exerciseClosed?: boolean;
 		/** The view-seam join for conclude cards (owner round, 2026-10-05):
 		 *  the modelSolution committed at POSE time, folded onto the part by
 		 *  projectView — the reveal is never re-authored. */

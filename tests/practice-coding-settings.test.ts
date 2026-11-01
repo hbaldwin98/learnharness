@@ -36,8 +36,8 @@ describe("the default coding language", () => {
 
 	it("reaches the agent through the problem tool's description", () => {
 		const gate = { problemActive: false, needsPassingSubmit: false };
-		const module = { id: "code", poseSchema: {}, verifyPose: async () => [] } as never;
-		assert.match(problemTool(gate, undefined, [module], "c", "Rust").description, /default coding language is Rust/);
-		assert.doesNotMatch(problemTool(gate, undefined, [module], "c").description, /default coding language/);
+		const codeModule = { id: "code", poseSchema: {}, verifyPose: async () => [] } as never;
+		assert.match(problemTool(gate, undefined, [codeModule], "c", "Rust").description, /default coding language is Rust/);
+		assert.doesNotMatch(problemTool(gate, undefined, [codeModule], "c").description, /default coding language/);
 	});
 });

@@ -40,6 +40,12 @@ export function composeListening(agent: AgentSettings | undefined, on: boolean):
 	return { ...agent, listening: { enabled: on } };
 }
 
+/** Compose the lessons' coding-exercise switch (plan step 9): the
+ *  agent.tools key `coding_exercise` (absent = ON). Pure. */
+export function composeCodingExercises(agent: AgentSettings | undefined, on: boolean): AgentSettings {
+	return { ...agent, tools: { ...agent?.tools, coding_exercise: on } };
+}
+
 /** Compose the default coding language ("" = the agent chooses). Pure. */
 export function composeCodingLanguage(agent: AgentSettings | undefined, id: string): AgentSettings {
 	const next = { ...agent };
@@ -86,6 +92,17 @@ export function CodingSection({
 				testid="coding-listening-row"
 			>
 				<Toggle checked={on} label="listening" onChange={(next) => onAgentChange(composeListening(agent, next))} />
+			</SettingsRow>
+			<SettingsRow
+				label="Exercises in lessons"
+				hint="The teacher can give you a coding exercise mid-lesson, worked in the same workspace"
+				testid="coding-exercises-row"
+			>
+				<Toggle
+					checked={agent?.tools?.coding_exercise !== false}
+					label="coding exercises in lessons"
+					onChange={(next) => onAgentChange(composeCodingExercises(agent, next))}
+				/>
 			</SettingsRow>
 			<DockerGroup />
 		</>

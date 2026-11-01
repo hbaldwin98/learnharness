@@ -89,6 +89,7 @@ export interface LhMarkerMessage {
 		| "practice-ask"
 		| "practice-listen"
 		| "practice-next"
+		| "exercise-skipped"
 		| "problem-dismissed"
 		| "compaction"
 		| "reading-discussion";
@@ -447,6 +448,19 @@ export function passingSubmissionOf(messages: readonly LhMessage[], problemCallI
  *  single-sourced NEXT_PROBLEM_TEXT — the model's unambiguous go-ahead;
  *  the transcript renders its own compact line off the marker (never
  *  the content). */
+/** The learner skipped a lesson's coding exercise (plan step 9). */
+export function newExerciseSkippedMessage(problemCallId: string): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "exercise-skipped",
+		content: "[exercise skipped] The learner skipped the coding exercise without submitting. Acknowledge briefly and carry on teaching.",
+		display: true,
+		details: { problemCallId },
+		timestamp: Date.now(),
+	};
+}
+
 export function newNextMessage(): LhMarkerMessage {
 	return {
 		id: newMessageId(),
@@ -696,6 +710,39 @@ export function activeProblemOf(
 		}
 	}
 	return null;
+}
+
+/** The teacher's coding exercise tool (plan step 9). */
+export const TEACH_CODING_EXERCISE_TOOL = "coding_exercise";
+
+/** The open coding exercise (plan step 9): the NEWEST clean
+ *  coding_exercise call, unless a Submit or skip for it followed. */
+export function activeExerciseOf(messages: readonly LhMessage[]): { toolCallId: string; input: unknown } | null {
+	const clean = cleanToolCallIds(messages);
+	const closed = new Set<string>();
+	for (let mi = messages.length - 1; mi >= 0; mi--) {
+		const m = messages[mi]!;
+		if (m.role === "custom") {
+			if (m.customType === "practice-submission" || m.customType === "exercise-skipped") {
+				const id = (m.details as { problemCallId?: unknown } | null)?.problemCallId;
+				if (typeof id === "string") closed.add(id);
+			}
+			continue;
+		}
+		if (m.role !== "assistant") continue;
+		for (let bi = m.content.length - 1; bi >= 0; bi--) {
+			const block = m.content[bi]!;
+			if (block.type !== "toolCall" || block.name !== TEACH_CODING_EXERCISE_TOOL || !clean.has(block.id)) continue;
+			return closed.has(block.id) ? null : { toolCallId: block.id, input: block.arguments };
+		}
+	}
+	return null;
+}
+
+/** The problem the coding workspace serves: the active practice problem,
+ *  else the open lesson exercise (plan step 9). */
+export function activeWorkspaceOf(messages: readonly LhMessage[]): { toolCallId: string; input: unknown } | null {
+	return activeProblemOf(messages) ?? activeExerciseOf(messages);
 }
 
 /** Is a problem-dismissal marker waiting for its conclude synthesis? The
@@ -1031,7 +1078,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "subagent-steer", "subagent-abort", "practice-listen"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-submission", "practice-ask", "practice-next"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-submission", "practice-ask", "practice-next", "exercise-skipped"].includes(message.customType)) return "learner";
 		// reading-discussion: a held note riding a run it never starts (docs/readings.md §14).
 		return ["graph-context", "plan-block", "problem-dismissed", "compaction", "reading-discussion"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}

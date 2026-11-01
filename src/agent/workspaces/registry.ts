@@ -34,7 +34,7 @@ export interface AgentWorkspaceModule {
 }
 
 /** One module's descriptor schema: its pose fields plus the module literal. */
-function descriptorSchema(module: AgentWorkspaceModule): TObject {
+export function descriptorSchema(module: AgentWorkspaceModule): TObject {
 	return Type.Object({
 		module: Type.Literal(module.id, { description: `REQUIRED — "${module.id}".` }),
 		...module.poseSchema.properties,

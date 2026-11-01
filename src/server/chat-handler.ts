@@ -516,7 +516,7 @@ export async function handleChatInput(
 	};
 	// PRACTICE WORKSPACES (plan step 2): learn whether Docker is installed
 	// before the practitioner's registry and prompt are composed.
-	if (record.kind === "practice" && !buildAgent) await refreshWorkspaceAvailability();
+	if ((record.kind === "practice" || teaching) && !buildAgent) await refreshWorkspaceAvailability();
 	// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
 	// session builds the practitioner from turn 1 — no prober→teacher
 	// split, no plan/question/job tools; the whole registry is
@@ -565,6 +565,13 @@ export async function handleChatInput(
 						// The registry drop's signal (2026-09-20): no live engine
 						// = no research tool in the teacher's registry.
 						searchAvailable,
+						// Plan step 9: the lesson's coding exercise, when Docker is up.
+						...(() => {
+							const code = availableWorkspaceModules()[0];
+							if (!code) return {};
+							const label = effective.agent.codingLanguage ? codeLanguageLabel(effective.agent.codingLanguage) : undefined;
+							return { codingExercise: { module: code, ...(label ? { defaultCodeLanguage: label } : {}) } };
+						})(),
 					},
 					agentOpts,
 				)

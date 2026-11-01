@@ -11,7 +11,7 @@
  * chat's containers other than its active coding problem are removed.
  */
 
-import { activeProblemOf, type LhMessage } from "../core/native-messages.ts";
+import { activeWorkspaceOf, type LhMessage } from "../core/native-messages.ts";
 import { workspaceOf } from "../core/workspaces.ts";
 import type { AgentWorkspaceModule } from "../agent/workspaces/registry.ts";
 import { CODE_MODULE_ID, createCodeModule } from "../agent/workspaces/code/module.ts";
@@ -97,7 +97,7 @@ export function availableWorkspaceModules(): readonly AgentWorkspaceModule[] {
 export function reconcileWorkspaces(chatId: string, messages: readonly LhMessage[]): void {
 	const s = state();
 	if (s.status !== "running") return;
-	const active = activeProblemOf(messages);
+	const active = activeWorkspaceOf(messages);
 	const keep = active && workspaceOf(active.input)?.module === CODE_MODULE_ID ? active.toolCallId : null;
 	stopChatDiagnostics(chatId, keep);
 	void s.runner.retainOnly(chatId, keep).catch(() => {});
@@ -118,7 +118,7 @@ import { lineDiff } from "../core/line-diff.ts";
 import { anchorOf, MAX_ANNOTATION_CHARS, MAX_ANNOTATIONS, reanchor, type CodeAnnotation } from "../core/annotations.ts";
 import type { AnnotateHandler } from "../agent/workspaces/code/annotate.ts";
 import { noteCodingActivity, processListening, type ListeningStatus } from "./listening.ts";
-import { PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
+import { PRACTICE_PROBLEM_TOOL, TEACH_CODING_EXERCISE_TOOL } from "../core/native-messages.ts";
 import { runCode } from "../agent/workspaces/code/runner.ts";
 import type { CodePose } from "../agent/workspaces/code/module.ts";
 import { deleteChatWorkspaces, getWorkspace, mutateWorkspace } from "../store/workspaces.ts";
@@ -143,10 +143,10 @@ function codeProblem(chatId: string, problemCallId: string): { pose: CodePose; a
 	for (const m of record.messages) {
 		if ((m as { role?: string }).role !== "assistant") continue;
 		for (const block of (m as { content: Array<{ type: string; id?: string; name?: string; arguments?: unknown }> }).content) {
-			if (block.type !== "toolCall" || block.name !== PRACTICE_PROBLEM_TOOL || block.id !== problemCallId) continue;
+			if (block.type !== "toolCall" || (block.name !== PRACTICE_PROBLEM_TOOL && block.name !== TEACH_CODING_EXERCISE_TOOL) || block.id !== problemCallId) continue;
 			const workspace = (block.arguments as { workspace?: unknown } | undefined)?.workspace;
 			if (workspaceOf(block.arguments)?.module !== CODE_MODULE_ID) throw new WorkspaceError("Not a coding problem", 404);
-			return { pose: workspace as CodePose, active: activeProblemOf(record.messages)?.toolCallId === problemCallId };
+			return { pose: workspace as CodePose, active: activeWorkspaceOf(record.messages)?.toolCallId === problemCallId };
 		}
 	}
 	throw new WorkspaceError("Unknown problem", 404);
@@ -399,7 +399,7 @@ export async function runWorkspace(
  *  visible test, lines inside its current text, a short note. */
 export const annotateActiveProblem: AnnotateHandler = (chatId, input) => {
 	const record = stores.chatStore.getChat(chatId);
-	const active = record ? activeProblemOf(record.messages) : null;
+	const active = record ? activeWorkspaceOf(record.messages) : null;
 	if (!active || workspaceOf(active.input)?.module !== CODE_MODULE_ID) {
 		return { ok: false, errors: ["no active coding problem to annotate"] };
 	}

@@ -33,6 +33,9 @@ import type { ListenCue } from "./listening.ts";
 import type { LhMessage } from "./native-messages.ts";
 import {
 	activeProblemOf,
+	activeWorkspaceOf,
+	activeExerciseOf,
+	newExerciseSkippedMessage,
 	concludedByDismissalPair,
 	danglingQuestionOf,
 	newAnswerResult,
@@ -76,7 +79,9 @@ export type ChatInput =
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
 	 *  only with nothing active (mid-problem input rides the dock). */
-	| { type: "next" };
+	| { type: "next" }
+	/** A lesson coding exercise's Skip (plan step 9): closes it, starts the teacher's turn. */
+	| { type: "exercise-skip"; problemCallId: string };
 
 /** A wake-pipeline steer delivery — same turn composition, server-origin.
  *  Wave C (2026-09-26): the idle wake carries EVERY queued marker as its
@@ -227,6 +232,11 @@ export function parseChatInput(input: unknown): ChatInput {
 			return { type: "ask", problemCallId: i.problemCallId, text: i.text };
 		case "next":
 			return { type: "next" };
+		case "exercise-skip":
+			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
+				throw new ChatInputError("exercise-skip input requires problemCallId");
+			}
+			return { type: "exercise-skip", problemCallId: i.problemCallId };
 		default:
 			throw new ChatInputError(`unknown input type: ${String(i.type)}`);
 	}
@@ -289,7 +299,7 @@ export function inputAppends(
 			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, code, trace)];
 		}
 		case "submission": {
-			const active = activeProblemOf(record.messages);
+			const active = activeWorkspaceOf(record.messages);
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("submission input targets no active problem");
 			}
@@ -307,7 +317,7 @@ export function inputAppends(
 			];
 		}
 		case "ask": {
-			const active = activeProblemOf(record.messages);
+			const active = activeWorkspaceOf(record.messages);
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("ask input targets no active problem");
 			}
@@ -321,13 +331,21 @@ export function inputAppends(
 		case "listen": {
 			// Server-origin: the listening module checked the gates, but the
 			// record may have moved on since (a conclude, a dismissal).
-			const active = activeProblemOf(record.messages);
+			const active = activeWorkspaceOf(record.messages);
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("listen input targets no active problem");
 			}
 			if (!workspace?.snapshot(input.problemCallId)) throw new ChatInputError("listen input targets no coding problem");
 			const trace = workspace.trace?.(input.problemCallId) ?? undefined;
 			return [newListenMessage({ problemCallId: input.problemCallId, cues: [...input.cues], ...(trace ? { trace } : {}) })];
+		}
+		case "exercise-skip": {
+			// Plan step 9: closes the lesson's open coding exercise.
+			const open = activeExerciseOf(record.messages);
+			if (!open || open.toolCallId !== input.problemCallId) {
+				throw new ChatInputError("exercise-skip input targets no open exercise");
+			}
+			return [newExerciseSkippedMessage(input.problemCallId)];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a

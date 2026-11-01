@@ -82,6 +82,7 @@ import { CoverageRing } from "@/components/extraction-coverage";
 import { Button } from "@/components/ui/button";
 import {
 	activeProblemOf,
+	activeExerciseOf,
 	pendingQuestionOf,
 	malformedQuestionsOf,
 	dismissedAnswer,
@@ -482,9 +483,13 @@ export function Chat({
 	// the transcript. While open, its narration strip is the talk channel and
 	// the dock is the problem bar (step 5); hidden, the thinking dock returns.
 	// Hidden only when the learner hides it; a new problem opens it again.
-	const WorkspacePane = activeProblem ? workspaceComponentFor(activeProblem.input) : null;
+	// Plan step 9: a lesson's open coding exercise opens the same pane (the
+	// composer stays — only practice problems own the dock).
+	const activeExercise = activeProblem ? null : activeExerciseOf(nativeMessages);
+	const workspaceTarget = activeProblem ?? activeExercise;
+	const WorkspacePane = workspaceTarget ? workspaceComponentFor(workspaceTarget.input) : null;
 	const [workspaceHiddenFor, setWorkspaceHiddenFor] = useState<string | null>(null);
-	const workspaceOpen = !!WorkspacePane && workspaceHiddenFor !== activeProblem?.toolCallId;
+	const workspaceOpen = !!WorkspacePane && workspaceHiddenFor !== workspaceTarget?.toolCallId;
 	// The attach handoff (stream-reattach wave): the moment a resumed
 	// stream takes over the rendering — the SDK left "ready", so
 	// submitted/streaming means chunks are flowing — localStream covers
@@ -551,6 +556,13 @@ export function Chat({
 	const askWorkspace = useCallback(
 		(problemCallId: string, text: string) => {
 			sendPastListening({ type: "ask", problemCallId, text });
+		},
+		[sendPastListening],
+	);
+	// A lesson exercise's Skip (plan step 9): closes it; the teacher replies.
+	const skipExercise = useCallback(
+		(problemCallId: string) => {
+			sendPastListening({ type: "exercise-skip", problemCallId });
 		},
 		[sendPastListening],
 	);
@@ -1431,7 +1443,7 @@ export function Chat({
 						</button>
 </Hint>
 					)}
-					{WorkspacePane && activeProblem && (
+					{WorkspacePane && workspaceTarget && (
 						<Hint label={workspaceOpen ? "Hide the code workspace" : "Show the code workspace"} side="bottom">
 							<button
 								type="button"
@@ -1439,7 +1451,7 @@ export function Chat({
 								aria-pressed={workspaceOpen}
 								onClick={(e) => {
 									blurAfterPointerClick(e);
-									setWorkspaceHiddenFor(workspaceOpen ? activeProblem.toolCallId : null);
+									setWorkspaceHiddenFor(workspaceOpen ? workspaceTarget.toolCallId : null);
 								}}
 								className="lh-no-drag flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border/80 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:border-border hover:text-foreground"
 							>
@@ -1547,6 +1559,17 @@ export function Chat({
 												return <ListenLine key={pi} data={part.data as ListenDetails & { quiet?: boolean }} />;
 											case "data-reading-discussion":
 												return <ReadingDiscussedLine key={pi} data={part.data as ReadingDiscussionMarkerDetails} />;
+											case "data-exercise-skipped":
+												return (
+													<div
+														key={pi}
+														data-testid="exercise-skipped-line"
+														className="my-4 flex items-center justify-center gap-1.5 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground"
+													>
+														<ArrowRightIcon className="size-3" />
+														Exercise skipped
+													</div>
+												);
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16): a compact
 												// centered mono-caps line — chrome, the dismissal register.
@@ -1906,17 +1929,18 @@ export function Chat({
 			</div>
 			{/* The coding workspace (practice workspaces, plan step 3): the
 			    right side of the split view; it overlays the session below lg. */}
-			{WorkspacePane && activeProblem && workspaceOpen && (
+			{WorkspacePane && workspaceTarget && workspaceOpen && (
 				<WorkspaceSide>
 					<WorkspacePane
-						key={activeProblem.toolCallId}
+						key={workspaceTarget.toolCallId}
 						chatId={chatId}
-						problemCallId={activeProblem.toolCallId}
-						input={activeProblem.input as { statement: string }}
+						problemCallId={workspaceTarget.toolCallId}
+						input={workspaceTarget.input as { statement: string }}
 						busy={busy && !listeningTurn}
 						onSubmitted={submitWorkspace}
 						onAsk={askWorkspace}
-						onHide={() => setWorkspaceHiddenFor(activeProblem.toolCallId)}
+						{...(activeExercise ? { onSkip: skipExercise } : {})}
+						onHide={() => setWorkspaceHiddenFor(workspaceTarget.toolCallId)}
 					/>
 				</WorkspaceSide>
 			)}

@@ -26,6 +26,9 @@ export interface WorkspaceProps {
 	/** Ask the agent (plan step 5): the narration draft, maybe empty; the
 	 *  server attaches the trace. Starts its turn. */
 	onAsk: (problemCallId: string, text: string) => void;
+	/** A lesson's coding exercise (plan step 9): skip it without
+	 *  submitting. Absent for practice problems. */
+	onSkip?: (problemCallId: string) => void;
 	/** Below lg the pane overlays the transcript: back to it. */
 	onHide?: () => void;
 }

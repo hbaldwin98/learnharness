@@ -6,7 +6,7 @@ import { VisualCard } from "@/components/artifacts/visual-card";
 import { ImageCard } from "@/components/artifacts/image-card";
 import { ProbeDoneCard } from "@/components/artifacts/probe-done-card";
 import { ToolCallCard } from "@/components/artifacts/tool-call-card";
-import { ProblemCard, ConcludeCard } from "@/components/practice-cards";
+import { ProblemCard, ConcludeCard, ExerciseCard } from "@/components/practice-cards";
 import { ReadingOfferCard } from "@/components/readings/offer-card";
 
 /**
@@ -50,6 +50,8 @@ export const artifactRenderers: Record<string, ComponentType<ArtifactPartProps>>
 	// The agent's code annotations (practice workspaces, plan step 7): the
 	// note shows in the editor; the transcript keeps a quiet one-liner.
 	annotate: ToolCallCard,
+	// A lesson's coding exercise (plan step 9).
+	coding_exercise: ExerciseCard,
 	// The prober's graph tools (wave 7): same quiet expandable card —
 	// collapsed one-liner (tool name + the session id for
 	// list_propositions), the tool's own compact row-per-line output
