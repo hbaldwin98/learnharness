@@ -406,9 +406,26 @@ Files still go in by tar on an exec's stdin, not the archive API (a copy into a 
 
 ---
 
-## Steps 7–10 — outline (detailed one at a time)
+## Step 7 — annotations (BUILT 2026-11-01)
 
-7. **Annotations.** The agent tool; anchors that follow edits; the outdated list.
+**Owner instruction (2026-11-01): "Just build all the steps with the recommended options."** Steps 7–9 were built on the recommended defaults below without a question round; step 10's doctrine is owner-authored by ruling, so it lands as a marked draft for the owner to rewrite.
+
+**Earlier rulings (design doc §6):** the agent annotates, never edits; an annotation moves with its code; if its lines are deleted it is marked outdated and listed, not deleted.
+
+**Defaulted (recommended):**
+- **The tool:** `annotate { path, line, endLine?, note }` from the code module (registered whenever the module is available), on the active coding problem's current code — a learner file or a visible test. Refused for unknown files, lines out of range, an empty note, a note over 600 characters, or more than 20 live notes. The agent can't remove notes; the learner dismisses them.
+- **Anchoring is server-side, by text:** each note keeps its lines' text; every save re-anchors it — unchanged → stays; moved → the nearest exact copy; gone → outdated. Between saves the editor maps the decorations through edits itself.
+- **Delivery:** a `workspace-annotations` bus event; the pane refetches `GET …/annotations`; `POST …/annotations { dismiss }` removes one.
+- **Display:** the annotated lines get a faint amber highlight and the note sits in a block under the last line ("Agent · …", with ×). Outdated notes collect in a collapsed "Outdated notes (n)" row under the editor. The transcript shows the call as the quiet tool-call one-liner.
+
+**Built:** `src/core/annotations.ts` (type, `anchorOf`, `reanchor`); `src/agent/workspaces/code/annotate.ts` (the tool, with the server's handler injected through `createCodeModule(runner, hooks)`); `annotateActiveProblem`, `workspaceAnnotations`, `dismissAnnotation` and re-anchoring in `saveWorkspace`; the route; `components/workspaces/code/annotation-decorations.ts`; the pane's notes and outdated list.
+
+**Tests:** `tests/practice-annotations.test.ts` (re-anchoring unchanged / moved / outdated / nearest copy; the call's validation and storage; a visible test; saves moving and outdating notes; dismissal).
+
+---
+
+## Steps 8–10 — outline (detailed one at a time)
+
 8. **Settings.** The Coding section: default language, listening, Docker status and image management.
 9. **Teacher exercises.** The teaching tool and its Tools toggle; an inline split view in the lesson; a quiz-style result back to the teacher.
 10. **Doctrine.** Owner-authored interview-style, coding and teacher-exercise sections.

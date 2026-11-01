@@ -9,6 +9,7 @@
  */
 
 import { Type } from "typebox";
+import { annotateTool, type AnnotateHandler } from "./annotate.ts";
 import type { AgentWorkspaceModule, WorkspacePoseContext } from "../registry.ts";
 import { CODE_LANGUAGES, LANGUAGES, layoutSummary, type CodeFile, type CodeLanguage } from "./languages.ts";
 import { AGENT_OUTPUT_CAP_BYTES, capOutput, runCode, type CodeRunner, type CodeRunResult } from "./runner.ts";
@@ -106,9 +107,15 @@ function describeFailure(heading: string, result: CodeRunResult): string {
 	return capOutput(lines.join("\n"), AGENT_OUTPUT_CAP_BYTES);
 }
 
-export function createCodeModule(runner: CodeRunner): AgentWorkspaceModule {
+/** What the server lends the module's tools (plan step 7). */
+export interface CodeModuleHooks {
+	annotate?: AnnotateHandler;
+}
+
+export function createCodeModule(runner: CodeRunner, hooks: CodeModuleHooks = {}): AgentWorkspaceModule {
 	return {
 		id: CODE_MODULE_ID,
+		...(hooks.annotate ? { tools: ({ chatId }: { chatId: string }) => ({ annotate: annotateTool(chatId, hooks.annotate!) }) } : {}),
 		poseSchema: codePoseSchema,
 		async verifyPose(workspace: unknown, ctx: WorkspacePoseContext): Promise<string[]> {
 			const pose = workspace as CodePose;

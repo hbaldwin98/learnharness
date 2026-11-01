@@ -62,6 +62,8 @@ export interface ServerEvents {
 	/** A coding workspace's language-server diagnostics or status changed
 	 *  (practice workspaces, plan step 4): the pane refetches them. */
 	"workspace-diagnostics": { chatId: string; problemCallId: string };
+	/** The agent annotated, or an annotation moved or was dismissed (plan step 7). */
+	"workspace-annotations": { chatId: string; problemCallId: string };
 }
 
 export type ServerEventType = keyof ServerEvents;
@@ -82,6 +84,7 @@ export const SERVER_EVENT_TYPES = [
 	"readings-changed",
 	"discussion-changed",
 	"workspace-diagnostics",
+	"workspace-annotations",
 ] as const satisfies readonly ServerEventType[];
 
 /** One notification: the type discriminates the payload. */

@@ -20,6 +20,7 @@ import {
 	bindingForAction,
 	formatBinding,
 	kbdEventForAction,
+	type CodeAnnotation,
 	type CodeDiagnostic,
 	type CodeFile,
 	type DiagnosticsSnapshot,
@@ -72,6 +73,7 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk,
 	const narration = useNarration(chatId, problemCallId, state?.narration ?? null, state?.active ?? false);
 	const [asking, setAsking] = useState(false);
 	const listening = useListeningPresence(chatId, problemCallId, state?.active ?? false);
+	const annotations = useAnnotations(chatId, problemCallId, state?.annotations ?? null);
 
 	// The live files (the editors own their documents; this mirrors them for
 	// saving) and the save machinery.
@@ -332,11 +334,14 @@ export function CodeWorkspace({ chatId, problemCallId, busy, onSubmitted, onAsk,
 							vimMode={vimMode}
 							onChange={readOnly ? undefined : (content) => onEdit(file.path, content)}
 							diagnostics={diagnostics?.files[file.path]}
+							annotations={annotations.list.filter((a) => a.path === file.path && !a.outdated)}
+							onDismissAnnotation={annotations.dismiss}
 						/>
 					</div>
 				))}
 			</div>
 			<ServerStatus snapshot={diagnostics} />
+			<OutdatedNotes list={annotations.list.filter((a) => a.outdated)} onDismiss={annotations.dismiss} />
 			{saveError && (
 				<p role="alert" className="shrink-0 border-t border-border/70 px-3 py-1 text-xs text-destructive">
 					Not saved: {saveError}
@@ -515,6 +520,66 @@ function useDiagnostics(chatId: string, problemCallId: string, loaded: boolean):
 		if (p.chatId === chatId && p.problemCallId === problemCallId) refetch();
 	});
 	return snapshot;
+}
+
+/** The agent's notes (plan step 7): loaded with the workspace, refetched
+ *  on each workspace-annotations event for this problem; dismiss removes. */
+function useAnnotations(chatId: string, problemCallId: string, initial: CodeAnnotation[] | null) {
+	const [list, setList] = useState<CodeAnnotation[]>([]);
+	useEffect(() => {
+		if (initial) setList(initial);
+	}, [initial]);
+	const refetch = useCallback(() => {
+		void fetch(`${url(chatId, problemCallId)}/annotations`)
+			.then((res) => (res.ok ? (res.json() as Promise<{ annotations: CodeAnnotation[] }>) : null))
+			.then((body) => {
+				if (body) setList(body.annotations);
+			})
+			.catch(() => {});
+	}, [chatId, problemCallId]);
+	useServerEvent("workspace-annotations", (p) => {
+		if (p.chatId === chatId && p.problemCallId === problemCallId) refetch();
+	});
+	const dismiss = useCallback(
+		(id: string) => {
+			setList((l) => l.filter((a) => a.id !== id));
+			void fetch(`${url(chatId, problemCallId)}/annotations`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ dismiss: id }),
+			}).catch(() => {});
+		},
+		[chatId, problemCallId],
+	);
+	return { list, dismiss };
+}
+
+/** Notes whose lines the learner deleted (owner ruling: listed, not lost). */
+function OutdatedNotes({ list, onDismiss }: { list: CodeAnnotation[]; onDismiss: (id: string) => void }) {
+	const [open, setOpen] = useState(false);
+	if (list.length === 0) return null;
+	return (
+		<div data-testid="outdated-notes" className="shrink-0 border-t border-border/70 px-3 py-1 text-xs text-muted-foreground">
+			<button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="hover:text-foreground">
+				Outdated notes ({list.length})
+			</button>
+			{open && (
+				<ul className="mt-1 flex flex-col gap-1">
+					{list.map((a) => (
+						<li key={a.id} className="flex gap-2">
+							<span className="shrink-0 font-mono">
+								{a.path}:{a.line}
+							</span>
+							<span className="min-w-0 flex-1 text-foreground/80">{a.note}</span>
+							<button type="button" aria-label="Dismiss the note" onClick={() => onDismiss(a.id)} className="hover:text-foreground">
+								×
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
+	);
 }
 
 type ListeningStatus = "on" | "paused" | "off";

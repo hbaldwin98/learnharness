@@ -15,6 +15,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { PATHS } from "../../config.ts";
 import type { CodeFile, NarrationEntry, WorkspaceRunResult } from "../core/contracts/workspaces.ts";
+import type { CodeAnnotation } from "../core/annotations.ts";
 
 export const CURRENT_WORKSPACE_VERSION = 1;
 
@@ -38,6 +39,8 @@ export interface WorkspaceRecord {
 	/** What the agent has been given: counts into the two lists above, and
 	 *  the code it last saw (absent = nothing delivered; it saw the starter). */
 	delivered?: { narration: number; runs: number; files: CodeFile[] };
+	/** The agent's annotations (plan step 7); dismissed ones are removed. */
+	annotations?: CodeAnnotation[];
 }
 
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;

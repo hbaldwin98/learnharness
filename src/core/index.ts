@@ -56,6 +56,8 @@ export * from "./view.ts";
 export * from "./workspaces.ts";
 // listening.ts: the coding listening cue engine (plan step 6; pure).
 export * from "./listening.ts";
+// annotations.ts: the agent's code annotations (plan step 7; pure).
+export * from "./annotations.ts";
 export * from "./tool-parts.ts";
 export * from "./answer-presentation.ts";
 export * from "./prices.ts";

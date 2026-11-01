@@ -40,7 +40,7 @@ function state(): ModuleState {
 	let s = g[STATE_KEY];
 	if (!s) {
 		const runner = createDockerRunner({ onIdleRemoved: (key) => void stopDiagnostics(key.chatId, key.problemCallId) });
-		s = { runner, code: createCodeModule(runner), status: null, reaped: false };
+		s = { runner, code: createCodeModule(runner, { annotate: (chatId, input) => annotateActiveProblem(chatId, input) }), status: null, reaped: false };
 		g[STATE_KEY] = s;
 	}
 	return s;
@@ -114,6 +114,8 @@ import type {
 	WorkspaceState,
 } from "../core/contracts/workspaces.ts";
 import { lineDiff } from "../core/line-diff.ts";
+import { anchorOf, MAX_ANNOTATION_CHARS, MAX_ANNOTATIONS, reanchor, type CodeAnnotation } from "../core/annotations.ts";
+import type { AnnotateHandler } from "../agent/workspaces/code/annotate.ts";
 import { noteCodingActivity, processListening, type ListeningStatus } from "./listening.ts";
 import { PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
 import { runCode } from "../agent/workspaces/code/runner.ts";
@@ -162,6 +164,7 @@ export function loadWorkspace(chatId: string, problemCallId: string): WorkspaceS
 		lastRun: record?.lastRun?.result ?? null,
 		lastSubmit: record?.lastSubmit?.result ?? null,
 		narration: record?.narration ?? [],
+		annotations: record?.annotations ?? [],
 	};
 }
 
@@ -265,7 +268,18 @@ export function saveWorkspace(chatId: string, problemCallId: string, files: unkn
 	const next = pose.files.map((f) => ({ path: f.path, content: byPath.get(f.path) ?? f.content }));
 	const bytes = next.reduce((n, f) => n + Buffer.byteLength(f.content, "utf8"), 0);
 	if (bytes > MAX_WORKSPACE_BYTES) throw new WorkspaceError(`files too large (${bytes} bytes; at most ${MAX_WORKSPACE_BYTES})`, 413);
-	mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({ ...r, files: next }));
+	let moved = false;
+	mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => {
+		// Annotations follow their code (plan step 7).
+		const annotations = (r.annotations ?? []).map((a) => {
+			const file = next.find((f) => f.path === a.path);
+			const after = file ? reanchor(a, file.content) : a;
+			if (after !== a) moved = true;
+			return after;
+		});
+		return { ...r, files: next, ...(r.annotations ? { annotations } : {}) };
+	});
+	if (moved) emit("workspace-annotations", { chatId, problemCallId });
 	// The saves feed the language server (plan step 4: one write path).
 	sessions().get(sessionKey(chatId, problemCallId))?.update(next);
 	noteCodingActivity(chatId, problemCallId, "edit");
@@ -376,6 +390,62 @@ export async function runWorkspace(
 	);
 	if (mode === "run") noteCodingActivity(chatId, problemCallId, "run");
 	return result;
+}
+
+// ─── annotations (plan step 7) ───────────────────────────────────────────────
+
+/** The agent's annotate call: the ACTIVE coding problem, a learner file or
+ *  visible test, lines inside its current text, a short note. */
+export const annotateActiveProblem: AnnotateHandler = (chatId, input) => {
+	const record = stores.chatStore.getChat(chatId);
+	const active = record ? activeProblemOf(record.messages) : null;
+	if (!active || workspaceOf(active.input)?.module !== CODE_MODULE_ID) {
+		return { ok: false, errors: ["no active coding problem to annotate"] };
+	}
+	const { pose } = codeProblem(chatId, active.toolCallId);
+	const saved = getWorkspace(chatId, active.toolCallId);
+	const files = [...(saved?.files ?? pose.files), ...pose.tests.visible];
+	const file = files.find((f) => f.path === input.path);
+	if (!file) return { ok: false, errors: [`no such file: ${input.path} (the learner's files: ${files.map((f) => f.path).join(", ")})`] };
+	const lineCount = file.content.split("\n").length;
+	const endLine = input.endLine ?? input.line;
+	const errors: string[] = [];
+	if (input.line > lineCount || endLine > lineCount) errors.push(`${input.path} has ${lineCount} lines`);
+	if (endLine < input.line) errors.push("endLine is before line");
+	const note = input.note.trim();
+	if (!note) errors.push("note must not be empty");
+	if (note.length > MAX_ANNOTATION_CHARS) errors.push(`note is longer than ${MAX_ANNOTATION_CHARS} characters`);
+	const live = (saved?.annotations ?? []).filter((a) => !a.outdated).length;
+	if (live >= MAX_ANNOTATIONS) errors.push(`at most ${MAX_ANNOTATIONS} live annotations`);
+	if (errors.length > 0) return { ok: false, errors };
+	const annotation: CodeAnnotation = {
+		id: `ann_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+		path: input.path,
+		line: input.line,
+		endLine,
+		note,
+		at: new Date().toISOString(),
+		anchor: anchorOf(file.content, input.line, endLine),
+	};
+	mutateWorkspace(chatId, active.toolCallId, () => pose.files, (r) => ({ ...r, annotations: [...(r.annotations ?? []), annotation] }));
+	emit("workspace-annotations", { chatId, problemCallId: active.toolCallId });
+	const range = endLine === input.line ? `${input.line}` : `${input.line}–${endLine}`;
+	return { ok: true, text: `Annotated ${input.path}:${range}. The learner sees the note beside those lines.` };
+};
+
+/** The learner's annotations, live and outdated. */
+export function workspaceAnnotations(chatId: string, problemCallId: string): CodeAnnotation[] {
+	codeProblem(chatId, problemCallId);
+	return getWorkspace(chatId, problemCallId)?.annotations ?? [];
+}
+
+/** The learner dismissed one (it's removed). */
+export function dismissAnnotation(chatId: string, problemCallId: string, id: unknown): CodeAnnotation[] {
+	const { pose } = codeProblem(chatId, problemCallId);
+	if (typeof id !== "string") throw new WorkspaceError("dismiss needs an annotation id", 400);
+	const next = mutateWorkspace(chatId, problemCallId, () => pose.files, (r) => ({ ...r, annotations: (r.annotations ?? []).filter((a) => a.id !== id) }));
+	emit("workspace-annotations", { chatId, problemCallId });
+	return next.annotations ?? [];
 }
 
 /** The pane's heartbeat (plan step 6): keeps listening present while the

@@ -47,6 +47,9 @@ export const artifactRenderers: Record<string, ComponentType<ArtifactPartProps>>
 	// the conclusion carries the outcome + verdict + the reveal.
 	problem: ProblemCard,
 	conclude: ConcludeCard,
+	// The agent's code annotations (practice workspaces, plan step 7): the
+	// note shows in the editor; the transcript keeps a quiet one-liner.
+	annotate: ToolCallCard,
 	// The prober's graph tools (wave 7): same quiet expandable card —
 	// collapsed one-liner (tool name + the session id for
 	// list_propositions), the tool's own compact row-per-line output

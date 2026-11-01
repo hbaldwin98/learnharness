@@ -52,6 +52,8 @@ export interface WorkspaceState {
 	lastSubmit: WorkspaceRunResult | null;
 	/** Every recorded narration line for this problem (plan step 5). */
 	narration: NarrationEntry[];
+	/** The agent's notes on the code (plan step 7), live and outdated. */
+	annotations: import("../annotations.ts").CodeAnnotation[];
 }
 
 /** The submission marker's details (transcript card + model text). */

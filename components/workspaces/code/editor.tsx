@@ -17,6 +17,7 @@ import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import type { CodeDiagnostic } from "@/src/core";
 import { toEditorDiagnostics } from "./diagnostic-positions";
+import { annotationField, annotationTheme, setAnnotations, type EditorAnnotation } from "./annotation-decorations";
 import {
 	EditorView,
 	crosshairCursor,
@@ -136,9 +137,12 @@ export interface CodeEditorProps {
 	autoFocus?: boolean;
 	/** The language server's errors and warnings for this file. */
 	diagnostics?: readonly CodeDiagnostic[];
+	/** The agent's live notes on this file (plan step 7). */
+	annotations?: readonly EditorAnnotation[];
+	onDismissAnnotation?: (id: string) => void;
 }
 
-export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange, autoFocus, diagnostics }: CodeEditorProps) {
+export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange, autoFocus, diagnostics, annotations, onDismissAnnotation }: CodeEditorProps) {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const viewRef = useRef<EditorView | null>(null);
 	const vimSlot = useRef(new Compartment());
@@ -175,6 +179,8 @@ export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange,
 					keymap.of([...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
 					languageFor(path),
 					lintGutter(),
+					annotationField,
+					annotationTheme,
 					theme,
 					EditorState.readOnly.of(readOnly),
 					EditorView.editable.of(!readOnly),
@@ -208,6 +214,17 @@ export function CodeEditor({ path, initial, readOnly = false, vimMode, onChange,
 		view.dispatch(setDiagnostics(view.state, toEditorDiagnostics(view.state.doc, diagnostics ?? [])));
 		// diagnosticsKey stands in for the array (a new array each fetch).
 	}, [diagnosticsKey]);
+
+	// The agent's notes (plan step 7), rebuilt when the server's set changes.
+	const dismissRef = useRef(onDismissAnnotation);
+	dismissRef.current = onDismissAnnotation;
+	const annotationsKey = JSON.stringify(annotations ?? []);
+	useEffect(() => {
+		const view = viewRef.current;
+		if (!view) return;
+		view.dispatch({ effects: setAnnotations.of({ list: [...(annotations ?? [])], onDismiss: (id) => dismissRef.current?.(id) }) });
+		// annotationsKey stands in for the array.
+	}, [annotationsKey]);
 
 	return (
 		<div
