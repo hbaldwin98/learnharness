@@ -1,0 +1,106 @@
+/*
+ * GRAPHITE — the fork's theme layer (design: the "Learn Harness Redesign"
+ * canvas, boards "Graphite · tokens" and "Graphite · layouts & components").
+ *
+ * Merge strategy: upstream owns app/globals.css; this file only OVERRIDES
+ * it. It is imported from app/layout.tsx right after globals.css, so for
+ * equal-specificity rules it wins by source order, and as unlayered CSS it
+ * beats Tailwind's utility layer. Delete the import and the app is upstream
+ * again.
+ *
+ * What it can't reach without component edits (Tier 3, deliberately not
+ * done): layout/structure, hard-coded colors (e.g. the confidence slider),
+ * and Tailwind tokens that @theme inline bakes in as literals (type ladder,
+ * radii) — those are kept at upstream's values, which are already close.
+ *
+ * Runtime Appearance settings still win: they are inline styles on <html>.
+ * With factory settings they leave colors and fonts alone, except heading
+ * weight (always written; set it in Settings → Appearance).
+ */
+
+/* ---------- Tier 1: tokens ---------- */
+
+:root,
+.dark {
+	/* Surfaces — back to front. */
+	--background: #08080a;
+	--card: #111114;
+	--popover: #141418;
+	--secondary: #16161a;
+	--muted: #16161a;
+	--accent: #1a1a1f;
+
+	/* Ink. */
+	--foreground: #ededef;
+	--card-foreground: #ededef;
+	--popover-foreground: #ededef;
+	--secondary-foreground: #ededef;
+	--accent-foreground: #ededef;
+	--muted-foreground: #8a8f98;
+
+	/* Primary = the bright button; inverted text sits on it. */
+	--primary: #ededef;
+	--primary-foreground: #08080a;
+
+	/* Hairline edges instead of the solid #434343. */
+	--border: rgb(255 255 255 / 0.08);
+	--input: rgb(255 255 255 / 0.08);
+
+	/* The one accent: indigo for focus/state. */
+	--ring: #8b93ff;
+	--destructive: #f2907f;
+
+	/* Graphite extras (new names only — upstream never reads them). */
+	--lh-graphite-accent: #8b93ff;
+	--lh-graphite-accent-ink: #b4b9ff;
+	--lh-graphite-sidebar: #0e0e11;
+
+	/* Fonts: Geist for everything, Geist Mono for code/numbers. */
+	--lh-graphite-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+	--lh-graphite-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+	--font-prose: var(--lh-graphite-sans);
+	/* Titles drop the CMU serif. (The Appearance "serif session names"
+	   toggle then has nothing to switch between — both are Geist.) */
+	--font-title: var(--lh-graphite-sans);
+}
+
+/* @theme inline bakes the font stacks into the utilities as literals, so
+   the font VARIABLES can't retarget them — override the classes instead. */
+body,
+.font-ui,
+.font-sans {
+	font-family: var(--lh-graphite-sans);
+}
+
+.font-mono,
+code,
+kbd,
+pre {
+	font-family: var(--lh-graphite-mono);
+}
+
+/* Session titles: Geist 600 with tight tracking, not 900. */
+.font-title {
+	font-weight: 600;
+	letter-spacing: -0.03em;
+}
+
+/* Code blocks sit darker than the page, as on the layouts board. */
+[data-streamdown="code-block"] {
+	background: #0b0b0d;
+}
+
+/* ---------- Tier 2: labels ---------- */
+
+/* Upstream's chrome labels are uppercase + wide-tracked; Graphite uses
+   sentence case at normal tracking. Blunt by design: one place, zero
+   component edits. Opt a label back in with .lh-keep-caps. */
+.uppercase:not(.lh-keep-caps) {
+	text-transform: none;
+}
+
+.tracking-wide:not(.lh-keep-caps),
+.tracking-wider:not(.lh-keep-caps),
+.tracking-widest:not(.lh-keep-caps) {
+	letter-spacing: normal;
+}
