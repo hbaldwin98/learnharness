@@ -420,6 +420,8 @@ describe("Practice settings API and effective prompt loading", () => {
 		}
 		assert.deepEqual(view.practice.map((s: { path: string }) => s.path), [
 			"practice/00-base.md", "practice/10-doctrine.md",
+			// Workspace doctrine is listed (overridable) even when no module is available.
+			"workspace-code/10-doctrine.md",
 			"shared/10-voice.md", "shared/15-accuracy.md", "shared/16-mental-model.md", "shared/40-formatting.md",
 		]);
 		assert.ok(!view.practice.some((s: { path: string }) => s.path === "system-prompt.md"));
@@ -443,7 +445,8 @@ describe("Practice settings API and effective prompt loading", () => {
 				const row = view.practice.find((s: { path: string }) => s.path === segment);
 				assert.equal(row.enabled, on);
 				assert.equal(row.overrideText, text);
-				const expected = effectivePromptSegments("practice", {}).map((s) => (on && s.path === segment ? text : s.sourceText).trim()).filter(Boolean).join("\n\n---\n\n");
+				// No workspace module is available here, so its listed doctrine does not compose.
+				const expected = effectivePromptSegments("practice", {}).filter((s) => !s.path.startsWith("workspace-")).map((s) => (on && s.path === segment ? text : s.sourceText).trim()).filter(Boolean).join("\n\n---\n\n");
 				assert.equal(loaded(), expected, "actual composed instructions replace exactly one source fragment");
 				for (const kind of ["teacher", "prober"] as const) {
 					assert.equal(teacherAgent.composeInstructions(kind, readSettingsRecord()?.agent?.prompts ?? {}), defaults[kind]);
