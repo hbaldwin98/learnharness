@@ -722,6 +722,14 @@ async function main() {
 		BrowserWindow, dialog, trustedAppWindows, origin: new URL(url).origin,
 	}));
 
+	// Fork: phone remote control over LAN (docs/remote-control.md).
+	require("./remote-control.cjs").installRemoteControl({
+		app, ipcMain, BrowserWindow, path, log,
+		origin: new URL(url).origin,
+		secret: () => desktopAPISecret,
+		trusted: (event) => trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) && trustedSender(event, new URL(url).origin, BrowserWindow),
+	});
+
 	installMenu();
 
 	// Auto-update (Wave C): wire the updater before the window so the

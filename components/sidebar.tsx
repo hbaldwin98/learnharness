@@ -52,6 +52,7 @@ import type { ChatGPTControlBridge, NativeSubscriptionControlBridge } from "@/sr
 import type { UpdateState } from "@/components/settings/update-settings.tsx";
 import { FilePathDropZone } from "@/components/file-path-drop-zone";
 import type { LocalDictationBridge } from "@/components/local-dictation";
+import type { RemoteControlBridge } from "@/components/settings/remote-section";
 const SIDEBAR_AUTOCLOSE = 928;
 
 // Module scope, guarded for SSR (the server has no navigator).
@@ -74,6 +75,8 @@ declare global {
 			subscriptions?: NativeSubscriptionControlBridge;
 			/** Local dictation (electron/dictation.cjs). */
 			dictation?: LocalDictationBridge;
+			/** Fork: phone remote control (components/settings/remote-section.tsx). */
+			remote?: RemoteControlBridge;
 			expandWindow: () => void;
 			/** The zoom truth (owner round 7): subscribes to "lh:zoom" pushes; returns unsubscribe. */
 			onZoom?: (cb: (factor: number) => void) => () => void;

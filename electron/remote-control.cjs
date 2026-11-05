@@ -292,4 +292,25 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 	return { start, stop, control, snapshot, boot: () => (state.enabled ? start() : Promise.resolve()) };
 }
 
-module.exports = { createRemoteControl, fileStore, defaultLanHost, stripOwnCookie, parseCookies, COOKIE, PAIR_PATH };
+/** All main-process wiring in one call, so electron/main.cjs carries a
+ *  single hunk (upstream-merge isolation). `trusted(event)` is main.cjs's
+ *  own trusted-window check. */
+function installRemoteControl({ app, ipcMain, BrowserWindow, path, trusted, origin, secret, log }) {
+	const rc = createRemoteControl({
+		store: fileStore(path.join(app.getPath("userData"), "remote-control.json")),
+		target: () => ({ origin, secret: secret() }),
+		log,
+		onChange: (snapshot) => {
+			for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:remote:changed", snapshot);
+		},
+	});
+	ipcMain.handle("lh:remote:control", async (event, command) => {
+		if (!trusted(event)) throw new Error("Untrusted desktop request.");
+		return rc.control(command);
+	});
+	app.on("before-quit", () => { void rc.stop(); });
+	void rc.boot();
+	return rc;
+}
+
+module.exports = { createRemoteControl, installRemoteControl, fileStore, defaultLanHost, stripOwnCookie, parseCookies, COOKIE, PAIR_PATH };

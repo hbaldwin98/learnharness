@@ -97,6 +97,15 @@ contextBridge.exposeInMainWorld("lh", {
 			return () => ipcRenderer.removeListener("lh:dictation:changed", listener);
 		},
 	},
+	// Fork: phone remote control (electron/remote-control.cjs).
+	remote: {
+		control: (command) => ipcRenderer.invoke("lh:remote:control", command),
+		onChange: (cb) => {
+			const listener = (_event, snapshot) => cb(snapshot);
+			ipcRenderer.on("lh:remote:changed", listener);
+			return () => ipcRenderer.removeListener("lh:remote:changed", listener);
+		},
+	},
 	expandWindow: () => ipcRenderer.send("lh:expand-window"),
 	onZoom: (cb) => {
 		const listener = (_event, factor) => cb(factor);

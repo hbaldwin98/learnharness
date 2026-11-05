@@ -51,6 +51,7 @@ import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
 import { CodingSection } from "./coding-section.tsx";
+import { RemoteSection } from "./remote-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
@@ -64,6 +65,7 @@ const SECTIONS = [
 	{ id: "graph", label: "Graph" },
 	{ id: "coding", label: "Coding" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
+	{ id: "remote", label: "Remote" }, // fork: phone remote control
 	{ id: "general", label: "General" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -438,6 +440,11 @@ export function SettingsDialogBody({
 									testid="section-keyboard"
 								>
 									<KeyboardSection />
+								</SettingsSection>
+							)}
+							{active === "remote" && (
+								<SettingsSection title="Remote" testid="section-remote">
+									<RemoteSection />
 								</SettingsSection>
 							)}
 						</div>
