@@ -113,8 +113,8 @@ function serveConfigured(dnsName, listenerUrl, { run = execFile, timeoutMs = 400
 			if (err) return resolve(false);
 			try {
 				const handlers = JSON.parse(String(stdout))?.Web?.[`${dnsName}:443`]?.Handlers ?? {};
-				const want = String(listenerUrl).replace(/\/$/, "");
-				resolve(Object.values(handlers).some((h) => String(h?.Proxy ?? "").replace(/\/$/, "") === want));
+				const wants = [].concat(listenerUrl).map((u) => String(u).replace(/\/$/, ""));
+				resolve(Object.values(handlers).some((h) => wants.includes(String(h?.Proxy ?? "").replace(/\/$/, ""))));
 			} catch {
 				resolve(false);
 			}

@@ -117,6 +117,7 @@ function fileStore(file) {
 function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null, icons = {}, detectTailscale = pwa.detectTailscale, probeHttps = (dnsName, listenerUrl) => pwa.serveConfigured(dnsName, listenerUrl).then((ok) => ok || pwa.probeHttps(dnsName)), dictation = () => null }) {
 	let state = store.load();
 	let server = null;
+	let loopback = null; // 127.0.0.1 twin: `tailscale serve` on Windows can't reach the machine's own Tailscale IP
 	let listening = null; // {host, port}
 	let lastError = null;
 	let pairing = null; // {hash, codeHash, expiresAt, failures}
@@ -146,7 +147,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 				certificates: tailscale.certificates,
 				httpsReady: tailscale.httpsReady,
 				url: `https://${tailscale.dnsName}`,
-				serveCommand: listening ? `tailscale serve --bg http://${listening.host}:${listening.port}` : null,
+				serveCommand: listening ? `tailscale serve --bg http://127.0.0.1:${listening.port}` : null,
 			},
 			devices: state.devices.map(({ id, name, createdAt, lastSeen }) => ({ id, name, createdAt, lastSeen })),
 		};
@@ -348,6 +349,13 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 				listening = { host, port: srv.address().port };
 				lastError = null;
 				log(`[remote] listening on http://${listening.host}:${listening.port}`);
+				if (host !== "127.0.0.1") {
+					const lo = http.createServer(onRequest);
+					lo.on("upgrade", onUpgrade);
+					lo.on("connection", (s) => { sockets.add(s); s.on("close", () => sockets.delete(s)); });
+					lo.once("error", (err) => log(`[remote] loopback listener unavailable (${err.code ?? err.message})`));
+					lo.listen(listening.port, "127.0.0.1", () => { loopback = lo; });
+				}
 				onChange(snapshot());
 				resolve();
 				void refreshTailscale();
@@ -363,6 +371,8 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		listening = null;
 		for (const s of sockets) s.destroy();
 		sockets.clear();
+		loopback?.close();
+		loopback = null;
 		return new Promise((resolve) => srv.close(() => { log("[remote] stopped"); onChange(snapshot()); resolve(); }));
 	}
 
@@ -396,7 +406,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 	/** Re-detect Tailscale and whether `tailscale serve` reaches this listener. */
 	async function refreshTailscale() {
 		const found = await detectTailscale().catch(() => null);
-		const httpsReady = !!(found && listening && (await probeHttps(found.dnsName, lanOrigin()).catch(() => false)));
+		const httpsReady = !!(found && listening && (await probeHttps(found.dnsName, [lanOrigin(), `http://127.0.0.1:${listening.port}`]).catch(() => false)));
 		tailscale = found ? { ...found, httpsReady } : null;
 		onChange(snapshot());
 		return snapshot();
