@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import type { LocalDictationModelId, ResolvedDictationSettings } from "@/src/core";
+import { remoteDictationBridge } from "@/components/remote-dictation"; // fork: phone dictation
 
 /**
  * The window's view of the local engine (electron/dictation.cjs): model
@@ -52,7 +53,7 @@ const UNAVAILABLE: LocalDictationSnapshot = {
 };
 
 const bridge = (): LocalDictationBridge | undefined =>
-	typeof window === "undefined" ? undefined : window.lh?.dictation;
+	typeof window === "undefined" ? undefined : window.lh?.dictation ?? remoteDictationBridge(); // fork: phone relay
 
 let snapshot = UNAVAILABLE;
 const listeners = new Set<() => void>();

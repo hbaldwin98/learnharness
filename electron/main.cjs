@@ -727,6 +727,7 @@ async function main() {
 		app, ipcMain, BrowserWindow, path, log,
 		origin: new URL(url).origin,
 		secret: () => desktopAPISecret,
+		dictation: () => dictation, // assigned below; read only per phone request
 		trusted: (event) => trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) && trustedSender(event, new URL(url).origin, BrowserWindow),
 	});
 

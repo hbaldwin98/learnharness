@@ -6,14 +6,31 @@
 
 import { useEffect, useState } from "react";
 
-let probe: Promise<boolean> | null = null;
+export type RemoteStatus = { remote: true; uploads: boolean; dictation?: boolean };
+
+let probe: Promise<RemoteStatus | null> | null = null;
+let known: RemoteStatus | null = null;
+
+/** The proxy's /_remote/status, or null when this page isn't remote-served. Cached. */
+export function remoteStatus(): Promise<RemoteStatus | null> {
+	probe ??= fetch("/_remote/status", { cache: "no-store" })
+		.then(async (res) => {
+			const body = res.ok ? ((await res.json()) as RemoteStatus | null) : null;
+			known = body?.remote === true ? body : null;
+			return known;
+		})
+		.catch(() => null);
+	return probe;
+}
+
+/** The status once the probe has answered (null before, or when not remote). */
+export function remoteStatusSync(): RemoteStatus | null {
+	return known;
+}
 
 /** True when this page is served through the remote-control proxy with uploads on. */
 export function remoteUploadsAvailable(): Promise<boolean> {
-	probe ??= fetch("/_remote/status", { cache: "no-store" })
-		.then(async (res) => res.ok && (await res.json())?.uploads === true)
-		.catch(() => false);
-	return probe;
+	return remoteStatus().then((s) => s?.uploads === true);
 }
 
 export function useRemoteUploads(enabled: boolean): boolean {
@@ -52,8 +69,11 @@ export async function uploadFilesToDesktop(files: File[]): Promise<{ paths: stri
  *  install-only service worker (all assets come from the proxy). Idempotent. */
 export function installRemotePwa(): void {
 	if (window.lh) return; // the desktop window is never a remote page
-	void remoteUploadsAvailable().then((remote) => {
-		if (!remote || document.querySelector('link[rel="manifest"]')) return;
+	void remoteStatus().then((status) => {
+		if (!status) return;
+		// Phone dictation relays to the desktop engine; the mic needs HTTPS.
+		if (status.dictation && window.isSecureContext) document.documentElement.dataset.lhRemoteDictation = "";
+		if (document.querySelector('link[rel="manifest"]')) return;
 		const add = (tag: string, attrs: Record<string, string>) => {
 			const el = document.createElement(tag);
 			for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);

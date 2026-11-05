@@ -55,9 +55,9 @@ html[data-lh-phone] [data-testid="question-dock"] {
 	--dock-max-h: 30dvh;
 }
 
-/* Phones dictate through their own keyboard; the desktop engine button only crowds the toolbar. */
-html[data-lh-phone] [data-testid="dictation-toggle"],
-html[data-lh-phone] *:has(> [data-testid="dictation-toggle"]):not(:has(> :not([data-testid="dictation-toggle"]))) {
+/* Dictate shows only when the desktop relays its engine over HTTPS (components/remote-dictation.ts). */
+html[data-lh-phone]:not([data-lh-remote-dictation]) [data-testid="dictation-toggle"],
+html[data-lh-phone]:not([data-lh-remote-dictation]) *:has(> [data-testid="dictation-toggle"]):not(:has(> :not([data-testid="dictation-toggle"]))) {
 	display: none;
 }
 

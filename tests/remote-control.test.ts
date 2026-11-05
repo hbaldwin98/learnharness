@@ -168,7 +168,7 @@ test("phone uploads: paired same-origin only, saved under uploadDir with a safe 
 		assert.equal((await request(`${f.base}/_remote/upload?name=a.txt`, { method: "POST", headers: { Origin: f.base } }, "x")).status, 401);
 		const { cookie } = await pair(f.rc);
 		const status = await request(`${f.base}/_remote/status`, { headers: { Cookie: cookie } });
-		assert.deepEqual(JSON.parse(status.body), { remote: true, uploads: true });
+		assert.deepEqual(JSON.parse(status.body), { remote: true, uploads: true, dictation: false });
 
 		const evil = await request(`${f.base}/_remote/upload?name=a.txt`, { method: "POST", headers: { Cookie: cookie, Origin: "http://evil.invalid" } }, "x");
 		assert.equal(evil.status, 403);
@@ -292,4 +292,149 @@ test("Tailscale without a working serve keeps LAN links", async () => {
 		assert.equal(snap.tailscale.httpsReady, false);
 		assert.match((await f.rc.control({ op: "pair" })).url, /^http:\/\/127\.0\.0\.1:/);
 	} finally { await f.close(); }
+});
+
+// ── Phone dictation relay (electron/remote-dictation.cjs over remote-ws.cjs) ──
+
+const { encodeFrame, decodeFrames } = require("../electron/remote-ws.cjs");
+import { MessageChannel as NodeMessageChannel } from "node:worker_threads";
+import { createHash, randomBytes } from "node:crypto";
+
+/** Masked client frame (browsers always mask). */
+function clientFrame(opcode: number, payload: Buffer) {
+	const mask = randomBytes(4);
+	const masked = Buffer.from(payload);
+	for (let i = 0; i < masked.length; i++) masked[i]! ^= mask[i & 3]!;
+	const len = payload.length;
+	const head = len < 126 ? Buffer.from([0x80 | opcode, 0x80 | len]) : Buffer.from([0x80 | opcode, 0x80 | 126, len >> 8, len & 0xff]);
+	return Buffer.concat([head, mask, masked]);
+}
+
+/** Server frames are unmasked: parse text frames out of a socket stream. */
+function serverMessages(socket: import("node:net").Socket, head: Buffer = Buffer.alloc(0)) {
+	const queue: string[] = [];
+	const waiters: Array<(s: string) => void> = [];
+	let buf = Buffer.alloc(0);
+	const onData = (chunk: Buffer) => {
+		buf = Buffer.concat([buf, chunk]);
+		while (buf.length >= 2) {
+			const len = buf[1]! & 0x7f;
+			const off = len === 126 ? 4 : 2;
+			const n = len === 126 ? buf.readUInt16BE(2) : len;
+			if (buf.length < off + n) break;
+			const text = buf.subarray(off, off + n).toString("utf8");
+			const opcode = buf[0]! & 0x0f;
+			buf = buf.subarray(off + n);
+			if (opcode !== 0x1) continue;
+			const w = waiters.shift();
+			if (w) w(text); else queue.push(text);
+		}
+	};
+	socket.on("data", onData);
+	if (head.length) onData(head);
+	return () => new Promise<string>((resolve) => { const q = queue.shift(); if (q !== undefined) resolve(q); else waiters.push(resolve); });
+}
+
+function wsConnect(base: string, headers: Record<string, string>) {
+	return new Promise<{ status: number; socket?: import("node:net").Socket; head?: Buffer }>((resolve, reject) => {
+		const key = randomBytes(16).toString("base64");
+		const req = http.request(`${base}/_remote/dictation`, { headers: { Connection: "Upgrade", Upgrade: "websocket", "Sec-WebSocket-Version": "13", "Sec-WebSocket-Key": key, ...headers } });
+		req.on("upgrade", (res, socket, head) => {
+			assert.equal(res.headers["sec-websocket-accept"], createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64"));
+			resolve({ status: res.statusCode ?? 0, socket, head });
+		});
+		req.on("response", (res) => resolve({ status: res.statusCode ?? 0 }));
+		req.on("error", (e) => (String(e).includes("socket hang up") ? resolve({ status: 0 }) : reject(e)));
+		req.end();
+	});
+}
+
+/** A fake local engine: connect() hands over a MessagePortMain-shaped port; `worker` is its other end. */
+function fakeDictation(ok = true) {
+	const received: any[] = [];
+	let worker: import("node:worker_threads").MessagePort | null = null;
+	return {
+		received,
+		toPhone: (msg: unknown) => worker!.postMessage(msg),
+		snapshot: () => ({ available: true, engine: { state: "ready" }, models: { m: { state: "ready" } }, vad: null }),
+		connect(webContents: { postMessage: (c: string, m: unknown, ports: unknown[]) => void }) {
+			if (!ok) return false;
+			const { port1, port2 } = new NodeMessageChannel();
+			worker = port1;
+			port1.on("message", (data) => received.push(data));
+			port1.unref(); port2.unref();
+			const mainPort = { on: (_e: string, cb: (ev: { data: unknown }) => void) => port2.on("message", (data) => cb({ data })), postMessage: (m: unknown) => port2.postMessage(m), start: () => {}, close: () => port2.close() };
+			webContents.postMessage("lh:dictation:port", null, [mainPort]);
+			return true;
+		},
+	};
+}
+
+const until = async (check: () => boolean, ms = 2000) => {
+	const end = Date.now() + ms;
+	while (!check()) { if (Date.now() > end) throw new Error("timed out"); await new Promise((r) => setTimeout(r, 10)); }
+};
+
+test("ws frames: encode/decode round-trip, masked only", () => {
+	const payload = Buffer.from("x".repeat(300));
+	const { frames, rest } = decodeFrames(Buffer.concat([clientFrame(0x1, payload), clientFrame(0x2, Buffer.from([1, 2]))]));
+	assert.equal(rest.length, 0);
+	assert.equal(frames[0].payload.toString(), payload.toString());
+	assert.deepEqual([...frames[1].payload], [1, 2]);
+	assert.throws(() => decodeFrames(encodeFrame(0x1, Buffer.from("hi"))), /unmasked/);
+	assert.equal(decodeFrames(clientFrame(0x1, payload).subarray(0, 10)).frames.length, 0, "partial frames wait for more bytes");
+});
+
+test("phone dictation: status, paired same-origin socket relays control, audio and worker replies", async () => {
+	const engine = fakeDictation();
+	const f = await fixture({ dictation: () => engine });
+	try {
+		const { cookie } = await pair(f.rc);
+		const st = JSON.parse((await request(`${f.base}/_remote/status`, { headers: { Cookie: cookie } })).body);
+		assert.equal(st.dictation, true);
+		const snap = JSON.parse((await request(`${f.base}/_remote/dictation/status`, { headers: { Cookie: cookie } })).body);
+		assert.equal(snap.models.m.state, "ready");
+
+		assert.equal((await wsConnect(f.base, { Origin: f.base })).status, 403, "unpaired socket refused");
+		assert.equal((await wsConnect(f.base, { Cookie: cookie, Origin: "http://evil.example" })).status, 403, "foreign origin refused");
+
+		const { socket, head } = await wsConnect(f.base, { Cookie: cookie, Origin: f.base });
+		const next = serverMessages(socket!, head);
+		assert.deepEqual(JSON.parse(await next()), { type: "ready" });
+		socket!.write(clientFrame(0x1, Buffer.from(JSON.stringify({ type: "start", runId: 7, language: "en", vad: true }))));
+		socket!.write(clientFrame(0x1, Buffer.from(JSON.stringify({ type: "download", runId: 7 }))));
+		const pcm = Buffer.alloc(4 + 8);
+		pcm.writeUInt32LE(7, 0);
+		pcm.writeInt16LE(1234, 4);
+		socket!.write(clientFrame(0x2, pcm));
+		await until(() => engine.received.length >= 2);
+		assert.deepEqual(engine.received[0], { type: "start", runId: 7, language: "en", vad: true });
+		assert.equal(engine.received[1].type, "audio", "unknown control types are dropped");
+		assert.equal(engine.received[1].runId, 7);
+		assert.ok(engine.received[1].pcm instanceof ArrayBuffer, "the worker gets an ArrayBuffer");
+		assert.equal(new Int16Array(engine.received[1].pcm)[0], 1234);
+
+		engine.toPhone({ type: "text", runId: 7, committed: "hello", tentative: "" });
+		assert.deepEqual(JSON.parse(await next()), { type: "text", runId: 7, committed: "hello", tentative: "" });
+
+		socket!.destroy(); // phone vanished mid-run
+		await until(() => engine.received.some((m) => m.type === "cancel"));
+		assert.deepEqual(engine.received.at(-1), { type: "cancel", runId: 7 });
+	} finally { await f.close(); }
+});
+
+test("phone dictation: a starting engine answers busy; no engine means no dictation", async () => {
+	const f = await fixture({ dictation: () => fakeDictation(false) });
+	try {
+		const { cookie } = await pair(f.rc);
+		const { socket, head } = await wsConnect(f.base, { Cookie: cookie, Origin: f.base });
+		assert.deepEqual(JSON.parse(await serverMessages(socket!, head)()), { type: "busy" });
+		socket!.destroy();
+	} finally { await f.close(); }
+	const g = await fixture();
+	try {
+		const { cookie } = await pair(g.rc);
+		assert.equal(JSON.parse((await request(`${g.base}/_remote/status`, { headers: { Cookie: cookie } })).body).dictation, false);
+		assert.equal((await wsConnect(g.base, { Cookie: cookie, Origin: g.base })).status, 503);
+	} finally { await g.close(); }
 });

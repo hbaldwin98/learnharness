@@ -13,11 +13,14 @@ const fs = require("node:fs");
 const { randomBytes, createHash, timingSafeEqual } = require("node:crypto");
 const { HEADER } = require("./desktop-api.cjs");
 const pwa = require("./remote-pwa.cjs");
+const { acceptWebSocket } = require("./remote-ws.cjs");
+const { relayDictation, openWorkerPort, dictationStatus } = require("./remote-dictation.cjs");
 
 const COOKIE = "lh_remote";
 const PAIR_PATH = "/_remote/pair";
 const STATUS_PATH = "/_remote/status";
 const UPLOAD_PATH = "/_remote/upload";
+const DICTATION_PATH = "/_remote/dictation";
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const PAIR_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_PORT = 47800;
@@ -109,8 +112,9 @@ function fileStore(file) {
  * @param {{192?: Buffer, 512?: Buffer}} [o.icons] PWA icons
  * @param {() => Promise<{dnsName: string, certificates: boolean} | null>} [o.detectTailscale]
  * @param {(dnsName: string) => Promise<boolean>} [o.probeHttps]
+ * @param {() => any} [o.dictation] the desktop's local dictation engine (electron/dictation.cjs), or null
  */
-function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null, icons = {}, detectTailscale = pwa.detectTailscale, probeHttps = pwa.probeHttps }) {
+function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null, icons = {}, detectTailscale = pwa.detectTailscale, probeHttps = pwa.probeHttps, dictation = () => null }) {
 	let state = store.load();
 	let server = null;
 	let listening = null; // {host, port}
@@ -275,7 +279,8 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		if (url.pathname === "/_remote/pair-code") return handlePairCode(req, res);
 		if (pwa.servePwaAsset(url.pathname, res, icons)) return;
 		if (!authorize(req)) return send(res, 401, pwa.notPairedPage(null));
-		if (url.pathname === STATUS_PATH) return json(res, 200, { remote: true, uploads: !!uploadDir });
+		if (url.pathname === STATUS_PATH) return json(res, 200, { remote: true, uploads: !!uploadDir, dictation: !!dictation() });
+		if (url.pathname === `${DICTATION_PATH}/status`) return json(res, 200, dictationStatus(dictation()));
 		if (url.pathname === UPLOAD_PATH) return handleUpload(req, res, url);
 		const upstream = target();
 		if (!upstream) return send(res, 503, page("Unavailable", "The desktop server is not running."));
@@ -293,6 +298,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 	}
 
 	function onUpgrade(req, socket, head) {
+		if (new URL(req.url ?? "/", "http://remote.invalid").pathname === DICTATION_PATH) return onDictationUpgrade(req, socket, head);
 		const upstream = target();
 		const headers = upstream && authorize(req) ? forwardHeaders(req, upstream) : null;
 		if (!headers) { socket.end("HTTP/1.1 403 Forbidden\r\n\r\n"); return; }
@@ -309,6 +315,15 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		});
 		out.on("error", () => socket.destroy());
 		out.end();
+	}
+
+	/** Phone dictation: a WebSocket relayed onto the local dictation worker. */
+	function onDictationUpgrade(req, socket, head) {
+		const engine = dictation();
+		if (!authorize(req) || !ownOrigins().includes(req.headers.origin)) { socket.end("HTTP/1.1 403 Forbidden\r\n\r\n"); return; }
+		if (!engine) { socket.end("HTTP/1.1 503 Service Unavailable\r\n\r\n"); return; }
+		const ws = acceptWebSocket(req, socket, head);
+		if (ws) relayDictation(ws, () => openWorkerPort(engine));
 	}
 
 	function start() {
@@ -427,13 +442,14 @@ function pwaIcons(file, log) {
 /** All main-process wiring in one call, so electron/main.cjs carries a
  *  single hunk (upstream-merge isolation). `trusted(event)` is main.cjs's
  *  own trusted-window check. */
-function installRemoteControl({ app, ipcMain, BrowserWindow, path, trusted, origin, secret, log }) {
+function installRemoteControl({ app, ipcMain, BrowserWindow, path, trusted, origin, secret, log, dictation = () => null }) {
 	const rc = createRemoteControl({
 		store: fileStore(path.join(app.getPath("userData"), "remote-control.json")),
 		target: () => ({ origin, secret: secret() }),
 		log,
 		uploadDir: path.join(app.getPath("userData"), "remote-uploads"),
 		icons: pwaIcons(path.join(__dirname, "remote-icon.png"), log),
+		dictation,
 		onChange: (snapshot) => {
 			for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:remote:changed", snapshot);
 		},

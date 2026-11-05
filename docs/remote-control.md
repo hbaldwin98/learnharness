@@ -36,3 +36,16 @@ Fork-only feature: control the running desktop app from a phone on the home LAN.
 - **Trusted origins:** the LAN listener origin plus `https://<name>.ts.net`, for writes, uploads and the pairing form.
 - **Short codes:** each pairing also issues an 8-character code (`XXXX-XXXX`, alphabet without I/O/0/1). The QR link and the code are one pairing slot, single use and valid for 5 minutes. 10 wrong codes cancel the pairing. The unpaired page (`/_remote/pair-code` form) lets an installed home-screen app pair itself, because iOS standalone apps don't share Safari's cookies.
 - **PWA:** the proxy serves `/_remote/manifest.webmanifest`, `/_remote/sw.js` (with `Service-Worker-Allowed: /`) and `/_remote/icon-{192,512}.png` without pairing. The icons are made from `electron/remote-icon.png`, a copy of `build/icon.png`, because only `electron/**` ships in the asar. The worker only enables installing and caches nothing. Failed navigations show a "Can't reach your computer" page. On pages served through remote control, `components/remote-upload.ts#installRemotePwa` adds the manifest and iOS tags; the desktop window skips this.
+
+## Phone performance and dictation (2026-11-05)
+
+**Lag on long chats.** Every streamed chunk re-rendered the whole transcript; on a 780 KB chat that cost ~0.5–0.8 s per update at phone CPU speed, so sends stalled and an answer could be lost when the app was backgrounded before the request left. Phones now:
+- render only the last 4 message groups, with a "Show earlier messages" button (+4 per tap) — `usePhoneMessageWindow` in `components/phone.tsx`, one hook in `components/chat.tsx`;
+- coalesce session re-renders to one per animation frame — `frameBatched` in `components/phone.tsx`, one hook in `components/session.ts`.
+Desktop is unchanged. In-chat find only searches what's rendered on the phone.
+
+**Dictation.** The phone uses the desktop's local model. The Dictate button shows on phones only when the page is HTTPS (Tailscale) and the desktop has a dictation engine. Tapping it never focuses the input, so the keyboard stays closed.
+- `components/remote-dictation.ts` stands in for `window.lh.dictation` (one hook in `components/local-dictation.ts`): status from `GET /_remote/dictation/status`; `connect` opens `wss://…/_remote/dictation` and hands the page a normal `MessagePort`, so `components/dictation.tsx` is unchanged.
+- `electron/remote-dictation.cjs` relays the socket onto a fresh worker port (via `dictation.connect()` with a stand-in webContents). Wire format: text JSON for `start`/`stop`/`cancel` and worker replies; binary `[u32 LE runId][PCM]` for audio. A phone that disconnects mid-run gets its run cancelled.
+- `electron/remote-ws.cjs` is a minimal RFC 6455 server (the shell ships no `ws`). The socket needs a paired cookie and one of the proxy's own origins.
+- Model downloads and settings stay on the desktop.
