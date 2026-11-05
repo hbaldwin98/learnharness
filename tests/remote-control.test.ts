@@ -11,10 +11,11 @@ const require = createRequire(import.meta.url);
 const { createRemoteControl, stripOwnCookie, COOKIE } = require("../electron/remote-control.cjs");
 const { HEADER } = require("../electron/desktop-api.cjs");
 const secret = "s".repeat(64);
+const noTailscale = { detectTailscale: async () => null };
 
 type Seen = { url?: string; headers: http.IncomingHttpHeaders; method?: string };
 
-async function fixture() {
+async function fixture(opts: Record<string, unknown> = {}) {
 	const seen: Seen[] = [];
 	const upstream = http.createServer((req, res) => {
 		seen.push({ url: req.url, headers: req.headers, method: req.method });
@@ -27,7 +28,7 @@ async function fixture() {
 	let saved: unknown = null;
 	const store = { load: () => ({ enabled: false, port: 0, host: "127.0.0.1", devices: [] }), save: (s: unknown) => { saved = s; } };
 	const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-remote-"));
-	const rc = createRemoteControl({ store, target: () => ({ origin, secret }), uploadDir });
+	const rc = createRemoteControl({ store, target: () => ({ origin, secret }), uploadDir, ...noTailscale, ...opts });
 	const snap = await rc.control({ op: "enable" });
 	const base: string = snap.url;
 	const close = async () => { await rc.stop(); await new Promise((r) => upstream.close(r)); fs.rmSync(uploadDir, { recursive: true, force: true }); };
@@ -112,7 +113,7 @@ test("absolute loopback redirects become relative", async () => {
 test("expired pairing codes fail", async () => {
 	let t = 1_000_000;
 	const store = { load: () => ({ enabled: true, port: 0, host: "127.0.0.1", devices: [] }), save() {} };
-	const rc = createRemoteControl({ store, target: () => null, now: () => t });
+	const rc = createRemoteControl({ store, target: () => null, now: () => t, ...noTailscale });
 	await rc.boot();
 	try {
 		const { url } = await rc.control({ op: "pair" });
@@ -145,7 +146,7 @@ test("network picker lists external IPv4 adapters and restarts the listener on t
 	let saved: any = null;
 	const store = { load: () => ({ enabled: true, port: 0, devices: [] }), save: (s: unknown) => { saved = s; } };
 	const nets = [{ name: "Loop A", address: "127.0.0.1" }, { name: "Loop B", address: "127.0.0.2" }];
-	const rc = createRemoteControl({ store, target: () => null, networks: () => nets, lanHost: () => "127.0.0.1" });
+	const rc = createRemoteControl({ store, target: () => null, networks: () => nets, lanHost: () => "127.0.0.1", ...noTailscale });
 	await rc.boot();
 	try {
 		assert.match(rc.snapshot().url, /^http:\/\/127\.0\.0\.1:/);
@@ -189,4 +190,106 @@ test("stripOwnCookie keeps other cookies only", () => {
 	assert.equal(stripOwnCookie(`a=1; ${COOKIE}=x; b=2`), "a=1; b=2");
 	assert.equal(stripOwnCookie(`${COOKIE}=x`), undefined);
 	assert.equal(stripOwnCookie(undefined), undefined);
+});
+
+const { newShortCode, normalizeShortCode, CODE_ALPHABET } = require("../electron/remote-pwa.cjs");
+
+function postForm(url: string, origin: string, code: string) {
+	const body = new URLSearchParams({ code }).toString();
+	return request(url, { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded", "Content-Length": String(Buffer.byteLength(body)) } }, body);
+}
+
+test("short codes: unambiguous alphabet, forgiving input", () => {
+	for (let i = 0; i < 50; i++) {
+		const code: string = newShortCode();
+		assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+		assert.doesNotMatch(code, /[IO01]/);
+		assert.equal(normalizeShortCode(code.toLowerCase().replace("-", " ")), code.replace("-", ""));
+	}
+	assert.equal(normalizeShortCode("ABCD-EFG0"), null, "0 is not in the alphabet");
+	assert.equal(normalizeShortCode("ABC"), null);
+	assert.ok(!CODE_ALPHABET.includes("I"));
+});
+
+test("in-app pairing: the short code pairs once, consumes the QR link too, and wrong codes are capped", async () => {
+	const f = await fixture();
+	try {
+		const unpaired = await request(`${f.base}/`);
+		assert.equal(unpaired.status, 401);
+		assert.match(unpaired.body, /action="\/_remote\/pair-code"/);
+		assert.match(unpaired.body, /rel="manifest"/);
+
+		const { url, shortCode } = await f.rc.control({ op: "pair" });
+		assert.equal((await postForm(`${f.base}/_remote/pair-code`, "http://evil.invalid", shortCode)).status, 403, "foreign origin");
+		const wrong = await postForm(`${f.base}/_remote/pair-code`, f.base, "AAAA-AAAA");
+		assert.equal(wrong.status, 403);
+		assert.match(wrong.body, /didn’t match/);
+
+		const ok = await postForm(`${f.base}/_remote/pair-code`, f.base, shortCode.toLowerCase());
+		assert.equal(ok.status, 302);
+		assert.match(String(ok.headers["set-cookie"]?.[0]), /^lh_remote=[0-9a-f]{64};/);
+		assert.equal((await request(url)).status, 403, "QR link consumed by the code");
+		assert.equal((await postForm(`${f.base}/_remote/pair-code`, f.base, shortCode)).status, 403, "code is single use");
+
+		const second = await f.rc.control({ op: "pair" });
+		for (let i = 0; i < 10; i++) await postForm(`${f.base}/_remote/pair-code`, f.base, "AAAA-AAAA");
+		const locked = await postForm(`${f.base}/_remote/pair-code`, f.base, second.shortCode);
+		assert.equal(locked.status, 403, "10 wrong attempts cancel the pairing");
+		assert.match(locked.body, /No active code/);
+	} finally { await f.close(); }
+});
+
+test("PWA assets are served without pairing; the worker may control the whole origin", async () => {
+	const icons = { 192: Buffer.from("png192"), 512: Buffer.from("png512") };
+	const f = await fixture({ icons });
+	try {
+		const manifest = await request(`${f.base}/_remote/manifest.webmanifest`);
+		assert.equal(manifest.status, 200);
+		const m = JSON.parse(manifest.body);
+		assert.equal(m.display, "standalone");
+		assert.equal(m.start_url, "/");
+		assert.deepEqual(m.icons.map((i: { sizes: string }) => i.sizes), ["192x192", "512x512"]);
+		const sw = await request(`${f.base}/_remote/sw.js`);
+		assert.equal(sw.headers["service-worker-allowed"], "/");
+		assert.match(sw.body, /Can’t reach your computer/);
+		assert.doesNotMatch(sw.body, /caches\./, "install-only worker: no caching");
+		assert.equal((await request(`${f.base}/_remote/icon-512.png`)).body, "png512");
+		assert.equal(f.seen.length, 0, "never reaches the Next server");
+	} finally { await f.close(); }
+});
+
+test("Tailscale: HTTPS origin is trusted for writes and used in QR links once serve is verified", async () => {
+	const f = await fixture({
+		detectTailscale: async () => ({ dnsName: "pc.tail.ts.net", certificates: true }),
+		probeHttps: async () => true,
+	});
+	try {
+		const snap = await f.rc.control({ op: "checkTailscale" });
+		assert.equal(snap.tailscale.httpsReady, true);
+		assert.equal(snap.tailscale.url, "https://pc.tail.ts.net");
+		assert.match(snap.tailscale.serveCommand, /^tailscale serve --bg http:\/\/127\.0\.0\.1:\d+$/);
+		const { url } = await f.rc.control({ op: "pair" });
+		assert.match(url, /^https:\/\/pc\.tail\.ts\.net\/_remote\/pair\?code=/);
+
+		const { shortCode } = await f.rc.control({ op: "pair" });
+		const paired = await postForm(`${f.base}/_remote/pair-code`, "https://pc.tail.ts.net", shortCode);
+		assert.equal(paired.status, 302, "pairing form accepted from the HTTPS origin");
+		const cookie = String(paired.headers["set-cookie"]?.[0]).split(";")[0] ?? "";
+		const post = await request(`${f.base}/api/chats`, { method: "POST", headers: { Cookie: cookie, Origin: "https://pc.tail.ts.net", Referer: "https://pc.tail.ts.net/chat/x" } }, "{}");
+		assert.equal(post.status, 200);
+		const hit = f.seen.at(-1)!;
+		assert.equal(hit.headers.origin, f.origin);
+		assert.equal(hit.headers.referer, `${f.origin}/chat/x`);
+		const up = await request(`${f.base}/_remote/upload?name=a.txt`, { method: "POST", headers: { Cookie: cookie, Origin: "https://pc.tail.ts.net" } }, "x");
+		assert.equal(up.status, 200);
+	} finally { await f.close(); }
+});
+
+test("Tailscale without a working serve keeps LAN links", async () => {
+	const f = await fixture({ detectTailscale: async () => ({ dnsName: "pc.tail.ts.net", certificates: true }), probeHttps: async () => false });
+	try {
+		const snap = await f.rc.control({ op: "checkTailscale" });
+		assert.equal(snap.tailscale.httpsReady, false);
+		assert.match((await f.rc.control({ op: "pair" })).url, /^http:\/\/127\.0\.0\.1:/);
+	} finally { await f.close(); }
 });

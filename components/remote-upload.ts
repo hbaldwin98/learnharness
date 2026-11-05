@@ -47,3 +47,27 @@ export async function uploadFilesToDesktop(files: File[]): Promise<{ paths: stri
 	}
 	return { paths, errors };
 }
+
+/** Remote-served pages only: add the PWA manifest + iOS tags and register the
+ *  install-only service worker (all assets come from the proxy). Idempotent. */
+export function installRemotePwa(): void {
+	if (window.lh) return; // the desktop window is never a remote page
+	void remoteUploadsAvailable().then((remote) => {
+		if (!remote || document.querySelector('link[rel="manifest"]')) return;
+		const add = (tag: string, attrs: Record<string, string>) => {
+			const el = document.createElement(tag);
+			for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+			document.head.appendChild(el);
+		};
+		add("link", { rel: "manifest", href: "/_remote/manifest.webmanifest" });
+		add("link", { rel: "apple-touch-icon", href: "/_remote/icon-192.png" });
+		add("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
+		add("meta", { name: "mobile-web-app-capable", content: "yes" });
+		add("meta", { name: "apple-mobile-web-app-status-bar-style", content: "black" });
+		add("meta", { name: "apple-mobile-web-app-title", content: "LearnHarness" });
+		add("meta", { name: "theme-color", content: "#141414" });
+		if ("serviceWorker" in navigator && window.isSecureContext) {
+			void navigator.serviceWorker.register("/_remote/sw.js", { scope: "/" }).catch(() => {});
+		}
+	});
+}

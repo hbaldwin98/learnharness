@@ -12,6 +12,7 @@ const os = require("node:os");
 const fs = require("node:fs");
 const { randomBytes, createHash, timingSafeEqual } = require("node:crypto");
 const { HEADER } = require("./desktop-api.cjs");
+const pwa = require("./remote-pwa.cjs");
 
 const COOKIE = "lh_remote";
 const PAIR_PATH = "/_remote/pair";
@@ -105,13 +106,23 @@ function fileStore(file) {
  * @param {() => {name: string, address: string}[]} [o.networks]
  * @param {(snapshot: any) => void} [o.onChange]
  * @param {string | null} [o.uploadDir] where phone attachments are saved (null = uploads off)
+ * @param {{192?: Buffer, 512?: Buffer}} [o.icons] PWA icons
+ * @param {() => Promise<{dnsName: string, certificates: boolean} | null>} [o.detectTailscale]
+ * @param {(dnsName: string) => Promise<boolean>} [o.probeHttps]
  */
-function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null }) {
+function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null, icons = {}, detectTailscale = pwa.detectTailscale, probeHttps = pwa.probeHttps }) {
 	let state = store.load();
 	let server = null;
 	let listening = null; // {host, port}
 	let lastError = null;
-	let pairing = null; // {hash, expiresAt}
+	let pairing = null; // {hash, codeHash, expiresAt, failures}
+	let tailscale = null; // {dnsName, certificates, httpsReady}
+	const MAX_CODE_FAILURES = 10;
+
+	const lanOrigin = () => (listening ? `http://${listening.host}:${listening.port}` : null);
+	const httpsOrigin = () => (tailscale?.httpsReady ? `https://${tailscale.dnsName}` : null);
+	/** Origins the phone may legitimately use: the LAN listener and, once verified, the Tailscale HTTPS name. */
+	const ownOrigins = () => [lanOrigin(), tailscale ? `https://${tailscale.dnsName}` : null].filter(Boolean);
 	const sockets = new Set();
 	const socketDevice = new WeakMap();
 
@@ -126,6 +137,13 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 			error: lastError,
 			host: state.host ?? null, // null = automatic (first adapter)
 			networks: networks(),
+			tailscale: tailscale && {
+				dnsName: tailscale.dnsName,
+				certificates: tailscale.certificates,
+				httpsReady: tailscale.httpsReady,
+				url: `https://${tailscale.dnsName}`,
+				serveCommand: listening ? `tailscale serve --bg http://${listening.host}:${listening.port}` : null,
+			},
 			devices: state.devices.map(({ id, name, createdAt, lastSeen }) => ({ id, name, createdAt, lastSeen })),
 		};
 	}
@@ -148,7 +166,28 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		const code = url.searchParams.get("code") ?? "";
 		const valid = pairing && pairing.expiresAt > now() && /^[0-9a-f]{32}$/.test(code) && safeEqualHex(pairing.hash, sha256(code));
 		if (!valid) return send(res, 403, page("Pairing failed", "This pairing code is invalid or expired. Generate a new QR code in the desktop app under Settings → Remote."));
-		pairing = null; // single use
+		completePairing(req, res);
+	}
+
+	/** POST /_remote/pair-code (form: code=XXXX-XXXX) — in-app pairing for installed home-screen apps. */
+	function handlePairCode(req, res) {
+		if (req.method !== "POST" || !ownOrigins().includes(req.headers.origin)) return send(res, 403, pwa.notPairedPage("Request rejected."));
+		let body = "";
+		req.on("data", (chunk) => { body += chunk; if (body.length > 1024) req.destroy(); });
+		req.on("end", () => {
+			const entered = pwa.normalizeShortCode(new URLSearchParams(body).get("code"));
+			const live = pairing && pairing.expiresAt > now();
+			if (live && entered && safeEqualHex(pairing.codeHash, sha256(entered))) return completePairing(req, res);
+			if (live) {
+				pairing.failures++;
+				if (pairing.failures >= MAX_CODE_FAILURES) { pairing = null; log("[remote] pairing cancelled after too many wrong codes"); }
+			}
+			send(res, 403, pwa.notPairedPage(live && pairing ? "That code didn’t match. Check it and try again." : "No active code. Tap “Show QR code” on your computer to get a new one."));
+		});
+	}
+
+	function completePairing(req, res) {
+		pairing = null; // single use: consumes both the QR link and the short code
 		const token = randomBytes(32).toString("hex");
 		const stamp = new Date(now()).toISOString();
 		state.devices.push({ id: randomBytes(8).toString("hex"), name: deviceName(req.headers["user-agent"]), hash: sha256(token), createdAt: stamp, lastSeen: stamp });
@@ -162,17 +201,18 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 
 	/** Shared header rewrite for HTTP and upgrade requests. Returns null to reject. */
 	function forwardHeaders(req, upstream) {
-		const own = listening ? `http://${listening.host}:${listening.port}` : null;
+		const owns = ownOrigins();
 		const headers = { ...req.headers };
 		for (const name of Object.keys(headers)) if (name.toLowerCase() === HEADER) delete headers[name];
 		const origin = headers.origin;
-		if (origin && origin !== own) {
+		if (origin && !owns.includes(origin)) {
 			const method = (req.method ?? "GET").toUpperCase();
 			if (method !== "GET" && method !== "HEAD") return null;
 		}
 		if (origin) headers.origin = upstream.origin;
 		headers.host = new URL(upstream.origin).host;
-		if (headers.referer && own && headers.referer.startsWith(own)) headers.referer = upstream.origin + headers.referer.slice(own.length);
+		const via = owns.find((o) => headers.referer?.startsWith(o));
+		if (via) headers.referer = upstream.origin + headers.referer.slice(via.length);
 		const cookie = stripOwnCookie(headers.cookie);
 		if (cookie) headers.cookie = cookie; else delete headers.cookie;
 		if (upstream.secret) headers[HEADER] = upstream.secret;
@@ -204,8 +244,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 
 	/** Raw-body upload (?name=…) → saved under uploadDir/<date>/<random>/<name>; replies {path}. */
 	function handleUpload(req, res, url) {
-		const own = listening ? `http://${listening.host}:${listening.port}` : null;
-		if (req.method !== "POST" || req.headers.origin !== own) return json(res, 403, { error: "Forbidden." });
+		if (req.method !== "POST" || !ownOrigins().includes(req.headers.origin)) return json(res, 403, { error: "Forbidden." });
 		if (!uploadDir) return json(res, 503, { error: "Uploads are unavailable." });
 		const declared = Number(req.headers["content-length"] ?? 0);
 		if (declared > MAX_UPLOAD_BYTES) { req.resume(); return json(res, 413, { error: "File is larger than 100 MB." }); }
@@ -233,7 +272,9 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 	function onRequest(req, res) {
 		const url = new URL(req.url ?? "/", "http://remote.invalid");
 		if (url.pathname === PAIR_PATH) return handlePair(req, res, url);
-		if (!authorize(req)) return send(res, 401, page("Not paired", "Open LearnHarness on your computer, go to Settings → Remote, and scan the QR code with this device."));
+		if (url.pathname === "/_remote/pair-code") return handlePairCode(req, res);
+		if (pwa.servePwaAsset(url.pathname, res, icons)) return;
+		if (!authorize(req)) return send(res, 401, pwa.notPairedPage(null));
 		if (url.pathname === STATUS_PATH) return json(res, 200, { remote: true, uploads: !!uploadDir });
 		if (url.pathname === UPLOAD_PATH) return handleUpload(req, res, url);
 		const upstream = target();
@@ -293,6 +334,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 				log(`[remote] listening on http://${listening.host}:${listening.port}`);
 				onChange(snapshot());
 				resolve();
+				void refreshTailscale();
 			});
 		});
 	}
@@ -328,9 +370,20 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 	function newPairing() {
 		if (!listening) throw new Error("Remote control is not listening.");
 		const code = randomBytes(16).toString("hex");
+		const shortCode = pwa.newShortCode();
 		const expiresAt = now() + PAIR_TTL_MS;
-		pairing = { hash: sha256(code), expiresAt };
-		return { url: `http://${listening.host}:${listening.port}${PAIR_PATH}?code=${code}`, expiresAt };
+		pairing = { hash: sha256(code), codeHash: sha256(pwa.normalizeShortCode(shortCode)), expiresAt, failures: 0 };
+		const base = httpsOrigin() ?? lanOrigin();
+		return { url: `${base}${PAIR_PATH}?code=${code}`, shortCode, expiresAt };
+	}
+
+	/** Re-detect Tailscale and whether `tailscale serve` reaches this listener. */
+	async function refreshTailscale() {
+		const found = await detectTailscale().catch(() => null);
+		const httpsReady = !!(found && listening && (await probeHttps(found.dnsName).catch(() => false)));
+		tailscale = found ? { ...found, httpsReady } : null;
+		onChange(snapshot());
+		return snapshot();
 	}
 
 	function revoke(id) {
@@ -349,12 +402,26 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 			case "disable": return setEnabled(false);
 			case "pair": return newPairing();
 			case "setHost": return setHost(typeof command.host === "string" ? command.host : null);
+			case "checkTailscale": return refreshTailscale();
 			case "revoke": return revoke(String(command.id ?? ""));
 			default: throw new Error("Unknown remote control request.");
 		}
 	}
 
 	return { start, stop, control, snapshot, boot: () => (state.enabled ? start() : Promise.resolve()) };
+}
+
+/** 192/512 PNGs for the PWA manifest, from the 512px app icon (main process only). */
+function pwaIcons(file, log) {
+	try {
+		const { nativeImage } = require("electron");
+		const img = nativeImage.createFromPath(file);
+		if (img.isEmpty()) throw new Error("icon not found");
+		return { 512: img.toPNG(), 192: img.resize({ width: 192, height: 192, quality: "best" }).toPNG() };
+	} catch (e) {
+		log(`[remote] PWA icons unavailable: ${e instanceof Error ? e.message : e}`);
+		return {};
+	}
 }
 
 /** All main-process wiring in one call, so electron/main.cjs carries a
@@ -366,6 +433,7 @@ function installRemoteControl({ app, ipcMain, BrowserWindow, path, trusted, orig
 		target: () => ({ origin, secret: secret() }),
 		log,
 		uploadDir: path.join(app.getPath("userData"), "remote-uploads"),
+		icons: pwaIcons(path.join(__dirname, "remote-icon.png"), log),
 		onChange: (snapshot) => {
 			for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:remote:changed", snapshot);
 		},

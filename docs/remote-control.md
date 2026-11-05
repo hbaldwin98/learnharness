@@ -29,3 +29,10 @@ Fork-only feature: control the running desktop app from a phone on the home LAN.
 
 - If Agent → File access is set to "Restrict to listed folders", add `%APPDATA%/LearnHarness/remote-uploads` to the allowed list, or the agent can't read phone attachments.
 - Upload routes (`/_remote/status`, `/_remote/upload`) are answered by the proxy and never reach the Next server. They require a paired device, and uploads also require a same-origin `Origin` header.
+
+## Tailscale HTTPS + installable PWA (2026-11-04)
+
+- **Tailscale:** Settings → Remote detects the machine's `*.ts.net` name with `tailscale status --json` and checks `https://<name>/_remote/manifest.webmanifest`. When that works, it shows "Ready" and QR links use the HTTPS address. When it doesn't, it shows the `tailscale serve --bg http://<listen-ip>:<port>` command to copy. The app never changes Tailscale's config (owner choice).
+- **Trusted origins:** the LAN listener origin plus `https://<name>.ts.net`, for writes, uploads and the pairing form.
+- **Short codes:** each pairing also issues an 8-character code (`XXXX-XXXX`, alphabet without I/O/0/1). The QR link and the code are one pairing slot, single use and valid for 5 minutes. 10 wrong codes cancel the pairing. The unpaired page (`/_remote/pair-code` form) lets an installed home-screen app pair itself, because iOS standalone apps don't share Safari's cookies.
+- **PWA:** the proxy serves `/_remote/manifest.webmanifest`, `/_remote/sw.js` (with `Service-Worker-Allowed: /`) and `/_remote/icon-{192,512}.png` without pairing. The icons are made from `electron/remote-icon.png`, a copy of `build/icon.png`, because only `electron/**` ships in the asar. The worker only enables installing and caches nothing. Failed navigations show a "Can't reach your computer" page. On pages served through remote control, `components/remote-upload.ts#installRemotePwa` adds the manifest and iOS tags; the desktop window skips this.

@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { installRemotePwa } from "@/components/remote-upload";
 
 export const PHONE_QUERY = "(max-width: 767px)";
 
@@ -17,6 +18,7 @@ export function isPhone(): boolean {
 export function usePhone(): boolean {
 	const [phone, setPhone] = useState(false);
 	useEffect(() => {
+		installRemotePwa(); // remote-control pages become an installable PWA (any width)
 		if (typeof window.matchMedia !== "function") return; // jsdom / very old engines
 		const mq = window.matchMedia(PHONE_QUERY);
 		const apply = () => {
