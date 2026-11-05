@@ -3,7 +3,7 @@
 // Upstream components call into this file through small hooks; the visual
 // rules live in app/phone.css, keyed on html[data-lh-phone].
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { installRemotePwa } from "@/components/remote-upload";
 
@@ -15,14 +15,23 @@ export function isPhone(): boolean {
 }
 
 /** Live phone-width flag; also mirrors it onto <html data-lh-phone> for CSS. */
+// Read synchronously on client renders (a chat opened from the sidebar is
+// windowed on its FIRST render, never rendered whole); false only while
+// hydrating server HTML.
+const subscribeWidth = (cb: () => void) => {
+	if (typeof window.matchMedia !== "function") return () => {};
+	const mq = window.matchMedia(PHONE_QUERY);
+	mq.addEventListener("change", cb);
+	return () => mq.removeEventListener("change", cb);
+};
+
 export function usePhone(): boolean {
-	const [phone, setPhone] = useState(false);
+	const phone = useSyncExternalStore(subscribeWidth, isPhone, () => false);
 	useEffect(() => {
 		installRemotePwa(); // remote-control pages become an installable PWA (any width)
 		if (typeof window.matchMedia !== "function") return; // jsdom / very old engines
 		const mq = window.matchMedia(PHONE_QUERY);
 		const apply = () => {
-			setPhone(mq.matches);
 			if (mq.matches) document.documentElement.dataset.lhPhone = "";
 			else delete document.documentElement.dataset.lhPhone;
 		};

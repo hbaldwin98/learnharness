@@ -53,7 +53,7 @@ async function pair(rc: any) {
 	assert.equal(res.status, 302);
 	const cookie = String(res.headers["set-cookie"]?.[0]).split(";")[0] ?? "";
 	assert.match(cookie, new RegExp(`^${COOKIE}=[0-9a-f]{64}$`));
-	assert.match(String(res.headers["set-cookie"]?.[0]), /HttpOnly; SameSite=Strict/);
+	assert.match(String(res.headers["set-cookie"]?.[0]), /HttpOnly; SameSite=Lax; Path=\/; Max-Age=31536000; Expires=/);
 	return { cookie, url };
 }
 

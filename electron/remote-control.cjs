@@ -114,7 +114,7 @@ function fileStore(file) {
  * @param {(dnsName: string) => Promise<boolean>} [o.probeHttps]
  * @param {() => any} [o.dictation] the desktop's local dictation engine (electron/dictation.cjs), or null
  */
-function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null, icons = {}, detectTailscale = pwa.detectTailscale, probeHttps = pwa.probeHttps, dictation = () => null }) {
+function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null, icons = {}, detectTailscale = pwa.detectTailscale, probeHttps = (dnsName, listenerUrl) => pwa.serveConfigured(dnsName, listenerUrl).then((ok) => ok || pwa.probeHttps(dnsName)), dictation = () => null }) {
 	let state = store.load();
 	let server = null;
 	let listening = null; // {host, port}
@@ -199,7 +199,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		log("[remote] device paired");
 		send(res, 302, "", {
 			Location: "/",
-			"Set-Cookie": `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${TOKEN_MAX_AGE_S}`,
+			"Set-Cookie": `${COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${TOKEN_MAX_AGE_S}; Expires=${new Date(now() + TOKEN_MAX_AGE_S * 1000).toUTCString()}`, // Lax: iOS home-screen cold launches drop Strict cookies; writes are origin-checked
 		});
 	}
 
@@ -395,7 +395,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 	/** Re-detect Tailscale and whether `tailscale serve` reaches this listener. */
 	async function refreshTailscale() {
 		const found = await detectTailscale().catch(() => null);
-		const httpsReady = !!(found && listening && (await probeHttps(found.dnsName).catch(() => false)));
+		const httpsReady = !!(found && listening && (await probeHttps(found.dnsName, lanOrigin()).catch(() => false)));
 		tailscale = found ? { ...found, httpsReady } : null;
 		onChange(snapshot());
 		return snapshot();

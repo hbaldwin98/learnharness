@@ -104,6 +104,24 @@ function detectTailscale({ run = execFile, timeoutMs = 4000 } = {}) {
 	});
 }
 
+/** True when `tailscale serve status --json` maps https://<dnsName>/ onto `listenerUrl`.
+ *  Windows can't reach its own serve address (the hairpin times out), so the
+ *  config is the reliable signal; the fetch probe below is the fallback. */
+function serveConfigured(dnsName, listenerUrl, { run = execFile, timeoutMs = 4000 } = {}) {
+	return new Promise((resolve) => {
+		run("tailscale", ["serve", "status", "--json"], { timeout: timeoutMs, windowsHide: true }, (err, stdout) => {
+			if (err) return resolve(false);
+			try {
+				const handlers = JSON.parse(String(stdout))?.Web?.[`${dnsName}:443`]?.Handlers ?? {};
+				const want = String(listenerUrl).replace(/\/$/, "");
+				resolve(Object.values(handlers).some((h) => String(h?.Proxy ?? "").replace(/\/$/, "") === want));
+			} catch {
+				resolve(false);
+			}
+		});
+	});
+}
+
 /** True when https://<dnsName> reaches this proxy (i.e. `tailscale serve` is set up). */
 async function probeHttps(dnsName, { fetchImpl = fetch, timeoutMs = 4000 } = {}) {
 	try {
@@ -114,4 +132,4 @@ async function probeHttps(dnsName, { fetchImpl = fetch, timeoutMs = 4000 } = {})
 	}
 }
 
-module.exports = { newShortCode, normalizeShortCode, notPairedPage, servePwaAsset, detectTailscale, probeHttps, HEAD_TAGS, CODE_ALPHABET };
+module.exports = { newShortCode, normalizeShortCode, notPairedPage, servePwaAsset, detectTailscale, probeHttps, serveConfigured, HEAD_TAGS, CODE_ALPHABET };
