@@ -69,3 +69,16 @@ html[data-lh-phone] :is([data-testid="readings-chip"], [data-testid="workspace-c
 html[data-lh-phone] [data-testid="readings-chip"] > span {
 	font-size: 0.75rem;
 }
+
+/* Graph home toolbar: fit beside the sidebar button instead of covering it.
+   Text buttons (Chains, Extract files) go icon-only; the node search narrows. */
+html[data-lh-phone] .lh-wco-floating {
+	max-width: calc(100% - 3.75rem);
+}
+html[data-lh-phone] .lh-wco-floating > div:first-child button {
+	font-size: 0;
+	gap: 0;
+}
+html[data-lh-phone] .lh-wco-floating > div:first-child > .w-56 {
+	width: 8.5rem;
+}
