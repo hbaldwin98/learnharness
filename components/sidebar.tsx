@@ -53,6 +53,7 @@ import type { UpdateState } from "@/components/settings/update-settings.tsx";
 import { FilePathDropZone } from "@/components/file-path-drop-zone";
 import type { LocalDictationBridge } from "@/components/local-dictation";
 import type { RemoteControlBridge } from "@/components/settings/remote-section";
+import { isPhone, PhoneDrawerBackdrop, usePhone, usePhoneDrawerAutoClose } from "@/components/phone"; // fork: phone layout
 const SIDEBAR_AUTOCLOSE = 928;
 
 // Module scope, guarded for SSR (the server has no navigator).
@@ -138,7 +139,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
 		const stored = localStorage.getItem(STORAGE_KEY);
 		// Default: open (first run introduces the sidebar).
-		setOpen(stored === null ? true : stored === "1");
+		setOpen(isPhone() ? false : stored === null ? true : stored === "1"); // fork: phones start closed
 		setMounted(true);
 		return () => off?.();
 	}, []);
@@ -168,7 +169,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 			return;
 		}
 		setOpen((v) => {
-			localStorage.setItem(STORAGE_KEY, v ? "0" : "1");
+			if (!isPhone()) localStorage.setItem(STORAGE_KEY, v ? "0" : "1"); // fork: drawer state isn't a preference
 			return !v;
 		});
 	}, [narrow, open]);
@@ -186,8 +187,13 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 		return () => window.removeEventListener(event, onToggle);
 	}, [toggle]);
 
+	const phone = usePhone(); // fork: phone drawer
+	const closeDrawer = useCallback(() => setOpen(false), []);
+	usePhoneDrawerAutoClose(phone, open, closeDrawer);
+
 	return (
 		<SidebarContext.Provider value={{ open: open && !narrow, toggle }}>
+			<PhoneDrawerBackdrop show={phone && open} onClose={closeDrawer} />
 			{/* transitions gated on mount: no slide-in flash on page load */}
 			<div className={cn("flex h-dvh", mounted && "[&_.sidebar-motion]:transition-[width,margin,opacity]")}>{children}</div>
 		</SidebarContext.Provider>
@@ -655,6 +661,7 @@ function SessionsSidebar() {
 
 	return (
 		<aside
+			data-lh-sidebar
 			className={cn("sidebar-motion shrink-0 overflow-hidden duration-200", open ? "w-72" : "w-0")}
 			aria-hidden={!open}
 		>
