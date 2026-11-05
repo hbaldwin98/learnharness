@@ -3,7 +3,7 @@
 // Upstream components call into this file through small hooks; the visual
 // rules live in app/phone.css, keyed on html[data-lh-phone].
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { installRemotePwa } from "@/components/remote-upload";
 
@@ -51,6 +51,44 @@ export function usePhoneDrawerAutoClose(phone: boolean, open: boolean, close: ()
 		obs.observe(document.body, { childList: true });
 		return () => obs.disconnect();
 	}, [phone, open, close]);
+}
+
+/** Phones: coalesce a re-render trigger to at most once per animation frame
+ *  (streaming fires one per chunk; a long chat re-render costs ~0.5s on a
+ *  phone). Desktop gets `fn` back unchanged. */
+export function frameBatched(fn: () => void): () => void {
+	if (!isPhone() || typeof requestAnimationFrame !== "function") return fn;
+	let queued = false;
+	return () => {
+		if (queued) return;
+		queued = true;
+		requestAnimationFrame(() => {
+			queued = false;
+			fn();
+		});
+	};
+}
+
+/** How many message groups a phone renders at first, and per "Show earlier". */
+export const PHONE_WINDOW_STEP = 4;
+
+/** Phones render only the last few message groups. Returns the first index
+ *  to render (0 on desktop) and the "Show earlier messages" button. */
+export function usePhoneMessageWindow(count: number): { start: number; earlier: ReactNode } {
+	const phone = usePhone();
+	const [shown, setShown] = useState(PHONE_WINDOW_STEP);
+	const start = phone ? Math.max(0, count - shown) : 0;
+	const earlier = start > 0 ? (
+		<button
+			type="button"
+			data-testid="phone-show-earlier"
+			className="mx-auto rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground"
+			onClick={() => setShown((n) => n + PHONE_WINDOW_STEP)}
+		>
+			Show earlier messages
+		</button>
+	) : null;
+	return { start, earlier };
 }
 
 /** Tap-outside scrim behind the open drawer. */
