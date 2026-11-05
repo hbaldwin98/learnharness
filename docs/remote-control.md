@@ -20,7 +20,7 @@ Fork-only feature: control the running desktop app from a phone on the home LAN.
 
 ## Minor decisions (recommended defaults taken)
 
-- Default port is 47800. The default bind host is the first non-internal IPv4 address. Both can be overridden in `userData/remote-control.json`.
+- Default port is 47800 (override it in `userData/remote-control.json`). Settings → Remote → Network chooses the adapter. "Automatic" falls back to the first non-internal IPv4 address, which on Windows may be Tailscale or WSL.
 - The QR code is rendered in the renderer with the `qrcode` package. That keeps the Electron asar's dependency allow-list unchanged.
 - State-changing requests carrying a foreign `Origin` header are rejected (403). The proxy rewrites `Host` and `Origin` to the loopback target so Next's server-action origin check passes.
 - Responses can carry an absolute `Location` header pointing at the loopback origin. The proxy rewrites those to relative paths.
