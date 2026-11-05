@@ -7,6 +7,7 @@ import { directoryReferencePath, quoteFilePath } from "@/src/core";
 import { Hint } from "@/components/ui/hint";
 import { INSERT_FILE_PATHS_EVENT } from "@/components/path-input";
 import { BROWSER_NOTICE } from "@/components/file-path-drop-zone";
+import { uploadFilesToDesktop, useRemoteUploads } from "@/components/remote-upload"; // fork: phone attachments
 
 /** Picked files → the rooted paths an editor chips (issue #285), via the
  *  desktop bridge. Same validity rule as drops: a file without a usable
@@ -58,6 +59,7 @@ function useDesktopPaths(): boolean {
 export function AttachFilesButton({ editorRef }: { editorRef: React.RefObject<HTMLDivElement | null> }) {
 	const pickerRef = useRef<HTMLInputElement>(null);
 	const desktop = useDesktopPaths();
+	const remote = useRemoteUploads(!desktop); // fork: phone uploads via remote control
 	const buttonRef = useRef<HTMLButtonElement>(null);
 	const popupRef = useRef<HTMLDivElement>(null);
 	const choosingFolder = useRef(false);
@@ -127,21 +129,33 @@ export function AttachFilesButton({ editorRef }: { editorRef: React.RefObject<HT
 				data-testid="attach-files-input"
 				onChange={(e) => {
 					const resolve = window.lh?.getPathForFile;
+					if (!resolve && remote) { // fork: upload to the desktop, then insert the saved paths
+						const editor = editorRef.current;
+						const files = Array.from(e.currentTarget.files ?? []);
+						e.currentTarget.value = "";
+						if (files.length === 0) return;
+						setNotice("Uploading…");
+						void uploadFilesToDesktop(files).then(({ paths, errors }) => {
+							if (paths.length > 0 && editor?.isConnected) editor.dispatchEvent(new CustomEvent(INSERT_FILE_PATHS_EVENT, { detail: paths }));
+							setNotice(errors.join(" · "));
+						});
+						return;
+					}
 					const { paths } = resolve ? pathsForFiles(Array.from(e.currentTarget.files ?? []), resolve) : { paths: [] };
 					if (paths.length > 0) editorRef.current?.dispatchEvent(new CustomEvent(INSERT_FILE_PATHS_EVENT, { detail: paths }));
 					e.currentTarget.value = ""; // allow re-picking the same file
 				}}
 			/>
-			<Hint label={desktop ? "Attach files or a folder" : BROWSER_NOTICE}>
+			<Hint label={desktop ? "Attach files or a folder" : remote ? "Attach files" : BROWSER_NOTICE}>
 				<button
 					ref={buttonRef}
 					type="button"
 					aria-label="Attach files"
-					aria-disabled={!desktop}
+					aria-disabled={!desktop && !remote}
 					aria-haspopup="menu"
 					aria-expanded={open}
 					data-testid="attach-files"
-					onClick={() => { if (desktop) { setNotice(""); setOpen(!open); } }}
+					onClick={() => { if (desktop) { setNotice(""); setOpen(!open); } else if (remote) { setNotice(""); pickerRef.current?.click(); } }}
 					className="flex size-10 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted-foreground"
 				>
 					<PaperclipIcon className="size-4" />

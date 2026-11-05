@@ -15,9 +15,19 @@ const { HEADER } = require("./desktop-api.cjs");
 
 const COOKIE = "lh_remote";
 const PAIR_PATH = "/_remote/pair";
+const STATUS_PATH = "/_remote/status";
+const UPLOAD_PATH = "/_remote/upload";
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const PAIR_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_PORT = 47800;
 const TOKEN_MAX_AGE_S = 365 * 24 * 60 * 60;
+
+/** A filesystem-safe basename; never empty, never a path. */
+function safeFileName(raw) {
+	const base = String(raw ?? "").split(/[\\/]/).pop() ?? "";
+	const cleaned = base.replace(/[\u0000-\u001f<>:"|?*]/g, "_").replace(/^[.\s]+|[.\s]+$/g, "").slice(0, 120);
+	return cleaned || "upload";
+}
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -94,8 +104,9 @@ function fileStore(file) {
  * @param {() => string | null} [o.lanHost]
  * @param {() => {name: string, address: string}[]} [o.networks]
  * @param {(snapshot: any) => void} [o.onChange]
+ * @param {string | null} [o.uploadDir] where phone attachments are saved (null = uploads off)
  */
-function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {} }) {
+function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {}, uploadDir = null }) {
 	let state = store.load();
 	let server = null;
 	let listening = null; // {host, port}
@@ -186,10 +197,45 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		return device;
 	}
 
+	const json = (res, status, body) => {
+		res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+		res.end(JSON.stringify(body));
+	};
+
+	/** Raw-body upload (?name=…) → saved under uploadDir/<date>/<random>/<name>; replies {path}. */
+	function handleUpload(req, res, url) {
+		const own = listening ? `http://${listening.host}:${listening.port}` : null;
+		if (req.method !== "POST" || req.headers.origin !== own) return json(res, 403, { error: "Forbidden." });
+		if (!uploadDir) return json(res, 503, { error: "Uploads are unavailable." });
+		const declared = Number(req.headers["content-length"] ?? 0);
+		if (declared > MAX_UPLOAD_BYTES) { req.resume(); return json(res, 413, { error: "File is larger than 100 MB." }); }
+		const day = new Date(now()).toISOString().slice(0, 10);
+		const dir = require("node:path").join(uploadDir, day, randomBytes(4).toString("hex"));
+		const file = require("node:path").join(dir, safeFileName(url.searchParams.get("name")));
+		fs.mkdirSync(dir, { recursive: true });
+		const out = fs.createWriteStream(file, { flags: "wx" });
+		let bytes = 0;
+		let failed = false;
+		const fail = (status, error) => {
+			if (failed) return;
+			failed = true;
+			req.unpipe(out); out.destroy(); req.resume();
+			fs.rm(dir, { recursive: true, force: true }, () => {});
+			json(res, status, { error });
+		};
+		req.on("data", (chunk) => { bytes += chunk.length; if (bytes > MAX_UPLOAD_BYTES) fail(413, "File is larger than 100 MB."); });
+		req.on("aborted", () => fail(400, "Upload interrupted."));
+		out.on("error", () => fail(500, "Could not save the file."));
+		out.on("finish", () => { if (!failed) { log("[remote] upload saved"); json(res, 200, { path: file }); } });
+		req.pipe(out);
+	}
+
 	function onRequest(req, res) {
 		const url = new URL(req.url ?? "/", "http://remote.invalid");
 		if (url.pathname === PAIR_PATH) return handlePair(req, res, url);
 		if (!authorize(req)) return send(res, 401, page("Not paired", "Open LearnHarness on your computer, go to Settings → Remote, and scan the QR code with this device."));
+		if (url.pathname === STATUS_PATH) return json(res, 200, { remote: true, uploads: !!uploadDir });
+		if (url.pathname === UPLOAD_PATH) return handleUpload(req, res, url);
 		const upstream = target();
 		if (!upstream) return send(res, 503, page("Unavailable", "The desktop server is not running."));
 		const headers = forwardHeaders(req, upstream);
@@ -319,6 +365,7 @@ function installRemoteControl({ app, ipcMain, BrowserWindow, path, trusted, orig
 		store: fileStore(path.join(app.getPath("userData"), "remote-control.json")),
 		target: () => ({ origin, secret: secret() }),
 		log,
+		uploadDir: path.join(app.getPath("userData"), "remote-uploads"),
 		onChange: (snapshot) => {
 			for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:remote:changed", snapshot);
 		},
@@ -332,4 +379,4 @@ function installRemoteControl({ app, ipcMain, BrowserWindow, path, trusted, orig
 	return rc;
 }
 
-module.exports = { createRemoteControl, installRemoteControl, fileStore, defaultLanHost, listNetworks, stripOwnCookie, parseCookies, COOKIE, PAIR_PATH };
+module.exports = { safeFileName, createRemoteControl, installRemoteControl, fileStore, defaultLanHost, listNetworks, stripOwnCookie, parseCookies, COOKIE, PAIR_PATH };

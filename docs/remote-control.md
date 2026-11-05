@@ -13,10 +13,10 @@ Fork-only feature: control the running desktop app from a phone on the home LAN.
 
 ## Steps
 
-1. LAN proxy and pairing (`electron/remote-control.cjs`), with tests. ← current
-2. Main/preload wiring, plus the Settings → Remote section with the QR code.
-3. Phone behavior: hide settings that depend on Electron, and add browser file upload for attachments if the picker only passes local paths.
-4. Responsive pass at ~390px, starting with chat and Claude Code sessions.
+1. ✅ LAN proxy and pairing (`electron/remote-control.cjs`), with tests.
+2. ✅ Main/preload wiring, plus the Settings → Remote section with the QR code and network picker.
+3. ✅ Phone attachments. The paperclip uploads to the proxy's `/_remote/upload`, and the saved desktop path is inserted like a desktop attachment. Uploads are saved under `userData/remote-uploads/<date>/<random>/<name>` and kept indefinitely (owner choice), with a 100 MB cap per file. Settings that depend on Electron already hide themselves because `window.lh` is absent on the phone.
+4. ✅ Phone layout (`app/phone.css`, `components/phone.tsx`): sidebar drawer, full-screen Settings, compact chat header, capped question dock, desktop dictation hidden.
 
 ## Minor decisions (recommended defaults taken)
 
@@ -24,3 +24,8 @@ Fork-only feature: control the running desktop app from a phone on the home LAN.
 - The QR code is rendered in the renderer with the `qrcode` package. That keeps the Electron asar's dependency allow-list unchanged.
 - State-changing requests carrying a foreign `Origin` header are rejected (403). The proxy rewrites `Host` and `Origin` to the loopback target so Next's server-action origin check passes.
 - Responses can carry an absolute `Location` header pointing at the loopback origin. The proxy rewrites those to relative paths.
+
+## Notes
+
+- If Agent → File access is set to "Restrict to listed folders", add `%APPDATA%LearnHarnessemote-uploads` to the allowed list, or the agent can't read phone attachments.
+- Upload routes (`/_remote/status`, `/_remote/upload`) are answered by the proxy and never reach the Next server. They require a paired device, and uploads also require a same-origin `Origin` header.

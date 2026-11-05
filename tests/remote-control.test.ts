@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const require = createRequire(import.meta.url);
 const { createRemoteControl, stripOwnCookie, COOKIE } = require("../electron/remote-control.cjs");
@@ -23,11 +26,12 @@ async function fixture() {
 	const origin = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
 	let saved: unknown = null;
 	const store = { load: () => ({ enabled: false, port: 0, host: "127.0.0.1", devices: [] }), save: (s: unknown) => { saved = s; } };
-	const rc = createRemoteControl({ store, target: () => ({ origin, secret }) });
+	const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-remote-"));
+	const rc = createRemoteControl({ store, target: () => ({ origin, secret }), uploadDir });
 	const snap = await rc.control({ op: "enable" });
 	const base: string = snap.url;
-	const close = async () => { await rc.stop(); await new Promise((r) => upstream.close(r)); };
-	return { rc, base, origin, seen, close, saved: () => saved };
+	const close = async () => { await rc.stop(); await new Promise((r) => upstream.close(r)); fs.rmSync(uploadDir, { recursive: true, force: true }); };
+	return { rc, base, origin, seen, close, uploadDir, saved: () => saved };
 }
 
 function request(url: string, opts: http.RequestOptions = {}, body?: string) {
@@ -154,6 +158,31 @@ test("network picker lists external IPv4 adapters and restarts the listener on t
 		assert.equal((await rc.control({ op: "setHost", host: null })).host, null);
 		assert.equal("host" in saved, false);
 	} finally { await rc.stop(); }
+});
+
+test("phone uploads: paired same-origin only, saved under uploadDir with a safe name, size-capped", async () => {
+	const f = await fixture();
+	try {
+		assert.equal((await request(`${f.base}/_remote/status`)).status, 401, "status needs pairing");
+		assert.equal((await request(`${f.base}/_remote/upload?name=a.txt`, { method: "POST", headers: { Origin: f.base } }, "x")).status, 401);
+		const { cookie } = await pair(f.rc);
+		const status = await request(`${f.base}/_remote/status`, { headers: { Cookie: cookie } });
+		assert.deepEqual(JSON.parse(status.body), { remote: true, uploads: true });
+
+		const evil = await request(`${f.base}/_remote/upload?name=a.txt`, { method: "POST", headers: { Cookie: cookie, Origin: "http://evil.invalid" } }, "x");
+		assert.equal(evil.status, 403);
+
+		const ok = await request(`${f.base}/_remote/upload?name=${encodeURIComponent("../../evil<1>.txt")}`, { method: "POST", headers: { Cookie: cookie, Origin: f.base } }, "hello phone");
+		assert.equal(ok.status, 200);
+		const saved: string = JSON.parse(ok.body).path;
+		assert.equal(path.basename(saved), "evil_1_.txt");
+		assert.ok(path.resolve(saved).startsWith(path.resolve(f.uploadDir) + path.sep), "stays inside uploadDir");
+		assert.equal(fs.readFileSync(saved, "utf8"), "hello phone");
+
+		const big = await request(`${f.base}/_remote/upload?name=big.bin`, { method: "POST", headers: { Cookie: cookie, Origin: f.base, "Content-Length": String(101 * 1024 * 1024) } });
+		assert.equal(big.status, 413);
+		assert.equal(f.seen.length, 0, "upload routes never reach the Next server");
+	} finally { await f.close(); }
 });
 
 test("stripOwnCookie keeps other cookies only", () => {
