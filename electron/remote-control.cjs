@@ -27,14 +27,20 @@ function safeEqualHex(a, b) {
 	return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
 }
 
-/** First non-internal IPv4 address, or null. */
-function defaultLanHost(interfaces = os.networkInterfaces()) {
-	for (const list of Object.values(interfaces)) {
+/** Non-internal IPv4 adapters, in OS order: [{name, address}]. */
+function listNetworks(interfaces = os.networkInterfaces()) {
+	const out = [];
+	for (const [name, list] of Object.entries(interfaces)) {
 		for (const addr of list ?? []) {
-			if ((addr.family === "IPv4" || addr.family === 4) && !addr.internal) return addr.address;
+			if ((addr.family === "IPv4" || addr.family === 4) && !addr.internal) out.push({ name, address: addr.address });
 		}
 	}
-	return null;
+	return out;
+}
+
+/** Fallback when no network was picked: the first non-internal IPv4, or null. */
+function defaultLanHost(interfaces = os.networkInterfaces()) {
+	return listNetworks(interfaces)[0]?.address ?? null;
 }
 
 function parseCookies(header) {
@@ -86,9 +92,10 @@ function fileStore(file) {
  * @param {(line: string) => void} [o.log]
  * @param {() => number} [o.now]
  * @param {() => string | null} [o.lanHost]
+ * @param {() => {name: string, address: string}[]} [o.networks]
  * @param {(snapshot: any) => void} [o.onChange]
  */
-function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, onChange = () => {} }) {
+function createRemoteControl({ store, target, log = () => {}, now = Date.now, lanHost = defaultLanHost, networks = listNetworks, onChange = () => {} }) {
 	let state = store.load();
 	let server = null;
 	let listening = null; // {host, port}
@@ -106,6 +113,8 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 			listening: !!listening,
 			url: listening ? `http://${listening.host}:${listening.port}` : null,
 			error: lastError,
+			host: state.host ?? null, // null = automatic (first adapter)
+			networks: networks(),
 			devices: state.devices.map(({ id, name, createdAt, lastSeen }) => ({ id, name, createdAt, lastSeen })),
 		};
 	}
@@ -260,6 +269,15 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		return snapshot();
 	}
 
+	/** Pick the adapter to listen on (null = automatic); restarts a live listener. */
+	async function setHost(host) {
+		if (host !== null && !networks().some((n) => n.address === host)) throw new Error("That network isn’t available on this computer.");
+		if (host === null) delete state.host; else state.host = host;
+		persist();
+		if (state.enabled) { await stop(); await start(); }
+		return snapshot();
+	}
+
 	/** New one-time pairing URL; replaces any previous unused code. */
 	function newPairing() {
 		if (!listening) throw new Error("Remote control is not listening.");
@@ -284,6 +302,7 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 			case "enable": return setEnabled(true);
 			case "disable": return setEnabled(false);
 			case "pair": return newPairing();
+			case "setHost": return setHost(typeof command.host === "string" ? command.host : null);
 			case "revoke": return revoke(String(command.id ?? ""));
 			default: throw new Error("Unknown remote control request.");
 		}
@@ -313,4 +332,4 @@ function installRemoteControl({ app, ipcMain, BrowserWindow, path, trusted, orig
 	return rc;
 }
 
-module.exports = { createRemoteControl, installRemoteControl, fileStore, defaultLanHost, stripOwnCookie, parseCookies, COOKIE, PAIR_PATH };
+module.exports = { createRemoteControl, installRemoteControl, fileStore, defaultLanHost, listNetworks, stripOwnCookie, parseCookies, COOKIE, PAIR_PATH };

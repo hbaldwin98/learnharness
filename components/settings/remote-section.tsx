@@ -4,17 +4,23 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
-import { SettingsRow, Toggle } from "./controls.tsx";
+import { SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
 
 export type RemoteSnapshot = {
 	enabled: boolean;
 	listening: boolean;
 	url: string | null;
 	error: string | null;
+	/** Chosen adapter address; null = automatic (first adapter). */
+	host: string | null;
+	networks: { name: string; address: string }[];
 	devices: { id: string; name: string; createdAt: string; lastSeen: string }[];
 };
 
-type RemoteCommand = { op: "status" | "enable" | "disable" | "pair" } | { op: "revoke"; id: string };
+type RemoteCommand =
+	| { op: "status" | "enable" | "disable" | "pair" }
+	| { op: "revoke"; id: string }
+	| { op: "setHost"; host: string | null };
 
 export type RemoteControlBridge = {
 	control: (command: RemoteCommand) => Promise<unknown>;
@@ -56,6 +62,11 @@ export function RemoteSection() {
 		setBusy(true);
 		try { setSnap((await bridge.control({ op: on ? "enable" : "disable" })) as RemoteSnapshot); } finally { setBusy(false); }
 	};
+	const pickNetwork = async (value: string) => {
+		setBusy(true);
+		try { setSnap((await bridge.control({ op: "setHost", host: value === "" ? null : value })) as RemoteSnapshot); } finally { setBusy(false); }
+	};
+	const missing = snap.host !== null && !snap.networks.some((n) => n.address === snap.host);
 	const pair = async () => {
 		const { url, expiresAt } = (await bridge.control({ op: "pair" })) as { url: string; expiresAt: number };
 		setQr({ src: await QRCode.toDataURL(url, { margin: 1, width: 220 }), expiresAt });
@@ -69,6 +80,13 @@ export function RemoteSection() {
 				testid="row-remote-enabled"
 			>
 				<Toggle checked={snap.enabled} disabled={busy} onChange={(on) => void toggle(on)} label="Remote control" />
+			</SettingsRow>
+			<SettingsRow label="Network" hint="Pick your home Wi-Fi or Ethernet adapter. Tailscale works too, if your phone runs it." testid="row-remote-network">
+				<ThinSelect value={snap.host ?? ""} onChange={(v) => void pickNetwork(v)} ariaLabel="Remote control network" testid="remote-network" disabled={busy}>
+					<option value="">Automatic{snap.networks[0] ? ` (${snap.networks[0].name})` : ""}</option>
+					{missing && <option value={snap.host ?? ""}>{snap.host} (unavailable)</option>}
+					{snap.networks.map((n) => <option key={`${n.name}-${n.address}`} value={n.address}>{n.name} · {n.address}</option>)}
+				</ThinSelect>
 			</SettingsRow>
 			{snap.listening && (
 				<SettingsRow label="Pair a phone" hint="Scan with your phone's camera. The code works once and expires in 5 minutes." testid="row-remote-pair">

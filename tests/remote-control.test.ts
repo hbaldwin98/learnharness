@@ -130,6 +130,32 @@ test("revoke removes access and disable closes the listener", async () => {
 	} finally { await f.close(); }
 });
 
+test("network picker lists external IPv4 adapters and restarts the listener on the chosen one", async () => {
+	const { listNetworks } = require("../electron/remote-control.cjs");
+	assert.deepEqual(listNetworks({
+		"Loopback": [{ family: "IPv4", address: "127.0.0.1", internal: true }],
+		"Wi-Fi": [{ family: "IPv6", address: "fe80::1", internal: false }, { family: "IPv4", address: "192.168.1.20", internal: false }],
+		"Tailscale": [{ family: "IPv4", address: "100.82.105.116", internal: false }],
+	}), [{ name: "Wi-Fi", address: "192.168.1.20" }, { name: "Tailscale", address: "100.82.105.116" }]);
+
+	let saved: any = null;
+	const store = { load: () => ({ enabled: true, port: 0, devices: [] }), save: (s: unknown) => { saved = s; } };
+	const nets = [{ name: "Loop A", address: "127.0.0.1" }, { name: "Loop B", address: "127.0.0.2" }];
+	const rc = createRemoteControl({ store, target: () => null, networks: () => nets, lanHost: () => "127.0.0.1" });
+	await rc.boot();
+	try {
+		assert.match(rc.snapshot().url, /^http:\/\/127\.0\.0\.1:/);
+		assert.equal(rc.snapshot().host, null);
+		await assert.rejects(rc.control({ op: "setHost", host: "10.9.9.9" }), /isn’t available/);
+		const snap = await rc.control({ op: "setHost", host: "127.0.0.2" });
+		assert.equal(snap.host, "127.0.0.2");
+		assert.match(snap.url, /^http:\/\/127\.0\.0\.2:/);
+		assert.equal(saved.host, "127.0.0.2");
+		assert.equal((await rc.control({ op: "setHost", host: null })).host, null);
+		assert.equal("host" in saved, false);
+	} finally { await rc.stop(); }
+});
+
 test("stripOwnCookie keeps other cookies only", () => {
 	assert.equal(stripOwnCookie(`a=1; ${COOKIE}=x; b=2`), "a=1; b=2");
 	assert.equal(stripOwnCookie(`${COOKIE}=x`), undefined);
