@@ -197,8 +197,9 @@ function createRemoteControl({ store, target, log = () => {}, now = Date.now, la
 		state.devices.push({ id: randomBytes(8).toString("hex"), name: deviceName(req.headers["user-agent"]), hash: sha256(token), createdAt: stamp, lastSeen: stamp });
 		persist();
 		log("[remote] device paired");
-		send(res, 302, "", {
-			Location: "/",
+		// A real page, not an empty 302: through `tailscale serve`, iOS Safari saved the
+		// empty redirect body as a "pair.txt" download. The page forwards to the app.
+		send(res, 200, `<!doctype html><html><head><meta charset="utf-8">${pwa.HEAD_TAGS}<meta http-equiv="refresh" content="0;url=/"><title>Paired</title></head><body style="font-family:system-ui;background:#141414;color:#e5e5e5;padding:32px 24px"><p>Paired. Opening LearnHarness…</p><script>location.replace("/")</script></body></html>`, {
 			"Set-Cookie": `${COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${TOKEN_MAX_AGE_S}; Expires=${new Date(now() + TOKEN_MAX_AGE_S * 1000).toUTCString()}`, // Lax: iOS home-screen cold launches drop Strict cookies; writes are origin-checked
 		});
 	}

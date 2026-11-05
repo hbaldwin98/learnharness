@@ -50,7 +50,9 @@ function request(url: string, opts: http.RequestOptions = {}, body?: string) {
 async function pair(rc: any) {
 	const { url } = await rc.control({ op: "pair" });
 	const res = await request(url, { headers: { "User-Agent": "Mozilla/5.0 (iPhone)" } });
-	assert.equal(res.status, 302);
+	assert.equal(res.status, 200);
+	assert.match(String(res.headers["content-type"]), /^text\/html/);
+	assert.match(res.body, /location\.replace\("\/"\)/);
 	const cookie = String(res.headers["set-cookie"]?.[0]).split(";")[0] ?? "";
 	assert.match(cookie, new RegExp(`^${COOKIE}=[0-9a-f]{64}$`));
 	assert.match(String(res.headers["set-cookie"]?.[0]), /HttpOnly; SameSite=Lax; Path=\/; Max-Age=31536000; Expires=/);
@@ -226,7 +228,7 @@ test("in-app pairing: the short code pairs once, consumes the QR link too, and w
 		assert.match(wrong.body, /didn’t match/);
 
 		const ok = await postForm(`${f.base}/_remote/pair-code`, f.base, shortCode.toLowerCase());
-		assert.equal(ok.status, 302);
+		assert.equal(ok.status, 200);
 		assert.match(String(ok.headers["set-cookie"]?.[0]), /^lh_remote=[0-9a-f]{64};/);
 		assert.equal((await request(url)).status, 403, "QR link consumed by the code");
 		assert.equal((await postForm(`${f.base}/_remote/pair-code`, f.base, shortCode)).status, 403, "code is single use");
@@ -273,7 +275,7 @@ test("Tailscale: HTTPS origin is trusted for writes and used in QR links once se
 
 		const { shortCode } = await f.rc.control({ op: "pair" });
 		const paired = await postForm(`${f.base}/_remote/pair-code`, "https://pc.tail.ts.net", shortCode);
-		assert.equal(paired.status, 302, "pairing form accepted from the HTTPS origin");
+		assert.equal(paired.status, 200, "pairing form accepted from the HTTPS origin");
 		const cookie = String(paired.headers["set-cookie"]?.[0]).split(";")[0] ?? "";
 		const post = await request(`${f.base}/api/chats`, { method: "POST", headers: { Cookie: cookie, Origin: "https://pc.tail.ts.net", Referer: "https://pc.tail.ts.net/chat/x" } }, "{}");
 		assert.equal(post.status, 200);
