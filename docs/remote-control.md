@@ -27,5 +27,5 @@ Fork-only feature: control the running desktop app from a phone on the home LAN.
 
 ## Notes
 
-- If Agent → File access is set to "Restrict to listed folders", add `%APPDATA%LearnHarnessemote-uploads` to the allowed list, or the agent can't read phone attachments.
+- If Agent → File access is set to "Restrict to listed folders", add `%APPDATA%/LearnHarness/remote-uploads` to the allowed list, or the agent can't read phone attachments.
 - Upload routes (`/_remote/status`, `/_remote/upload`) are answered by the proxy and never reach the Next server. They require a paired device, and uploads also require a same-origin `Origin` header.
