@@ -60,3 +60,12 @@ html[data-lh-phone] [data-testid="dictation-toggle"],
 html[data-lh-phone] *:has(> [data-testid="dictation-toggle"]):not(:has(> :not([data-testid="dictation-toggle"]))) {
 	display: none;
 }
+
+/* Chat header chips go icon-only so the title has room (labels stay in the accessibility tree). */
+html[data-lh-phone] :is([data-testid="readings-chip"], [data-testid="workspace-chip"], [data-testid="plan-chip"], [data-testid="phase-chip"]) {
+	font-size: 0;
+	gap: 0.25rem;
+}
+html[data-lh-phone] [data-testid="readings-chip"] > span {
+	font-size: 0.75rem;
+}
