@@ -452,3 +452,9 @@ button[role="switch"][aria-checked="true"] {
 .cm-gutters {
 	background-color: var(--lh-bg-editor);
 }
+
+/* Teaching transcript: a 760px column, centered (Teaching board).
+   Upstream runs it full width (max-w-none). */
+[data-session-find-root].max-w-none {
+	max-width: 760px;
+}
