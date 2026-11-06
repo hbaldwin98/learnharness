@@ -458,3 +458,42 @@ button[role="switch"][aria-checked="true"] {
 [data-session-find-root].max-w-none {
 	max-width: 760px;
 }
+
+/* New session (Home board): no empty-state blurb, the composer centered
+   under the display heading (components/lh/new-session-hero.tsx). */
+[data-lh-new-session] .sticky.mt-auto {
+	position: static;
+	margin-block: auto;
+}
+[data-lh-new-session] .sticky.mt-auto > :first-child,
+[data-lh-new-session] .sticky.mt-auto > .h-24 {
+	display: none;
+}
+[data-lh-new-session] .sticky.mt-auto > .bg-background {
+	background: transparent;
+	padding-bottom: 8vh;
+}
+[data-lh-new-session] .max-w-\[46rem\] {
+	max-width: 712px;
+}
+.lh-hero {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 28px;
+}
+.lh-hero-kicker {
+	font-size: 13px;
+	color: var(--lh-ink-muted);
+}
+.lh-hero-title {
+	margin: 0;
+	font-size: 40px;
+	font-weight: 600;
+	line-height: 1.08;
+	letter-spacing: -0.04em;
+	color: var(--lh-ink);
+}
+.lh-hero-muted {
+	color: var(--lh-ink-faint);
+}

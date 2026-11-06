@@ -60,3 +60,6 @@ Build plus the existing tests after each step. Then run the app and take a scree
 - Skipped: the graph popover, and the #141414 / #888888 fallbacks. Those are edge-case fallbacks that are never visible with the theme on.
 - Upstream touches: `chat.tsx` (+3 lines), `home.tsx` (+2, 1 copy), `new-session.tsx` (1 copy), `reading-view.tsx` (+2), `confidence-rail.tsx` (7 values wrapped in var()). All marked `// fork: graphite`.
 - Gates: build green. Tests: same 27 failures as unmodified main (Windows baseline), no new ones.
+- Follow-up after the screenshot review:
+  - The transcript is capped at 760px.
+  - `/chat/new` now centers the composer under a display heading (`components/lh/new-session-hero.tsx`) and shows the resume cards. Upstream touch: `new-session.tsx`, which gets a data attribute and two mounts.
