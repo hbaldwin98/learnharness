@@ -18,6 +18,8 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
 import { newSessionReturnKey, saveDeepDiveReturn, takeDeepDiveReturn } from "@/components/deep-dive-return";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
+import { NewSessionHero } from "@/components/lh/new-session-hero"; // fork: graphite
+import { ResumeCards } from "@/components/lh/resume-cards"; // fork: graphite
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
  *  bar lifts — resolved nodes as the learner SAW them at pick time. */
@@ -173,7 +175,7 @@ export function DraftShell({
 		 * (the only pointer-events-auto spot), the empty state carrying the
 		 * orientation. The chain picker then owns the column top exactly
 		 * like the graph view's — no stacked bars. */
-		<div className="relative flex h-dvh">
+		<div className="relative flex h-dvh" data-lh-new-session="" /* fork: graphite */>
 			{/* Window-drag strip — deliberately FIRST in the DOM (the mask
 			    law: no-drag subtraction resolves by DOM order, so every
 			    carved control later in the tree subtracts correctly). */}
@@ -199,6 +201,7 @@ export function DraftShell({
 						<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 						<div className="bg-background pb-4">
 							<div className={DOCK}>
+								<NewSessionHero mode={mode} /> {/* fork: graphite */}
 								<ComposerActions
 									picker={
 										(picks.length > 0 || mode === "practice" || primerAction) && (
@@ -228,13 +231,14 @@ export function DraftShell({
 										// input (owner refinement round, 2026-09-24) — no lesson has
 										// started yet, so the composer must not read like one is in
 										// flight.
-										placeholder={mode === "practice" ? "What do you want to practice?" : "What do you want to learn?"}
+										placeholder={mode === "practice" ? "What do you want to practice?" : "A topic, a question, or something you're stuck on…" /* fork: graphite */}
 									/>
 								</div>
 								<StatsBar
 									dictationSlot={<DictationBar dictation={dictation} />}
 									turns={[]}
 								/>
+								<ResumeCards /> {/* fork: graphite */}
 							</div>
 						</div>
 					</div>

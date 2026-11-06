@@ -55,6 +55,43 @@
 	--lh-graphite-accent-ink: #b4b9ff;
 	--lh-graphite-sidebar: #0e0e11;
 
+	/* The full Graphite token set (Tokens board), as --lh-* aliases. */
+	--lh-bg: #08080a;
+	--lh-bg-editor: #0b0b0d;
+	--lh-bg-sidebar: #0e0e11;
+	--lh-bg-modal: #0f0f12;
+	--lh-surface: #111114;
+	--lh-surface-2: #141418;
+	--lh-inset: #16161a;
+	--lh-chip: #17171b;
+	--lh-hover: #1a1a1f;
+	--lh-control: #1d1d22;
+	--lh-control-on: #26262c;
+	--lh-track: #2a2a30;
+	--lh-ink: #ededef;
+	--lh-ink-body: #d6d8dd;
+	--lh-ink-2: #c4c7ce;
+	--lh-ink-3: #a9adb5;
+	--lh-ink-muted: #8a8f98;
+	--lh-ink-faint: #6e727b;
+	--lh-ink-sep: #4a4d55;
+	--lh-accent: #8b93ff;
+	--lh-accent-ink: #b4b9ff;
+	--lh-accent-soft: rgb(139 147 255 / 0.12);
+	--lh-success: #9fd8c4;
+	--lh-warn: #e8c38a;
+	--lh-danger: #f2907f;
+	--lh-line: rgb(255 255 255 / 0.06);
+	--lh-line-control: rgb(255 255 255 / 0.08);
+	--lh-line-strong: rgb(255 255 255 / 0.1);
+	--lh-shadow-card: 0 20px 50px rgb(0 0 0 / 0.4);
+	--lh-shadow-popover: 0 24px 60px rgb(0 0 0 / 0.55);
+	--lh-shadow-modal: 0 40px 100px rgb(0 0 0 / 0.6);
+	--lh-scrim: rgb(4 4 6 / 0.72);
+
+	/* Reading prose breathes more (16/1.7). Appearance settings still win. */
+	--lh-prose-leading: 1.7;
+
 	/* Fonts: Geist for everything, Geist Mono for code/numbers. */
 	--lh-graphite-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
 	--lh-graphite-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
@@ -103,4 +140,360 @@ pre {
 .tracking-wider:not(.lh-keep-caps),
 .tracking-widest:not(.lh-keep-caps) {
 	letter-spacing: normal;
+}
+
+/* ---------- Tier 3: shell, components, overlays ---------- */
+
+/* Elevation: upstream's shadow utilities -> Graphite's deeper shadows. */
+.shadow-lg { box-shadow: var(--lh-shadow-card); }
+.shadow-xl { box-shadow: var(--lh-shadow-popover); }
+.shadow-2xl { box-shadow: var(--lh-shadow-modal); }
+
+/* Sidebar: 264px on its own ground, 13px nav rows (Home/Reading boards). */
+aside[data-lh-sidebar].w-72,
+aside[data-lh-sidebar] > .w-72 {
+	width: 264px;
+}
+aside[data-lh-sidebar] > div {
+	background: var(--lh-bg-sidebar);
+	border-right-color: var(--lh-line);
+}
+aside[data-lh-sidebar] [data-testid="new-session"],
+aside[data-lh-sidebar] [data-testid="new-session-practice"],
+aside[data-lh-sidebar] [data-testid="nav-readings"] {
+	height: 32px;
+	padding: 0 10px;
+	gap: 10px;
+	font-size: 13px;
+	color: var(--lh-ink-2);
+	border-radius: 6px;
+}
+aside[data-lh-sidebar] [data-testid="nav-readings"].bg-accent,
+aside[data-lh-sidebar] [data-testid="session-row"].bg-accent {
+	background: var(--lh-hover);
+	color: var(--lh-ink);
+}
+aside[data-lh-sidebar] [data-testid="session-row"],
+aside[data-lh-sidebar] [data-testid="session-row-kbd"] {
+	border-radius: 6px;
+	padding: 6px 10px;
+}
+aside[data-lh-sidebar] [data-testid="session-row"] .font-prose,
+aside[data-lh-sidebar] [data-testid="session-row-kbd"] .font-prose {
+	font-size: 13px;
+	color: var(--lh-ink-2);
+}
+aside[data-lh-sidebar] [data-testid="session-row"].bg-accent .font-prose {
+	color: var(--lh-ink);
+}
+
+/* Session-kind filter = the segmented control. */
+[data-testid="session-kind-filter"] {
+	background: var(--lh-inset);
+	border-color: transparent;
+	border-radius: 6px;
+	padding: 2px;
+	gap: 2px;
+}
+[data-testid="session-kind-filter"] > button {
+	height: 24px;
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 500;
+}
+[data-testid="session-kind-filter"] > button.bg-accent {
+	background: var(--lh-control-on);
+}
+
+/* Top bars: 52px (TopBar, settings/setup/workspace headers all share h-15). */
+header.h-15,
+.lh-wco-gutter.h-15 {
+	height: 52px;
+	border-bottom-color: var(--lh-line);
+}
+
+/* Chat column: 760px (the dock + transcript share max-w-[46rem]). */
+.max-w-\[46rem\] {
+	max-width: 760px;
+}
+
+/* Hairlines: chrome borders at 6%, controls keep 8%. */
+.border-b.border-border,
+.border-t.border-border,
+.border-r.border-border {
+	border-color: var(--lh-line);
+}
+
+/* Confidence rail: one accent on the track (confidence-rail.tsx reads
+   these with upstream's ramp as the fallback). */
+:root {
+	--lh-conf-0: var(--lh-accent);
+	--lh-conf-1: var(--lh-accent);
+	--lh-conf-2: var(--lh-accent);
+	--lh-conf-3: var(--lh-accent);
+	--lh-conf-4: var(--lh-accent);
+	--lh-conf-5: var(--lh-accent);
+	--lh-conf-track: var(--lh-track);
+}
+[data-testid="confidence-rail"] {
+	border-color: transparent;
+}
+
+/* Breadcrumb top bar (components/lh/breadcrumb.tsx): the session title
+   shrinks from text-3xl to the 13px/500 crumb. */
+header .font-title.text-3xl {
+	font-size: 13px;
+	line-height: 1.4;
+	font-weight: 500;
+	letter-spacing: normal;
+	color: var(--lh-ink);
+}
+.lh-crumb-prefix {
+	font-size: 13px;
+}
+.lh-crumb-section {
+	color: var(--lh-ink-muted);
+}
+.lh-crumb-sep {
+	color: var(--lh-ink-sep);
+}
+.lh-status-pill {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 6px;
+	height: 22px;
+	padding: 0 8px;
+	border-radius: 999px;
+	background: var(--lh-accent-soft);
+	color: var(--lh-accent-ink);
+	font-size: 12px;
+	font-weight: 500;
+}
+.lh-status-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: var(--lh-accent);
+}
+.lh-status-pill[data-state="working"] {
+	background: var(--lh-inset);
+	color: var(--lh-ink-2);
+}
+.lh-status-pill[data-state="working"] .lh-status-dot {
+	background: var(--lh-ink-muted);
+}
+
+/* Composers: a 12px card on surface with the card shadow (Home board). */
+form[data-attachment-composer].rounded-2xl {
+	border-radius: 12px;
+	background: var(--lh-surface);
+	border-color: var(--lh-line-control);
+}
+
+/* "Pick up where you left off" (components/lh/resume-cards.tsx). */
+.lh-resume {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-top: 28px;
+}
+.lh-resume-label {
+	font-size: 12px;
+	color: var(--lh-ink-muted);
+}
+.lh-resume-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 8px;
+}
+.lh-resume-card {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 14px 16px;
+	border-radius: 10px;
+	background: var(--lh-surface);
+	border: 1px solid var(--lh-line);
+	text-decoration: none;
+	transition: background-color 120ms;
+}
+.lh-resume-card:hover {
+	background: var(--lh-surface-2);
+}
+.lh-resume-title {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--lh-ink);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.lh-resume-meta {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--lh-ink-muted);
+}
+
+/* Home mode switch matches the sidebar's segmented control. */
+[data-testid="home-mode-switch"] {
+	background: var(--lh-inset);
+	border-color: transparent;
+	border-radius: 6px;
+	padding: 2px;
+}
+[data-testid="home-mode-switch"] > button {
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 500;
+}
+[data-testid="home-mode-switch"] > button.bg-accent {
+	background: var(--lh-control-on);
+}
+
+/* Reading: a 300px Discuss rail, 48px from the article, not sticky. */
+.lg\:grid-cols-\[minmax\(0\,1fr\)_20rem\] {
+	column-gap: 48px;
+}
+@media (width >= 64rem) {
+	.lg\:grid-cols-\[minmax\(0\,1fr\)_20rem\] {
+		grid-template-columns: minmax(0, 1fr) 300px;
+	}
+	[data-testid="discuss-column"] {
+		position: static;
+		max-height: none;
+		overflow: visible;
+		border-left-color: var(--lh-line);
+	}
+}
+[data-testid="reading-section"] > h2 {
+	font-size: 20px;
+	font-weight: 600;
+	letter-spacing: -0.02em;
+}
+
+/* "On this page" (components/lh/reading-toc.tsx). */
+.lh-toc {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid var(--lh-line);
+}
+.lh-toc[hidden] {
+	display: none;
+}
+.lh-toc-label {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--lh-ink-muted);
+}
+.lh-toc-link {
+	all: unset;
+	cursor: pointer;
+	font-size: 13px;
+	color: var(--lh-ink-2);
+}
+.lh-toc-link:hover {
+	color: var(--lh-ink);
+}
+
+/* Settings (Settings board): 14px modal on bg-modal over a blurred scrim,
+   a 200px nav, indigo switches. */
+[data-testid="settings-backdrop"] {
+	background: var(--lh-scrim);
+	backdrop-filter: blur(4px);
+}
+[data-testid="settings-dialog"] {
+	border-radius: 14px;
+	background: var(--lh-bg-modal);
+	border-color: var(--lh-line-control);
+	box-shadow: var(--lh-shadow-modal);
+}
+[data-testid="settings-dialog"] header .font-title {
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+[data-testid="settings-nav"] {
+	width: 200px;
+	background: var(--lh-bg-sidebar);
+	border-right-color: var(--lh-line);
+	padding: 10px;
+}
+[data-testid="settings-nav"] > button {
+	height: 32px;
+	padding: 0 10px;
+	border-radius: 6px;
+	font-size: 13px;
+}
+[data-testid="settings-nav"] > button[aria-current="true"] {
+	background: var(--lh-hover);
+}
+button[role="switch"] {
+	border-color: transparent;
+	background: var(--lh-track);
+}
+button[role="switch"][aria-checked="true"] {
+	background: var(--lh-accent);
+}
+
+/* Chains overlay (Chains board): deeper, blurrier veil. */
+[data-testid="chain-table-overlay"] {
+	background: rgb(8 8 10 / 0.86);
+	backdrop-filter: blur(8px);
+}
+
+/* Practice: the code editor pane sits darker than the page. */
+.cm-editor,
+.cm-gutters {
+	background-color: var(--lh-bg-editor);
+}
+
+/* Teaching transcript: a 760px column, centered (Teaching board).
+   Upstream runs it full width (max-w-none). */
+[data-session-find-root].max-w-none {
+	max-width: 760px;
+}
+
+/* New session (Home board): no empty-state blurb, the composer centered
+   under the display heading (components/lh/new-session-hero.tsx). */
+[data-lh-new-session] .sticky.mt-auto {
+	position: static;
+	margin-block: auto;
+}
+[data-lh-new-session] .sticky.mt-auto > :first-child,
+[data-lh-new-session] .sticky.mt-auto > .h-24 {
+	display: none;
+}
+[data-lh-new-session] .sticky.mt-auto > .bg-background {
+	background: transparent;
+	padding-bottom: 8vh;
+}
+[data-lh-new-session] .max-w-\[46rem\] {
+	max-width: 712px;
+}
+.lh-hero {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 28px;
+}
+.lh-hero-kicker {
+	font-size: 13px;
+	color: var(--lh-ink-muted);
+}
+.lh-hero-title {
+	margin: 0;
+	font-size: 40px;
+	font-weight: 600;
+	line-height: 1.08;
+	letter-spacing: -0.04em;
+	color: var(--lh-ink);
+}
+.lh-hero-muted {
+	color: var(--lh-ink-faint);
 }

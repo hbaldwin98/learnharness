@@ -58,6 +58,7 @@ import {
 } from "@/components/readings/api";
 import { useDiscussion } from "@/components/readings/discussion-api";
 import { blockKeys, DiscussPanel, DiscussProvider, PassageAsk, ReadingBlocks } from "@/components/readings/discussion";
+import { ReadingToc } from "@/components/lh/reading-toc"; // fork: graphite
 
 export function ModeToggle({
 	mode,
@@ -451,6 +452,7 @@ export function ReadingDocument({
 							<MessagesSquareIcon className="size-3.5" /> Discuss
 						</h2>
 						<DiscussPanel renderedBlocks={renderedBlocks} />
+						<ReadingToc /> {/* fork: graphite */}
 					</aside>
 				</div>
 			) : (
