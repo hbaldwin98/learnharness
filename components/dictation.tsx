@@ -9,7 +9,7 @@ import {
 	type DictationLanguage, type ResolvedDictationSettings,
 } from "@/src/core";
 import { useDictationSettings } from "@/components/dictation-preference";
-import { setDictationActive } from "@/components/dictation-state";
+import { isDictationActive, setDictationActive } from "@/components/dictation-state";
 import { DictationSpans, type DictationTarget } from "@/components/dictation-spans";
 import {
 	openLocalDictationPort, refreshLocalDictation, useLocalDictationSync,
@@ -190,6 +190,23 @@ let dictationFinisher: (() => Promise<void>) | null = null;
 /** Finish any live dictation run before continuing (see Dictation.finish). */
 export function finishDictation(): Promise<void> {
 	return dictationFinisher ? dictationFinisher() : Promise.resolve();
+}
+
+/* The starter registry (same shape as the finisher): lets a hand-off
+ * resume dictation from a subtree far from the hook's owner. */
+let dictationStarter: (() => void) | null = null;
+
+/**
+ * Move live dictation across a claim change without splitting text
+ * (owner, 2026-11-06): the run FINISHES into the field that owns it now,
+ * `between` changes the claim (e.g. reveals the check), and a fresh run
+ * resumes into the new owner. Idle → just `between`; nothing starts.
+ */
+export async function handOffDictation(between: () => void): Promise<void> {
+	const wasActive = isDictationActive();
+	await finishDictation();
+	between();
+	if (wasActive) dictationStarter?.();
 }
 
 /** Join dictated text onto the current text (shared separator rule). */
@@ -670,6 +687,14 @@ export function useDictation({ target }: { target: DictationTarget }): Dictation
 			if (dictationFinisher === finish) dictationFinisher = null;
 		};
 	}, [finish]);
+
+	useEffect(() => {
+		const starter = () => { void start(); };
+		dictationStarter = starter;
+		return () => {
+			if (dictationStarter === starter) dictationStarter = null;
+		};
+	}, [start]);
 
 	const toggle = useCallback(() => {
 		if (phase === "idle") void start();

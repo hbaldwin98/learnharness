@@ -26,6 +26,7 @@ export function ReadingThinkingField({
 	onEscape,
 	onOpen,
 	claim,
+	onFocus,
 }: {
 	value: string;
 	revision: number;
@@ -39,6 +40,8 @@ export function ReadingThinkingField({
 	onOpen?: () => void;
 	/** Primary dictation claim — true while the check is behind its reveal. */
 	claim: boolean;
+	/** The learner focused the field (follow-focus claim after reveal). */
+	onFocus?: () => void;
 }) {
 	const [draft, setDraft] = useState(value);
 	// Appends may arrive back-to-back before React commits. Like Chat's
@@ -66,6 +69,7 @@ export function ReadingThinkingField({
 			<PathInput
 				value={draft}
 				onValueChange={applyDraft}
+				onFocus={() => onFocus?.()}
 				/* py-0.5 (owner round, 2026-10-07): the scrollbar fix. Source
 				   Sans 3's font box is 22px at 16px; lh-input's 1.25 leading
 				   gives a 20px line box — the content area sticks 1px below the

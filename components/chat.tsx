@@ -31,7 +31,7 @@ import { dockStateKey } from "@/components/dock-state-key";
 import { clearOpeningPrompt, readOpeningPromptEntry, stashOpeningPrompt, OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { forwardDockWheel, useDockHeight } from "@/components/dock-height";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
-import { DictationBar, finishDictation, useDictation } from "@/components/dictation";
+import { DictationBar, finishDictation, handOffDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
 import { StatsBar } from "@/components/stats-bar";
@@ -2191,6 +2191,15 @@ function DockOverlay({
 	// revealed, the normal collapse machine rules apply untouched.
 	const [revealed, setRevealed] = useState(false);
 	const revealPending = requiresReveal && !revealed;
+	// FOLLOW FOCUS (owner, 2026-11-06): after the reveal, focusing the
+	// reading-thinking field takes the dictation claim back; focusing the
+	// check returns it. Scrolling alone never moves it.
+	const [readingFocused, setReadingFocused] = useState(false);
+	const readingClaim = revealPending || readingFocused;
+	const focusReading = (next: boolean) => {
+		if (revealPending || next === readingFocused) return;
+		void handOffDictation(() => setReadingFocused(next));
+	};
 
 	const pendingId = pending?.key ?? null;
 	const initialPendingRef = useRef(pendingId);
@@ -2212,6 +2221,7 @@ function DockOverlay({
 			const arrival = revealArrival(wasQuestion);
 			setExpanded(arrival.expanded);
 			setRevealed(arrival.revealed);
+			setReadingFocused(false);
 		} else if (pendingId) {
 			// Probe arrival (flicker round): open iff following at the bottom.
 			// Painted in THIS render — no stale-open frame, no after-paint flip.
@@ -2552,10 +2562,11 @@ function DockOverlay({
 										}
 									: undefined
 							}
-							claim={revealPending}
+							claim={readingClaim}
+							onFocus={() => focusReading(true)}
 						/>
 					)}
-					<div ref={shellRef} data-attachment-composer="" className="pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg">
+					<div ref={shellRef} onFocusCapture={() => focusReading(false)} data-attachment-composer="" className="pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg">
 						{/* Include descendant margins (notably practice thinking's
 						    bottom margin) in the natural content measurement. */}
 						<div
@@ -2571,12 +2582,17 @@ function DockOverlay({
 									expanded={expanded}
 									reveal={revealPending}
 									phase={phase}
-									onExpand={expandAndReveal}
+									onExpand={() => {
+										// A click can't strand a live run's unsaved text in
+										// the check: finish into the reading field, then resume.
+										if (revealPending) void handOffDictation(expandAndReveal);
+										else expandAndReveal();
+									}}
 									onSubmit={onSubmitAnswer}
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
 									onEscape={dictationCancel}
-									dictationClaim={!revealPending}
+									dictationClaim={!readingClaim}
 									compactionRunning={compactionRunning}
 								/>
 							) : practice ? (
