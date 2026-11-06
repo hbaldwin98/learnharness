@@ -2,7 +2,7 @@ import React, { act } from "react";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { parseHTML } from "linkedom";
-import { useDictation, type Dictation } from "../components/dictation.tsx";
+import { handOffDictation, useDictation, useDictationTarget, type Dictation } from "../components/dictation.tsx";
 import { notifySettingsSaved } from "../components/settings-signal.ts";
 import { useDictationLanguage } from "../components/dictation-preference.ts";
 import { isDictationActive, useDictationActive } from "../components/dictation-state.ts";
@@ -132,7 +132,8 @@ async function fixture(language: "pl" | "en" = "pl", delayedRead?: Promise<Respo
 	};
 }
 
-afterEach(async () => { await dispose?.(); restore?.(); dispose = undefined; restore = undefined; });
+let disposeClaim: (() => Promise<void>) | undefined;
+afterEach(async () => { await disposeClaim?.(); disposeClaim = undefined; await dispose?.(); restore?.(); dispose = undefined; restore = undefined; });
 
 test("waits for the saved language; reconnect preserves it and finals land live exactly once", async () => {
 	const read = deferred<Response>();
@@ -469,4 +470,50 @@ test("local engine without a downloaded model says so and opens no microphone", 
 	assert.equal(f.dictation.error, "Dictation needs a local model");
 	assert.equal(f.dictation.phase, "idle");
 	assert.equal(f.state.stops, f.state.captures, "any microphone opened was released");
+});
+
+test("hand-off: a live run finishes into its field, the claim moves, and a fresh run resumes there", async () => {
+	const f = await fixture();
+	await f.mount();
+	// The check's field: claims dictation only once `claimed` flips.
+	const check = { text: "", setClaimed: (_: boolean) => {} };
+	function Check() {
+		const [claimed, setClaimed] = React.useState(false);
+		check.setClaimed = setClaimed;
+		useDictationTarget({ read: () => check.text, write: (v) => { check.text = v; } }, claimed);
+		return null;
+	}
+	const host = document.createElement("div");
+	document.body.appendChild(host);
+	const { createRoot } = await import("react-dom/client");
+	const claimRoot = createRoot(host);
+	disposeClaim = async () => { await act(async () => { claimRoot.unmount(); }); };
+	await act(async () => { claimRoot.render(<Check />); });
+
+	await act(async () => { f.dictation.toggle(); });
+	const first = Socket.all[0]!;
+	await act(async () => { first.open(); first.final("reading thought"); });
+	let handed!: Promise<void>;
+	await act(async () => { handed = handOffDictation(() => check.setClaimed(true)); });
+	assert.equal(first.sent.at(-1), JSON.stringify({ type: "CloseStream" }), "the live run is finishing");
+	// The engine flushes held words AFTER the reveal click — they still
+	// belong to the reading field, never the check.
+	await act(async () => { first.final("still reading"); first.end(); await handed; });
+	assert.equal(f.state.text, "reading thought still reading");
+	assert.equal(check.text, "", "nothing from the first run splits into the check");
+	const second = Socket.all[1];
+	assert.ok(second, "a fresh run resumed after the hand-off");
+	await act(async () => { second.open(); second.final("check answer"); });
+	assert.equal(check.text, "check answer");
+	assert.equal(f.state.text, "reading thought still reading");
+});
+
+test("hand-off while idle only moves the claim — it never starts dictation", async () => {
+	const f = await fixture();
+	await f.mount();
+	let moved = false;
+	await act(async () => { await handOffDictation(() => { moved = true; }); });
+	assert.equal(moved, true);
+	assert.equal(Socket.all.length, 0);
+	assert.equal(f.dictation.phase, "idle");
 });
