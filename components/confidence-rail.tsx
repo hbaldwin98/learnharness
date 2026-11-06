@@ -23,19 +23,19 @@ import { CONFIDENCE_STOPS } from "@/src/core";
 
 /** The six-step ramp (owner ruling): 0 red → 100 emerald, indexed by stop. */
 export const CONFIDENCE_COLORS: readonly string[] = [
-	"#ef4444", // 0
-	"#f97316", // 30
-	"#eab308", // 50
-	"#84cc16", // 70
-	"#22c55e", // 90
-	"#10b981", // 100
+	"var(--lh-conf-0, #ef4444)", // 0
+	"var(--lh-conf-1, #f97316)", // 30
+	"var(--lh-conf-2, #eab308)", // 50
+	"var(--lh-conf-3, #84cc16)", // 70
+	"var(--lh-conf-4, #22c55e)", // 90
+	"var(--lh-conf-5, #10b981)", // 100
 ];
 
 /** The rail's paint for a stop value (0–100). */
 export function confidenceRailStyle(value: number): CSSProperties {
 	const color = CONFIDENCE_COLORS[CONFIDENCE_STOPS.indexOf(value)] ?? CONFIDENCE_COLORS[2]!;
 	return {
-		backgroundColor: "#141414",
+		backgroundColor: "var(--lh-conf-track, #141414)",
 		backgroundImage: [
 			`linear-gradient(90deg, ${color} 0%, ${color} ${value}%, transparent ${value}%, transparent 100%)`,
 			...[30, 50, 70, 90].map(

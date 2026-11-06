@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ResumeCards } from "@/components/lh/resume-cards"; // fork: graphite
 import { CornerDownLeftIcon, DumbbellIcon } from "lucide-react";
 import { GraphView } from "@/components/graph-view";
 import { MinimalHome } from "@/components/minimal-home";
@@ -289,7 +290,7 @@ export function Home({
 								void start();
 							}
 						}}
-						placeholder={mode === "practice" ? "What do you want to practice?" : "What do you want to learn?"}
+						placeholder={mode === "practice" ? "What do you want to practice?" : "What do you want to understand?" /* fork: graphite */}
 						autoFocus
 						className="field-sizing-content lh-input max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"
 					/>
@@ -334,6 +335,7 @@ export function Home({
 							</div>
 						}
 					/>
+					<ResumeCards /> {/* fork: graphite */}
 				</div>
 			</div>
 
