@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { joinDictation, useDictationTarget } from "@/components/dictation";
+import { useDictationTarget } from "@/components/dictation";
 import { composingQuestionKey, pluginQuestionKeySuppressed } from "./plugin-question-keys";
 import { PathInput } from "@/components/path-input";
 import { useOptionalInteractionLayers } from "./interaction-layers";
@@ -29,6 +29,7 @@ export function ReadingThinkingField({
 	onEscape,
 	onOpen,
 	claim,
+	onFocus,
 	inputRef,
 }: {
 	value: string;
@@ -43,12 +44,15 @@ export function ReadingThinkingField({
 	onOpen?: () => void;
 	/** Primary dictation claim — true while the check is behind its reveal. */
 	claim: boolean;
+	/** The learner focused the field (follow-focus claim after reveal). */
+	onFocus?: () => void;
 	inputRef?: RefObject<HTMLDivElement | null>;
 }) {
 	const controller = useOptionalInteractionLayers();
 	const [draft, setDraft] = useState(value);
 	// Appends may arrive back-to-back before React commits. Like Chat's
-	// submit mirror, this ref includes every edit synchronously.
+	// submit mirror, this ref includes every edit synchronously, so live
+	// dictation reads what it just wrote.
 	const draftRef = useRef(value);
 	useLayoutEffect(() => { draftRef.current = value; setDraft(value); }, [revision, value]);
 	const applyDraft = useCallback((next: string) => {
@@ -57,7 +61,7 @@ export function ReadingThinkingField({
 		onChange(next);
 	}, [onChange]);
 	useDictationTarget(
-		useCallback((text: string) => applyDraft(joinDictation(draftRef.current, text)), [applyDraft]),
+		{ read: () => draftRef.current, write: applyDraft },
 		claim,
 	);
 	return (
@@ -72,6 +76,7 @@ export function ReadingThinkingField({
 				ref={inputRef}
 				value={draft}
 				onValueChange={applyDraft}
+				onFocus={() => onFocus?.()}
 				/* py-0.5 (owner round, 2026-10-07): the scrollbar fix. Source
 				   Sans 3's font box is 22px at 16px; lh-input's 1.25 leading
 				   gives a 20px line box — the content area sticks 1px below the

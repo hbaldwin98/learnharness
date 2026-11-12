@@ -58,6 +58,7 @@ import type { UpdateState } from "@/components/settings/update-settings.tsx";
 import { FilePathDropZone } from "@/components/file-path-drop-zone";
 import type { RemoteControlBridge } from "@/components/settings/remote-section"; // fork: phone remote control
 import { isPhone, PhoneDrawerBackdrop, usePhone, usePhoneDrawerAutoClose } from "@/components/phone"; // fork: phone layout
+import type { LocalDictationBridge } from "@/components/local-dictation";
 const SIDEBAR_AUTOCLOSE = 928;
 
 // Module scope, guarded for SSR (the server has no navigator).
@@ -80,6 +81,8 @@ declare global {
 			subscriptions?: NativeSubscriptionControlBridge;
 			/** Fork: phone remote control (components/settings/remote-section.tsx). */
 			remote?: RemoteControlBridge;
+			/** Local dictation (electron/dictation.cjs). */
+			dictation?: LocalDictationBridge;
 			expandWindow: () => void;
 			/** Native chrome follows the active theme (theme wave): main sets
 			 *  themeSource and repaints the window background / overlay. */

@@ -46,7 +46,7 @@ async function fixture() {
 	Object.defineProperty(dom.document, "activeElement", { get: () => active });
 	dom.window.HTMLElement.prototype.focus = function () { active = this; };
 	const state = {
-		core: [] as string[], question: [] as string[], plugin: [] as string[], other: [] as string[],
+		core: "", question: "", plugin: [] as string[], other: [] as string[],
 		questionClaimed: false, showPlugin: true, showCore: true, disabled: false, captures: 0, stops: 0,
 		append: undefined as ((text: string) => void | Promise<void>) | undefined,
 		mic: undefined as Promise<{ getTracks: () => { stop: () => void }[] }> | undefined,
@@ -64,7 +64,7 @@ async function fixture() {
 		fetch: async (url: string) => {
 			if (url === "/api/stt/token") return Response.json({ token: "test-token" });
 			assert.equal(url, "/api/settings");
-			return Response.json({ settings: { version: 1, dictation: { language: "en" } } });
+			return Response.json({ settings: { version: 1, dictation: { engine: "deepgram", language: "en" } } });
 		},
 	})) {
 		previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
@@ -87,12 +87,12 @@ async function fixture() {
 		return <div id="plugin"><textarea id="plugin-input" /><button id="plugin-button">Dictate</button></div>;
 	}
 	function Core() {
-		core = useDictation({ append: (text) => { state.core.push(text); } });
+		core = useDictation({ target: { read: () => state.core, write: (v) => { state.core = v; } } });
 		return <textarea id="core" />;
 	}
 	function Harness() {
 		other = usePluginDictation({ append: (text) => { state.other.push(text); } });
-		useDictationTarget((text) => { state.question.push(text); }, state.questionClaimed);
+		useDictationTarget({ read: () => state.question, write: (v) => { state.question = v; } }, state.questionClaimed);
 		return <>{state.showCore && <Core />}{state.showPlugin && <Plugin />}<div id="other"><textarea id="other-input" /></div></>;
 	}
 	const { createRoot } = await import("react-dom/client");
@@ -119,7 +119,7 @@ afterEach(async () => {
 test("mounted plugins never replace core insertion, question priority, or core finish", async () => {
 	const f = await fixture();
 	assert.equal(appendToPrimaryInput("file"), true);
-	assert.deepEqual(f.state.core, ["file"]);
+	assert.equal(f.state.core, "file");
 	f.state.questionClaimed = true;
 	await f.render();
 	appendToPrimaryInput("question file");
@@ -133,7 +133,7 @@ test("mounted plugins never replace core insertion, question priority, or core f
 	assert.equal(finished, false);
 	await act(async () => { socket.final("tail"); socket.end(); await finish; });
 	assert.equal(finished, true);
-	assert.deepEqual(f.state.question, ["question file", "spoken answer tail"]);
+	assert.equal(f.state.question, "question file spoken answer tail");
 	assert.deepEqual(f.state.plugin, []);
 });
 
@@ -154,8 +154,8 @@ test("explicit plugin capture never appends into core/question and cannot steal 
 	await act(async () => { finish = f.plugin.finish(); });
 	await act(async () => { socket.end(); await finish; });
 	assert.deepEqual(f.state.plugin, ["plugin only"]);
-	assert.deepEqual(f.state.core, []);
-	assert.deepEqual(f.state.question, []);
+	assert.equal(f.state.core, "");
+	assert.equal(f.state.question, "");
 	assert.equal(isDictationActive(), false);
 });
 
@@ -350,7 +350,7 @@ test("core cancel before transcript delivery still resolves finish and discards 
 		await finish;
 	});
 	assert.equal(finished, true);
-	assert.deepEqual(f.state.core, []);
+	assert.equal(f.state.core, "");
 	assert.equal(isDictationActive(), false);
 });
 

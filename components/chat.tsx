@@ -46,7 +46,7 @@ import { clearOpeningPrompt, readOpeningPromptEntry, stashOpeningPrompt, OPENING
 import { forwardDockWheel, useDockHeight } from "@/components/dock-height";
 import { createDockMorph } from "@/components/dock-morph";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
-import { DictationBar, finishDictation, joinDictation, useDictation, type Dictation } from "@/components/dictation";
+import { DictationBar, finishDictation, handOffDictation, joinDictation, useDictation, type Dictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { useOptionalInteractionLayers } from "./interaction-layers";
 import { isInteractionScopeEligible } from "./plugin-input-focus";
@@ -951,9 +951,10 @@ export function Chat({
 	}, []);
 	useFieldCycle(cycleChatFields);
 	const recording = useDictation({
-		// Ref-first (see textRef): the join is computed from the mirror so a
-		// send resuming after `await finish()` reads the dictated tail.
-		append: (t) => { if (!pluginOwnsDock) applyText(joinDictation(textRef.current, t)); },
+		// Ref-first (see textRef): the run reads the mirror so a send
+		// resuming after `await finish()` reads the dictated tail. A
+		// plugin-owned dock keeps the composer out of reach.
+		target: { read: () => textRef.current, write: (v) => { if (!pluginOwnsDock) applyText(v); } },
 		disabled: pluginOwnsDock && !pluginMicAvailable,
 	});
 	const dictation: Dictation = { ...recording,
@@ -2512,6 +2513,15 @@ export function DockOverlay({
 	// revealed, the normal collapse machine rules apply untouched.
 	const [revealed, setRevealed] = useState(false);
 	const revealPending = requiresReveal && !revealed;
+	// FOLLOW FOCUS (fork, owner 2026-11-06): after the reveal, focusing the
+	// reading-thinking field takes the dictation claim back; focusing the
+	// check returns it. Scrolling alone never moves it.
+	const [readingFocused, setReadingFocused] = useState(false);
+	const readingClaim = revealPending || readingFocused;
+	const focusReading = (next: boolean) => {
+		if (revealPending || next === readingFocused) return;
+		void handOffDictation(() => setReadingFocused(next));
+	};
 
 	const pendingId = pluginQuestion ? pluginQuestionOccurrenceKey(pluginQuestion.occurrence) : unreadablePlugin ? "unreadable-plugin-question" : pending?.key ?? null;
 	const readingInputRef = useRef<HTMLDivElement>(null);
@@ -2539,6 +2549,7 @@ export function DockOverlay({
 			const arrival = revealArrival(wasQuestion);
 			setExpanded(arrival.expanded);
 			setRevealed(arrival.revealed);
+			setReadingFocused(false); // fork: follow-focus claim
 		} else if (pendingId) {
 			// Probe arrival (flicker round): open iff following at the bottom.
 			// Painted in THIS render — no stale-open frame, no after-paint flip.
@@ -2888,10 +2899,11 @@ export function DockOverlay({
 										}
 									: undefined
 							}
-							claim={revealPending}
+							claim={readingClaim}
+							onFocus={() => focusReading(true)}
 						/>
 					)}
-					<div ref={shellRef} data-attachment-composer="" className="pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg">
+					<div ref={shellRef} onFocusCapture={() => focusReading(false)} data-attachment-composer="" className="pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg">
 						{preparationStatus}
 						{/* Include descendant margins (notably practice thinking's
 						    bottom margin) in the natural content measurement. */}
@@ -2916,7 +2928,12 @@ export function DockOverlay({
 									expanded={expanded}
 									reveal={revealPending}
 									phase={phase}
-									onExpand={expandAndReveal}
+									onExpand={() => {
+										// Fork: a click can't strand a live run's unsaved text in
+										// the check: finish into the reading field, then resume.
+										if (revealPending) void handOffDictation(expandAndReveal);
+										else expandAndReveal();
+									}}
 									onSubmit={onSubmitAnswer}
 									onPrepareSubmission={onPrepareBuiltin}
 									hasPendingInput={onBuiltinPendingInput}
@@ -2925,7 +2942,7 @@ export function DockOverlay({
 									onSaveDraft={onSaveQuestionDraft}
 									workingRef={workingRef}
 									onEscape={dictationCancel}
-									dictationClaim={!revealPending}
+									dictationClaim={!readingClaim}
 									compactionRunning={compactionRunning}
 								/>
 							) : pluginPractice ? (

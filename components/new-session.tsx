@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { SurfaceRegion, usePageSurfaceBoundary, useSurfaceChromeStyle } from "./plugin-surfaces";
 import { Conversation, ConversationContent, ConversationEmptyState } from "@/components/ai-elements/conversation";
 import { Composer } from "@/components/composer";
-import { DictationBar, joinDictation, useDictation } from "@/components/dictation";
+import { DictationBar, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { useOptionalInteractionLayers } from "./interaction-layers";
 import { isInteractionScopeEligible } from "./plugin-input-focus";
@@ -128,8 +128,18 @@ export function DraftShell({
 		Array.from(document.querySelectorAll<HTMLElement>('[data-testid="composer"] [data-file-path-input]')),
 		[]);
 	useFieldCycle(cycleComposer);
+	// The parent owns the text; the mirror lets live dictation read what it
+	// just wrote before the parent re-renders.
+	const textRef = useRef(text);
+	textRef.current = text;
 	const dictation = useDictation({
-		append: (t) => onChange(joinDictation(text, t)),
+		target: {
+			read: () => textRef.current,
+			write: (v) => {
+				textRef.current = v;
+				onChange(v);
+			},
+		},
 	});
 	// A LIVE dictation keeps the composer sendable ("nothing gets lost"
 	// round, owner 2026-10-01): the spoken text is deferred in the run's

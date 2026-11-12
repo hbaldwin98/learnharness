@@ -35,7 +35,8 @@ import {
 	type BackgroundModelRole,
 	type FactorySettings,
 	type GeneralSettings,
-	type DictationSettings,
+	type ResolvedDictationSettings,
+	resolveDictationSettings,
 	type CompactionSettings,
 	type CustomModel,
 	type CustomModelOverride,
@@ -73,7 +74,7 @@ export type EffectiveAppearance = FactorySettings["appearance"];
 /** The concrete view: every knob resolved, no absent fields. */
 export interface EffectiveSettings {
 	general: Required<GeneralSettings>;
-	dictation: Required<DictationSettings>;
+	dictation: ResolvedDictationSettings;
 	agent: {
 		workerRequestConcurrency: number;
 		models: Record<BackgroundModelRole, EffectiveModelSpec | undefined>;
@@ -198,9 +199,7 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 		general: {
 			autoUpdate: record?.general?.autoUpdate ?? FACTORY_SETTINGS.general.autoUpdate,
 		},
-		dictation: {
-			language: record?.dictation?.language ?? FACTORY_SETTINGS.dictation.language,
-		},
+		dictation: resolveDictationSettings(record?.dictation),
 		agent: {
 			workerRequestConcurrency: agent.workerRequestConcurrency ?? FACTORY_SETTINGS.agent.workerRequestConcurrency,
 			models,

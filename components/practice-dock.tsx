@@ -5,7 +5,7 @@ import type { ViewReaderRef } from "./session-view-readers";
 import { ChevronRightIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
-import { joinDictation, useDictationTarget } from "@/components/dictation";
+import { useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { useOptionalInteractionLayers } from "./interaction-layers";
 import { isInteractionScopeEligible } from "./plugin-input-focus";
@@ -88,14 +88,13 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 	}, [viewReader]);
 
 	useDictationTarget(
-		useCallback(
-			(t: string) => {
-				const v = joinDictation(thinkingRef.current, t);
+		{
+			read: () => thinkingRef.current,
+			write: (v) => {
 				thinkingRef.current = v; editRevision.current++;
 				setThinking(v);
 			},
-			[],
-		),
+		},
 		true,
 	);
 

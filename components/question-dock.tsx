@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ViewReaderRef, NativeQuestionViewState } from "./session-view-readers";
 import { ArrowDownIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
+import { finishDictation, isDictationActive, useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { useOptionalInteractionLayers } from "./interaction-layers";
 import { isInteractionScopeEligible } from "./plugin-input-focus";
@@ -372,23 +372,12 @@ function QuestionDockForm({
 	// is effect-scoped, so the question unmounting releases it and
 	// dictation falls back to the composer automatically.
 	useDictationTarget(
-		useCallback(
-			(t: string) => {
-				// Ref-first (see the refs block above): the join is computed from
-				// the mirror, then both mirrors agree with state — a submit
-				// resuming post-finish reads the tail, never a stale closure.
-				if (qd.mode === "text") {
-					const v = joinDictation(answerTextRef.current, t);
-					answerTextRef.current = v;
-					setText(v);
-				} else {
-					const v = joinDictation(thinkingTextRef.current, t);
-					thinkingTextRef.current = v;
-					setThinking(v);
-				}
-			},
-			[qd.mode],
-		),
+		// Ref-first (see the refs block above): the run reads the mirror,
+		// then both mirrors agree with state — a submit resuming post-finish
+		// reads the tail, never a stale closure.
+		qd.mode === "text"
+			? { read: () => answerTextRef.current, write: (v) => { answerTextRef.current = v; setText(v); } }
+			: { read: () => thinkingTextRef.current, write: (v) => { thinkingTextRef.current = v; setThinking(v); } },
 		// Released while a teach check sits unrevealed (owner 2026-10-03):
 		// the reading-thinking field owns dictated speech during the reading.
 		dictationClaim,

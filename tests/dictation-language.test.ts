@@ -23,6 +23,13 @@ describe("Nova-3 dictation language contract", () => {
 		assert.deepEqual(labels, [...labels].sort((a, b) => a.localeCompare(b, "en")));
 	});
 
+	it("live interims and kept filler words are opt-in URL switches", () => {
+		const url = new URL(deepgramListenUrl("en", { interim: true, keepFillerWords: true }));
+		assert.equal(url.searchParams.get("interim_results"), "true");
+		assert.equal(url.searchParams.get("filler_words"), "true");
+		assert.equal(url.searchParams.get("endpointing"), "300");
+	});
+
 	it("only language varies in the streaming URL; all tuned parameters survive", () => {
 		for (const { code: language } of DICTATION_LANGUAGES) {
 			const url = new URL(deepgramListenUrl(language));
