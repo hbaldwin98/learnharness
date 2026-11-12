@@ -216,6 +216,15 @@ export function discardChatDeliveries(chatId: string): void {
 	for (const entry of queue) entry.resolve();
 }
 
+/** Fork E3: drop a still-queued (not yet handed off or waking) steer; true when dropped. */
+export function discardQueuedSteer(chatId: string, steerId: string): boolean {
+	const entry = (state().queues.get(chatId) ?? []).find((candidate) => candidate.steer.id === steerId);
+	if (!entry || entry.waking || entry.handedTo) return false;
+	removeEntry(chatId, entry);
+	entry.resolve();
+	return true;
+}
+
 /** Finalize a delivered steer's job bookkeeping — job steers only. */
 function finalizeSteer(steer: SteerMessage): void {
 	const jobId = jobIdOf(steer);
@@ -469,6 +478,8 @@ function chatIdOf(steer: SteerMessage): string {
 	if (steer.customType === "probe-handoff") {
 		return (steer.details as { chatId: string }).chatId;
 	}
+	// Fork E3: plugin steers carry their session in host-owned marker details.
+	if (steer.customType === "plugin-marker") return (steer.details as { chatId?: string }).chatId ?? "";
 	// The chat is resolvable from the job record; the steer's details
 	// carry jobId, which indexes the store.
 	const jobId = jobIdOf(steer);

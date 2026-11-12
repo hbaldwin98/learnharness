@@ -19,6 +19,14 @@ capability. Plugins own external input, intentional transformations, UI and pers
 Surfaces cover page bodies, not arbitrary regions; no transcript-only coverage or navigation
 suspension/restoration is provided.
 
+**Fork exception (E3, this fork only; not proposed upstream).** The backend context adds
+`turns.steer(chatId, input)`, which delivers plugin input into a native session's conversation
+(steer a live run or wake an idle one) as a `plugin-marker`. It goes through the host's wake
+pipeline and safety limits (recent sessions only, no compaction, one in-flight steer per plugin
+and session, 6 wakes per hour, 8 KB model text, `trigger` decides interactive vs background
+purpose). It is the only plugin path that starts native turns; the rest of this boundary stands.
+See `src/core/plugin-turns.ts`.
+
 ## 2. Learner content
 
 `PluginSubmissionContent` is `{text: string, images: readonly ImageContent[]}`. Images

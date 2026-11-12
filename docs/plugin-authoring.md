@@ -747,3 +747,13 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   runs the first turn server-side immediately (interactive purpose), opened or not; if the turn
   is refused the opening is still saved. `idempotencyKey` is permanent per plugin: the same key
   returns the same session while it exists.
+- **Plugin steers (fork exception to the session-extension contract §1)** —
+  [`turns.steer(chatId, input)`](plugin-api/plugin-turns.md), backend only. Stored as a
+  `plugin-marker` (typeId `steer`: `displayText` shown, `modelText` read as `[plugin <id>] …`,
+  `details` as marker data). Steers a live run or wakes an idle session through the host wake
+  pipeline (409 retry, waits behind pending questions, deduped by `idempotencyKey`).
+  `trigger: "learner"` runs with interactive purpose, `"background"` with background purpose.
+  Rejects for sessions not opened/updated in 30 minutes, during compaction, while an earlier
+  steer from the plugin to that session is undelivered, beyond 6 wakes/hour/session, for
+  `modelText` over 8 KB, and in `steer-only` mode without a live run. Queued steers are dropped
+  when the plugin is disabled.

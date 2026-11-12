@@ -43,6 +43,7 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 - [plugin-shortcuts](plugin-shortcuts.md)
 - [plugin-submissions](plugin-submissions.md)
 - [plugin-tree](plugin-tree.md)
+- [plugin-turns](plugin-turns.md)
 - [plugin-ui](plugin-ui.md)
 - [plugin-view-context](plugin-view-context.md)
 - [plugin-workers](plugin-workers.md)
@@ -181,6 +182,8 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema) | `plugin-ui` |
 | [PluginShortcutViewScope](plugin-shortcuts.md#pluginshortcutviewscope) | `plugin-shortcuts` |
 | [PluginStandardComposerProps](plugin-ui.md#pluginstandardcomposerprops) | `plugin-ui` |
+| [PluginSteerInput](plugin-turns.md#pluginsteerinput) | `plugin-turns` |
+| [PluginSteerReceipt](plugin-turns.md#pluginsteerreceipt) | `plugin-turns` |
 | [PluginSubmission](plugin-submissions.md#pluginsubmission) | `plugin-submissions` |
 | [PluginSubmissionChannel](plugin-submissions.md#pluginsubmissionchannel) | `plugin-submissions` |
 | [PluginSubmissionContent](plugin-submissions.md#pluginsubmissioncontent) | `plugin-submissions` |
@@ -208,6 +211,8 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginTreeContent](plugin-tree.md#plugintreecontent) | `plugin-tree` |
 | [PluginTreeProps](plugin-tree.md#plugintreeprops) | `plugin-tree` |
 | [PluginTreeRow](plugin-tree.md#plugintreerow) | `plugin-tree` |
+| [PluginTurnsBackendContext](plugin-turns.md#pluginturnsbackendcontext) | `plugin-turns` |
+| [PluginTurnService](plugin-turns.md#pluginturnservice) | `plugin-turns` |
 | [PluginUi](plugin-ui.md#pluginui) | `plugin-ui` |
 | [PluginUiCallback](plugin-ui.md#pluginuicallback) | `plugin-ui` |
 | [PluginUiContent](plugin-ui.md#pluginuicontent) | `plugin-ui` |
@@ -289,4 +294,4 @@ These are reachable through public data, event, inheritance or helper-type relat
 
 Standard JavaScript/DOM types (`Promise`, `AbortSignal`, `File`, `HTMLElement`, and utility types) use their standard contracts. Pi model/messages/tools and TypeBox schemas use the exact peer versions declared by the bundled SDK's `package.json`. Supply those peers when typechecking; they are development types, not permission to import private LearnHarness runtime modules.
 
-Coverage: **166 public types**, **58 supporting declarations**, **975 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
+Coverage: **170 public types**, **58 supporting declarations**, **984 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.

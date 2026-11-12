@@ -14,7 +14,8 @@ import { createPluginLearningData } from "./plugin-learning.ts";
 import { createPluginInference } from "./plugin-inference.ts";
 import { createPluginBackgroundTool, recoverPluginBackgroundJob } from "./plugin-background-tools.ts";
 import { registerPluginWorkerActivity } from "./plugin-worker-activity.ts";
-import { deliverJobResult, setPluginJobRecovery } from "./jobs.ts";
+import { deliverJobResult, discardQueuedSteer, setPluginJobRecovery } from "./jobs.ts";
+import { createPluginTurnService } from "./plugin-turns.ts";
 import { createPluginHost } from "./plugin-host.ts";
 import { createPluginTransport } from "./plugin-transport.ts";
 import { createPluginDocumentConverter } from "./plugin-documents.ts";
@@ -74,6 +75,7 @@ function runtime(): Runtime {
 			});
 			return { learning, inference: inference.inference, agents, workers,
 				markers: createPluginMarkerService(manifest.id, { chatStore: stores.chatStore, signal }),
+				turns: createPluginTurnService(manifest.id, { chatStore: stores.chatStore, signal, deliver: deliverJobResult, discard: discardQueuedSteer, turnRunning: isTurnRunning, compacting: compactionInFlight }),
 				createBackgroundTool(context, definition) {
 					return createPluginBackgroundTool({
 						pluginId: manifest.id, context, definition, workers, signal, jobStore: stores.jobStore,

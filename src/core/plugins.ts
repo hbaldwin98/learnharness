@@ -33,6 +33,8 @@ import type { PluginHiddenTurnTextTools } from "./plugin-hidden-text.ts";
 export type * from "./plugin-hidden-text.ts";
 import type { PluginSessionsAppContext } from "./plugin-sessions.ts";
 export type * from "./plugin-sessions.ts";
+import type { PluginTurnsBackendContext } from "./plugin-turns.ts";
+export type * from "./plugin-turns.ts";
 
 export const PLUGIN_API_VERSION = 1 as const;
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -146,7 +148,7 @@ export interface PluginTools extends PluginHiddenTurnTextTools {
 }
 /** Backend activation scope, once per enabled plugin per server, not per window.
  * Trusted Node code must cooperate with cancellation; no forced process isolation. */
-export interface PluginBackendContext extends PluginMarkersBackendContext {
+export interface PluginBackendContext extends PluginMarkersBackendContext, PluginTurnsBackendContext {
 	readonly manifest: PluginManifest;
 	/** Absolute code directory: app core-plugins/<id> or community plugins/<id>/dist. */
 	readonly directory: string;

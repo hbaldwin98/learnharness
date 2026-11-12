@@ -45,6 +45,7 @@ export interface PluginHostDependencies {
 		createBackgroundTool: PluginBackendContext["createBackgroundTool"];
 		/** Fork extension services; absent ones reject when used. */
 		markers?: PluginBackendContext["markers"];
+		turns?: PluginBackendContext["turns"];
 	};
 	/** One process-wide pure converter; no backend services are needed for uploads. */
 	convertDocument?: (request: Request, signal: AbortSignal) => ReturnType<PluginFrontendContext["documents"]["toMarkdown"]>;
@@ -251,6 +252,7 @@ export function createPluginHost(deps: PluginHostDependencies) {
 				const ctx: PluginBackendContext = {
 					manifest, directory: pkg.directory, dataDirectory, signal: activation.controller.signal, cleanup, ...services,
 					markers: services.markers ?? { append: async () => { throw new Error("Plugin markers are unavailable"); } },
+					turns: services.turns ?? { steer: async () => { throw new Error("Plugin steers are unavailable"); } },
 					createBackgroundTool(context, definition) { requireLive(); return services.createBackgroundTool(context, definition); },
 					registerInstructions(contribution: PluginInstructions) {
 						requireLive();

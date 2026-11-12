@@ -261,7 +261,7 @@ Backend activation scope, once per enabled plugin per server, not per window.
 Trusted Node code must cooperate with cancellation; no forced process isolation.
 
 ```ts
-export interface PluginBackendContext extends PluginMarkersBackendContext {
+export interface PluginBackendContext extends PluginMarkersBackendContext, PluginTurnsBackendContext {
     readonly manifest: PluginManifest;
     readonly directory: string;
     readonly dataDirectory: string;
@@ -284,7 +284,7 @@ export interface PluginBackendContext extends PluginMarkersBackendContext {
 }
 ```
 
-**Related types:** [PluginAgentService](plugin-agents.md#pluginagentservice), [PluginBackgroundTool](plugin-workers.md#pluginbackgroundtool), [PluginCleanup](plugins.md#plugincleanup), [PluginInference](plugins.md#plugininference), [PluginInstructions](plugins.md#plugininstructions), [PluginLearningData](plugins.md#pluginlearningdata), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersBackendContext](plugin-markers.md#pluginmarkersbackendcontext), [PluginProblemTypeDefinition](plugin-problems.md#pluginproblemtypedefinition), [PluginQuestionTypeDefinition](plugin-questions.md#pluginquestiontypedefinition), [PluginToolContext](plugins.md#plugintoolcontext), [PluginTools](plugins.md#plugintools), [PluginWorkerService](plugin-workers.md#pluginworkerservice), [ServerEvent](events.md#serverevent).
+**Related types:** [PluginAgentService](plugin-agents.md#pluginagentservice), [PluginBackgroundTool](plugin-workers.md#pluginbackgroundtool), [PluginCleanup](plugins.md#plugincleanup), [PluginInference](plugins.md#plugininference), [PluginInstructions](plugins.md#plugininstructions), [PluginLearningData](plugins.md#pluginlearningdata), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersBackendContext](plugin-markers.md#pluginmarkersbackendcontext), [PluginProblemTypeDefinition](plugin-problems.md#pluginproblemtypedefinition), [PluginQuestionTypeDefinition](plugin-questions.md#pluginquestiontypedefinition), [PluginToolContext](plugins.md#plugintoolcontext), [PluginTools](plugins.md#plugintools), [PluginTurnsBackendContext](plugin-turns.md#pluginturnsbackendcontext), [PluginWorkerService](plugin-workers.md#pluginworkerservice), [ServerEvent](events.md#serverevent).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
