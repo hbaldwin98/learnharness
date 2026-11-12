@@ -6,6 +6,8 @@ import type {
 
 import { preparePluginShortcut, copyPluginSubmissionTarget, preparePluginSubmissionInterceptor, type PluginSubmissionInterceptor, type PluginSubmissionTarget } from "../src/core/index.ts";
 import { orderSubmissionInterceptors, type SubmissionInterceptorRegistration } from "./plugin-submission-runner.ts";
+import { PluginForkRegistry } from "./plugin-fork-registry.ts";
+import { createForkFrontendContext } from "./plugin-fork-context.ts";
 
 export type PluginMount = (container: HTMLElement, signal: AbortSignal) => ReturnType<PluginView["mount"]>;
 export interface PluginRendererRegistration<T> {
@@ -132,6 +134,8 @@ export class PluginFrontendManager {
 	private started = false;
 	private shortcutPages = new Map<string, { read: () => PluginPageActionContext | undefined }>();
 	private snapshot: PluginSnapshot = { plugins: [], codeBlocks: [], toolRenderers: [], directory: "", conflicts: [], loading: true, refreshing: false };
+	/** Fork-only extension registrations (components/plugin-fork-context.ts). */
+	readonly fork = new PluginForkRegistry();
 	constructor(private host: PluginHost) {}
 	getSnapshot = () => this.snapshot;
 	subscribe = (listener: () => void) => {
@@ -357,6 +361,8 @@ export class PluginFrontendManager {
 		const thisManager = this;
 		let ui: import("@/src/core/plugin-ui").PluginUi | undefined;
 		const context: PluginFrontendContext = {
+			...createForkFrontendContext(this.fork, { pluginId: life.id, pluginName: manifest.name, signal: life.controller.signal,
+				isCurrent: () => this.current(life), addCleanup: cleanup => this.addCleanup(life, cleanup), report: error => this.report(life, error) }),
 			manifest, signal: life.controller.signal,
 			cleanup: cleanup => { this.addCleanup(life, cleanup); },
 			registerView: view => register(life.views, view, "mount"),

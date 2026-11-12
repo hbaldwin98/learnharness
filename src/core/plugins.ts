@@ -20,6 +20,9 @@ import type { PluginProblemTypeDefinition, PluginProblemRenderer } from "./plugi
 export type * from "./plugin-problems.ts";
 import type { PluginSubmissionInterceptor } from "./plugin-submissions.ts";
 export type * from "./plugin-submissions.ts";
+// Fork extension points (docs/fork-extension-points.md).
+import type { PluginFieldsFrontendContext } from "./plugin-fields.ts";
+export type * from "./plugin-fields.ts";
 
 export const PLUGIN_API_VERSION = 1 as const;
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -273,7 +276,7 @@ export interface PluginToolRenderer {
 }
 /** Frontend activation scope, once per enabled plugin per window. Registrations,
  * subscriptions and UI expire with this activation; backend work is server-owned. */
-export interface PluginFrontendContext {
+export interface PluginFrontendContext extends PluginFieldsFrontendContext {
 	readonly manifest: PluginManifest;
 	/** Aborted when this window's activation ends. Use shorter per-mount signals
 	 * for view widgets and cooperative async work. */

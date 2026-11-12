@@ -698,3 +698,14 @@ No marketplace/community updater, sandbox/per-plugin process, hot replacement,
 programmable core-data writes, general UI/forms or raw keyboard-event framework, or automatic replay
 of interrupted arbitrary tools. The platform supplies mechanisms, not feature prompts,
 algorithms, defaults or deletion policy; product decisions belong to the human.
+
+## Fork extension points
+
+This fork adds the extension points designed in `docs/fork-extension-points.md`. They are
+additive under `apiVersion: 1`; plugins that use them do not run on upstream LearnHarness.
+
+- **Learner-field accessories** — [`registerFieldAccessory`](plugin-api/plugin-fields.md).
+  Host icon buttons inside the session composer, a text question's answer, a select
+  question's thinking field and the native practice field. `run(field)` receives a live
+  handle whose `read`/`write`/`insert` go through that field's own draft state; it throws once
+  the field unmounts or is replaced, the accessory is unregistered or the plugin is disabled.

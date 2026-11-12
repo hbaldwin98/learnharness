@@ -7,6 +7,7 @@ import { PathInput } from "@/components/path-input";
 import { AttachFilesButton } from "@/components/attach-files-button";
 import { useOptionalInteractionLayers } from "./interaction-layers";
 import { isInteractionScopeEligible } from "./plugin-input-focus";
+import { PluginFieldAccessories } from "./plugin-field-accessory";
 
 /**
  * The chat composer — content row ONLY (the persistent rounded shell lives in
@@ -79,9 +80,11 @@ export function ChatSessionComposer({
 	pendingInput?: boolean;
 }) {
 	const [draft, setDraft] = useState(value);
+	const draftRef = useRef(draft); draftRef.current = draft;
 	useLayoutEffect(() => { setDraft(value); }, [revision, value]);
 	const canSend = sendAllowed && (draft.trim().length > 0 || dictationActive || pendingInput);
 	const applyDraft = useCallback((next: string) => {
+		draftRef.current = next;
 		setDraft(next);
 		onChange(next);
 	}, [onChange]);
@@ -100,6 +103,7 @@ export function ChatSessionComposer({
 			placeholder={placeholder}
 			nextProblem={nextProblem}
 			onNext={onNext}
+			accessory={<PluginFieldAccessories kind="composer" read={() => draftRef.current} write={applyDraft} editorRef={inputRef} />}
 		/>
 	);
 }
@@ -119,6 +123,7 @@ export function Composer({
 	onNext,
 	defaultDropTarget = true,
 	fileInsertion = true,
+	accessory,
 }: {
 	busy: boolean;
 	value: string;
@@ -147,6 +152,8 @@ export function Composer({
 	/** Neutral plugin composers opt out without changing core defaults. */
 	defaultDropTarget?: boolean;
 	fileInsertion?: boolean;
+	/** Fork: plugin learner-field accessories, rendered before the paperclip. */
+	accessory?: React.ReactNode;
 }) {
 	const controller = useOptionalInteractionLayers();
 	const act = () => {
@@ -197,6 +204,7 @@ export function Composer({
 				autoFocus={autoFocus}
 				className="field-sizing-content lh-input max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"
 			/>
+			{accessory}
 			<AttachFilesButton editorRef={editorRef} />
 			{/* The button follows the text (owner report 2026-10-03): while
 				 a turn runs WITH text typed it stays the SEND affordance

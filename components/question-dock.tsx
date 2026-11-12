@@ -44,6 +44,7 @@ import {
 } from "@/src/core";
 import type { PrepareBuiltinSubmission } from "./plugin-submission-adapters";
 import { CONFIDENCE_COLORS, confidenceRailStyle } from "@/components/confidence-rail";
+import { PluginFieldAccessories } from "@/components/plugin-field-accessory";
 
 /**
  * The question dock — a pending quiz/ask REPLACES the chat composer: the
@@ -357,6 +358,7 @@ function QuestionDockForm({
 	 * in time — submit reads these, kept current at every write site. */
 	const thinkingTextRef = useRef(initialDraft?.thinking ?? "");
 	const answerTextRef = useRef(initialDraft?.text ?? "");
+	const answerEditorRef = useRef<HTMLDivElement>(null);
 	// Confidence (owner, 2026-10-01): an index into CONFIDENCE_STOPS,
 	// resting at 50 — a real coin flip by definition, untouched or
 	// deliberate (the same number, the same meaning). The dock unmounts
@@ -908,6 +910,7 @@ function QuestionDockForm({
 					</div>
 					{qd.mode === "text" ? (
 						<PathInput
+							ref={answerEditorRef}
 							value={text}
 							onValueChange={(value) => {
 								answerTextRef.current = value;
@@ -976,6 +979,9 @@ function QuestionDockForm({
 						<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
 								{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
 						</span>
+						{qd.mode === "text"
+							? <PluginFieldAccessories kind="question-answer" read={() => answerTextRef.current} write={v => { answerTextRef.current = v; setText(v); }} editorRef={answerEditorRef} />
+							: <PluginFieldAccessories kind="thinking" read={() => thinkingTextRef.current} write={v => { thinkingTextRef.current = v; setThinking(v); }} editorRef={thinkingRef} />}
 						<Button
 							type="submit"
 							disabled={!canSubmit || compactionRunning || preparing}

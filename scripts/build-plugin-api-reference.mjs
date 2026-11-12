@@ -19,6 +19,8 @@ const guides = {
 	"plugin-agents": ["Managed agents", "../plugin-authoring.md#managed-conversational-agents"],
 	"plugin-workers": ["Workers and background tools", "../plugin-authoring.md#result-oriented-workers-and-background-tools"],
 	"plugin-shortcuts": ["Action shortcuts", "../plugin-authoring.md#action-shortcuts"],
+	// Fork extension points.
+	"plugin-fields": ["Learner-field accessories", "../plugin-authoring.md#fork-extension-points"],
 };
 const declarationKind = node => ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isVariableDeclaration(node) || ts.isEnumDeclaration(node);
 function comments(node) {

@@ -32,6 +32,7 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 - [native-messages](native-messages.md)
 - [phases](phases.md)
 - [plugin-agents](plugin-agents.md)
+- [plugin-fields](plugin-fields.md)
 - [plugin-problems](plugin-problems.md)
 - [plugin-questions](plugin-questions.md)
 - [plugin-shortcuts](plugin-shortcuts.md)
@@ -89,6 +90,8 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginDialogProps](plugin-ui.md#plugindialogprops) | `plugin-ui` |
 | [PluginDictationHandle](plugin-ui.md#plugindictationhandle) | `plugin-ui` |
 | [PluginDictationProps](plugin-ui.md#plugindictationprops) | `plugin-ui` |
+| [PluginFieldAccessory](plugin-fields.md#pluginfieldaccessory) | `plugin-fields` |
+| [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext) | `plugin-fields` |
 | [PluginFrontendContext](plugins.md#pluginfrontendcontext) | `plugins` |
 | [PluginFrontendModule](plugins.md#pluginfrontendmodule) | `plugins` |
 | [PluginGraphFileData](plugins.md#plugingraphfiledata) | `plugins` |
@@ -98,6 +101,9 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginInfo](plugins.md#plugininfo) | `plugins` |
 | [PluginInstructions](plugins.md#plugininstructions) | `plugins` |
 | [PluginKnowledgePickerProps](plugin-ui.md#pluginknowledgepickerprops) | `plugin-ui` |
+| [PluginLearnerField](plugin-fields.md#pluginlearnerfield) | `plugin-fields` |
+| [PluginLearnerFieldBinding](plugin-fields.md#pluginlearnerfieldbinding) | `plugin-fields` |
+| [PluginLearnerFieldKind](plugin-fields.md#pluginlearnerfieldkind) | `plugin-fields` |
 | [PluginLearningData](plugins.md#pluginlearningdata) | `plugins` |
 | [PluginManifest](plugins.md#pluginmanifest) | `plugins` |
 | [PluginMarkdownProps](plugin-ui.md#pluginmarkdownprops) | `plugin-ui` |
@@ -224,6 +230,7 @@ These are reachable through public data, event, inheritance or helper-type relat
 - [LhMarkerMessage](native-messages.md#lhmarkermessage) — `native-messages`
 - [LhMessage](native-messages.md#lhmessage) — `native-messages`
 - [Phase3](phases.md#phase3) — `phases`
+- [PLUGIN_LEARNER_FIELD_KINDS](plugin-fields.md#plugin_learner_field_kinds) — `plugin-fields`
 - [Immutable](plugin-submissions.md#immutable) — `plugin-submissions`
 - [ImmutableJson](plugin-submissions.md#immutablejson) — `plugin-submissions`
 - [ImmutableJsonArray](plugin-submissions.md#immutablejsonarray) — `plugin-submissions`
@@ -256,4 +263,4 @@ These are reachable through public data, event, inheritance or helper-type relat
 
 Standard JavaScript/DOM types (`Promise`, `AbortSignal`, `File`, `HTMLElement`, and utility types) use their standard contracts. Pi model/messages/tools and TypeBox schemas use the exact peer versions declared by the bundled SDK's `package.json`. Supply those peers when typechecking; they are development types, not permission to import private LearnHarness runtime modules.
 
-Coverage: **140 public types**, **57 supporting declarations**, **894 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
+Coverage: **145 public types**, **58 supporting declarations**, **911 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.

@@ -4,6 +4,7 @@ import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMe
 import { usePathname } from "next/navigation";
 import { useChatSession } from "@/components/session";
 import { usePlugins } from "./plugins";
+import { PluginFieldSessionProvider } from "./plugin-field-accessory";
 import { PluginSubmissionRunner, SubmissionModelEpoch, type SubmissionAttempt } from "./plugin-submission-runner";
 import { submissionImages, type BuiltinSubmissionCapture, type PrepareBuiltinSubmission, type PrepareThinkingSubmission, type PreparePluginQuestionSubmission, type PreparePluginProblemSubmission } from "./plugin-submission-adapters";
 import { SubmittedImages } from "./submitted-images";
@@ -1593,6 +1594,7 @@ export function Chat({
 	usePluginShortcutPage(`/chat/${encodeURIComponent(chatId)}`, captureActionContext);
 
 	return (
+		<PluginFieldSessionProvider sessionId={chatId}>
 		<ChatActionsContext.Provider
 			value={{
 				chatId,
@@ -2240,6 +2242,7 @@ export function Chat({
 			}}
 		/>
 		</ChatActionsContext.Provider>
+		</PluginFieldSessionProvider>
 	);
 }
 

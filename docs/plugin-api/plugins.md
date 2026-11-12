@@ -660,7 +660,7 @@ Frontend activation scope, once per enabled plugin per window. Registrations,
 subscriptions and UI expire with this activation; backend work is server-owned.
 
 ```ts
-export interface PluginFrontendContext {
+export interface PluginFrontendContext extends PluginFieldsFrontendContext {
     readonly manifest: PluginManifest;
     readonly signal: AbortSignal;
     cleanup(dispose: PluginCleanup): void;
@@ -701,7 +701,7 @@ export interface PluginFrontendContext {
 }
 ```
 
-**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginManifest](plugins.md#pluginmanifest), [PluginNotification](plugins.md#pluginnotification), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
+**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext), [PluginManifest](plugins.md#pluginmanifest), [PluginNotification](plugins.md#pluginnotification), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 

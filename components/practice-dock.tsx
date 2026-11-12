@@ -12,6 +12,7 @@ import { isInteractionScopeEligible } from "./plugin-input-focus";
 import { PathInput } from "@/components/path-input";
 import type { PrepareThinkingSubmission } from "./plugin-submission-adapters";
 import { cn } from "@/lib/utils";
+import { PluginFieldAccessories } from "@/components/plugin-field-accessory";
 
 /**
  * The practice dock (practice sessions, owner design 2026-10-04): an
@@ -77,6 +78,7 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 	// the tail, never a stale closure.
 	const thinkingRef = useRef(thinking); thinkingRef.current = thinking;
 	const editRevision = useRef(0);
+	const editorRef = useRef<HTMLDivElement>(null);
 	useLayoutEffect(() => {
 		if (!viewReader) return;
 		const read = () => thinkingRef.current;
@@ -165,6 +167,7 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 					YOUR THINKING
 				</div>
 				<PathInput
+					ref={editorRef}
 					value={thinking}
 					onValueChange={(value) => {
 						thinkingRef.current = value; editRevision.current++;
@@ -201,6 +204,7 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 					<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
 						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
 					</span>
+					<PluginFieldAccessories kind="practice-answer" read={() => thinkingRef.current} write={v => { thinkingRef.current = v; editRevision.current++; setThinking(v); }} editorRef={editorRef} />
 					<Button
 						type="button"
 						data-testid="practice-send"
