@@ -1,0 +1,282 @@
+/*
+ * GRAPHITE — chrome layer (style-only Core plugin).
+ *
+ * Colours are NOT set here: pick the Graphite theme (or any theme) in
+ * Settings → Appearance. Everything below reads the host's theme tokens
+ * (--background, --card, --popover, --muted, --accent, --border, --ring,
+ * --lh-*), so it works under every theme, light ones included.
+ *
+ * Selectors prefer data-testid / data-* hooks; a few state classes the
+ * host exposes only as Tailwind utilities (.bg-accent = selected,
+ * .w-72 = sidebar open, .max-w-none = transcript column) are noted inline.
+ */
+
+/* ---------- Fonts: Geist + Geist Mono (SIL OFL 1.1, assets/fonts) ---------- */
+
+@font-face {
+	font-family: "Graphite Geist";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url("assets/fonts/geist-latin-wght-normal.woff2") format("woff2-variations");
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: "Graphite Geist";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url("assets/fonts/geist-latin-ext-wght-normal.woff2") format("woff2-variations");
+	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+	font-family: "Graphite Geist Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url("assets/fonts/geist-mono-latin-wght-normal.woff2") format("woff2-variations");
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: "Graphite Geist Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url("assets/fonts/geist-mono-latin-ext-wght-normal.woff2") format("woff2-variations");
+	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---------- Derived chrome tokens (from the active theme) ---------- */
+
+:root {
+	--lh-graphite-sans: "Graphite Geist", ui-sans-serif, system-ui, sans-serif;
+	--lh-graphite-mono: "Graphite Geist Mono", ui-monospace, SFMono-Regular, monospace;
+
+	/* Hairlines: chrome edges softer than the theme border. */
+	--lh-graphite-line: color-mix(in srgb, var(--border) 75%, transparent);
+	/* Sidebar / settings nav ground: a step between page and card. */
+	--lh-graphite-sidebar: color-mix(in srgb, var(--background) 60%, var(--card));
+	/* Modal ground. */
+	--lh-graphite-modal: var(--popover);
+	/* Inset (segmented controls), selected segment, switch track. */
+	--lh-graphite-inset: var(--muted);
+	--lh-graphite-control-on: var(--accent);
+	--lh-graphite-track: var(--border);
+	/* Editor / code block ground: the page itself. */
+	--lh-graphite-editor: var(--background);
+
+	--lh-graphite-shadow-card: 0 20px 50px rgb(0 0 0 / 0.4);
+	--lh-graphite-shadow-popover: 0 24px 60px rgb(0 0 0 / 0.55);
+	--lh-graphite-shadow-modal: 0 40px 100px rgb(0 0 0 / 0.6);
+	--lh-graphite-scrim: color-mix(in srgb, var(--background) 72%, transparent);
+
+	/* Reading prose breathes more (16/1.7). Appearance settings still win. */
+	--lh-prose-leading: 1.7;
+
+	/* Prose and titles in Geist. An Appearance reading-font choice is an
+	   inline style on <html> and still wins. */
+	--font-prose: var(--lh-graphite-sans);
+	--font-title: var(--lh-graphite-sans);
+}
+
+/* @theme inline bakes the ui/mono stacks into the utilities as literals,
+   so override the classes rather than the variables. */
+body,
+.font-ui,
+.font-sans {
+	font-family: var(--lh-graphite-sans);
+}
+
+.font-mono,
+code,
+kbd,
+pre {
+	font-family: var(--lh-graphite-mono);
+}
+
+/* Session titles: Geist 600 with tight tracking, not 900. */
+.font-title {
+	font-weight: 600;
+	letter-spacing: -0.03em;
+}
+
+/* Code blocks sit on the page ground. */
+[data-streamdown="code-block"] {
+	background: var(--lh-graphite-editor);
+}
+
+/* ---------- Labels: sentence case ---------- */
+
+/* Upstream chrome labels are uppercase + wide-tracked; Graphite uses
+   sentence case at normal tracking. Opt a label back in with .lh-keep-caps. */
+.uppercase:not(.lh-keep-caps) {
+	text-transform: none;
+}
+
+.tracking-wide:not(.lh-keep-caps),
+.tracking-wider:not(.lh-keep-caps),
+.tracking-widest:not(.lh-keep-caps) {
+	letter-spacing: normal;
+}
+
+/* ---------- Elevation ---------- */
+
+.shadow-lg { box-shadow: var(--lh-graphite-shadow-card); }
+.shadow-xl { box-shadow: var(--lh-graphite-shadow-popover); }
+.shadow-2xl { box-shadow: var(--lh-graphite-shadow-modal); }
+
+/* ---------- Sidebar ---------- */
+
+/* The sidebar is the <aside> holding the new-session doors. .w-72 is the
+   open state (no data hook upstream). 264px on its own ground. */
+aside:has([data-testid="new-session"]).w-72,
+aside:has([data-testid="new-session"]) > .w-72 {
+	width: 264px;
+}
+aside:has([data-testid="new-session"]) > div {
+	background: var(--lh-graphite-sidebar);
+	border-right-color: var(--lh-graphite-line);
+}
+[data-testid="new-session"],
+[data-testid="new-session-practice"] {
+	height: 32px;
+	padding: 0 10px;
+	gap: 10px;
+	font-size: 13px;
+	border-radius: 6px;
+}
+[data-testid="session-row"],
+[data-testid="session-row-kbd"] {
+	border-radius: 6px;
+	padding: 6px 10px;
+}
+[data-testid="session-row"] .font-prose,
+[data-testid="session-row-kbd"] .font-prose {
+	font-size: 13px;
+}
+
+/* Session-kind filter and Home mode switch: the segmented control.
+   .bg-accent marks the selected segment (no data hook upstream). */
+[data-testid="session-kind-filter"],
+[data-testid="home-mode-switch"] {
+	background: var(--lh-graphite-inset);
+	border-color: transparent;
+	border-radius: 6px;
+	padding: 2px;
+	gap: 2px;
+}
+[data-testid^="kind-filter-"],
+[data-testid^="home-mode-"] {
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 500;
+}
+[data-testid^="kind-filter-"] {
+	height: 24px;
+}
+[data-testid^="kind-filter-"].bg-accent,
+[data-testid^="home-mode-"].bg-accent {
+	background: var(--lh-graphite-control-on);
+}
+
+/* ---------- Top bars, hairlines, composer ---------- */
+
+/* Top bars: 52px (TopBar, settings/workspace headers share h-15). */
+header.h-15,
+.lh-wco-gutter.h-15 {
+	height: 52px;
+	border-bottom-color: var(--lh-graphite-line);
+}
+
+/* Chat dock column: 760px (dock shares max-w-[46rem]). */
+.max-w-\[46rem\] {
+	max-width: 760px;
+}
+
+/* Chrome hairlines. */
+.border-b.border-border,
+.border-t.border-border,
+.border-r.border-border {
+	border-color: var(--lh-graphite-line);
+}
+
+/* Composers: a 12px card. */
+[data-attachment-composer].rounded-2xl {
+	border-radius: 12px;
+}
+
+/* Confidence rail: no outline on the track. */
+[data-testid="confidence-rail"] {
+	border-color: transparent;
+}
+
+/* ---------- Settings ---------- */
+
+[data-testid="settings-backdrop"] {
+	background: var(--lh-graphite-scrim);
+	backdrop-filter: blur(4px);
+}
+[data-testid="settings-dialog"] {
+	border-radius: 14px;
+	background: var(--lh-graphite-modal);
+	box-shadow: var(--lh-graphite-shadow-modal);
+}
+[data-testid="settings-dialog"] header .font-title {
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+[data-testid="settings-nav"] {
+	width: 200px;
+	background: var(--lh-graphite-sidebar);
+	border-right-color: var(--lh-graphite-line);
+	padding: 10px;
+}
+[data-testid^="settings-nav-"] {
+	height: 32px;
+	padding: 0 10px;
+	border-radius: 6px;
+	font-size: 13px;
+}
+[data-testid^="settings-nav-"][aria-current="true"] {
+	background: var(--accent);
+}
+button[role="switch"] {
+	border-color: transparent;
+	background: var(--lh-graphite-track);
+}
+button[role="switch"][aria-checked="true"] {
+	background: var(--lh-accent);
+}
+
+/* ---------- Overlays, editor ---------- */
+
+/* Chains overlay: deeper, blurrier veil. */
+[data-testid="chain-table-overlay"] {
+	background: color-mix(in srgb, var(--background) 86%, transparent);
+	backdrop-filter: blur(8px);
+}
+
+/* Practice: the code editor pane on the page ground. */
+.cm-editor,
+.cm-gutters {
+	background-color: var(--lh-graphite-editor);
+}
+
+/* ---------- Transcript column ---------- */
+
+/* A centred 760px column (upstream runs it full width via .max-w-none).
+   The top-bar width chip sets data-lh-transcript-width on <html>; the
+   composer dock keeps its width. */
+[data-session-find-root].max-w-none {
+	max-width: 760px;
+}
+:root[data-lh-transcript-width="wide"] [data-session-find-root].max-w-none {
+	max-width: 960px;
+}
+:root[data-lh-transcript-width="wider"] [data-session-find-root].max-w-none {
+	max-width: 1160px;
+}
+:root[data-lh-transcript-width="widest"] [data-session-find-root].max-w-none {
+	max-width: 1360px;
+}

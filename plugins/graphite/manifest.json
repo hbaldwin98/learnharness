@@ -1,0 +1,10 @@
+{
+  "apiVersion": 1,
+  "id": "graphite",
+  "name": "Graphite",
+  "version": "0.1.0",
+  "minAppVersion": "0.4.1",
+  "description": "Graphite chrome: Geist fonts, sentence-case labels, deeper shadows, a tighter sidebar and settings, and a centred transcript with a width chip. Pair it with the Graphite theme or any other.",
+  "main": "main.js",
+  "styles": "styles.css"
+}

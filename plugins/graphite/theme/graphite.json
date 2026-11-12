@@ -1,0 +1,18 @@
+{
+	"name": "Graphite",
+	"mode": "dark",
+	"colors": {
+		"background": "#08080a",
+		"surface": "#111114",
+		"border": "#1c1c1e",
+		"text": "#ededef",
+		"textMuted": "#8a8f98",
+		"accent": "#8b93ff",
+		"bold": "#ededef",
+		"italic": "#ededef",
+		"code": "#ededef",
+		"error": "#f2907f",
+		"success": "#9fd8c4",
+		"warning": "#e8c38a"
+	}
+}
