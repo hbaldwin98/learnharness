@@ -1,0 +1,89 @@
+# Fork plugin extension points (E1–E7) — design draft
+
+Status: APPROVED by owner 2026-11-12 (decisions at the end). Grounded in upstream v0.6.1
+(`src/core/plugins.ts`, `plugin-ui.ts`, `plugin-view-context.ts`,
+`src/server/plugin-host.ts`, `components/plugin-manager.ts`).
+
+Conventions followed: `register*(def): () => void`; lowercase-hyphen ids;
+invalid/duplicate defs throw; UI = `mount(container, props{signal}) → cleanup`;
+additive under `apiVersion: 1`; one doc per feature in `docs/plugin-api/`.
+
+## E1 — Plugin transcript markers
+```ts
+interface PluginMarkerInput { typeId: string; details: unknown /* JSON ≤64KB */;
+  modelText?: string /* omitted ⇒ invisible to model */; idempotencyKey?: string }
+// backend
+markers: { append(chatId: string, m: PluginMarkerInput): Promise<{ messageId: string; chatId: string }> }
+// frontend
+registerMarkerRenderer(r: { typeId: string; mount(container, m: { details; messageId; sessionId; signal }) }): () => void
+```
+- One generic `"plugin-marker"` customType, `details: { pluginId, typeId, data }`.
+- Idle: write-ahead append under the chat claim. Busy: queued, lands at run persist via jobs registry.
+- view.ts: `case "plugin-marker"` → `data-plugin-marker`; model sees `[plugin <id>] modelText` only if set; classifier → neutral.
+- Disabled/missing plugin: muted "Plugin content (<id>)" fallback.
+- New: `src/core/plugin-markers.ts`, `src/server/plugin-markers.ts`, `components/plugin-marker.tsx`. Touch: native-messages (+20), view (+10), plugins (+12), plugin-host (+25), part renderer (+15).
+
+## E2 — Session side panel
+```ts
+registerSessionPanel(p: { id; title; icon?; sessions?: ("teaching"|"practice")[];
+  defaultWidth?; minWidth?; mount(container, ctx: { sessionId; kind; signal }) }): () => void
+app.openSessionPanel(sessionId, panelId); app.closeSessionPanel(sessionId)
+```
+- Lives per session view; survives turns/streaming; aborts on leave/disable.
+- Host owns layout, splitter, close button, width/open persistence (localStorage per session+panel).
+- Top-bar placements may declare `opens: panelId`.
+- New: `components/plugin-session-panel.tsx`, `src/core/plugin-panels.ts`. Touch: `components/session.ts` (+20).
+
+## E3 — Backend steer / start turn (fork exception to contract §1)
+```ts
+turns: { steer(chatId, input: { displayText: string; modelText: string; details?: unknown;
+  idempotencyKey: string; mode?: "steer-or-wake" | "steer-only" })
+  : Promise<{ delivery: "steered" | "woke" | "queued" }> }
+```
+- Wraps `jobs.ts deliverJobResult` (live → steer, idle → wake, 409 retry, question wait, dedupe).
+- Limits: recently-touched sessions only; not archived/deleted; 1 in-flight wake per (plugin, chat), ≤6 wakes/chat/hour/plugin; never during compaction; modelText ≤8KB, framed as plugin-originated; queued steers dropped on disable.
+- New: `src/server/plugin-turns.ts`, `src/core/plugin-turns.ts`. Touch: jobs (+10), plugin-host (+15).
+
+## E4 — Seeded native session
+```ts
+sessions: { create(spec: { kind; nodeIds?; title?; opening?: { displayText; modelText };
+  start?: boolean; idempotencyKey? }): Promise<{ chatId }> }
+app.createSession(spec, opts?: { open?: boolean }): Promise<string>
+```
+- Reuses the existing create route; nodeIds validated against the graph; plugin origin recorded.
+- New: `src/server/plugin-sessions.ts`. Touch: chats route (+15), plugins (+10).
+
+## E5 — Richer action contexts
+New placements/contexts (existing `"graph"` unchanged):
+- `transcript-selection` → `{ sessionId, kind, selection: { text ≤4KB, messageId, partIndex? } }` via host popover.
+- `plan-node` → `{ sessionId, planNodeId, title }`.
+- `graph-selection` (graph + Chains) → `{ nodeIds, chainIds }`.
+- New: `components/plugin-selection-popover.tsx`. Touch: plugins (+15), plugin-view-context (+20), plan / graph / chains components (+10 each).
+
+## E6 — Learner-field accessory
+```ts
+registerFieldAccessory(a: { id; label; icon;
+  fields?: ("composer"|"question-answer"|"practice-answer"|"thinking")[];
+  run(field: PluginLearnerField) }): () => void
+interface PluginLearnerField { kind; sessionId; read(): string; write(t): void; insert(t): void; signal }
+```
+- Writes go through the field's draft state; stale handles throw (contract §5.2 style).
+- New: `components/plugin-field-accessory.tsx`, `src/core/plugin-fields.ts`. Touch: composer-actions, question-dock, practice-dock (+10 each).
+
+## E7 — Tool hides its turn's assistant text
+- `registerTools({ ..., hidesTurnText?: string[] })`; flag persisted into tool-result details.
+- view.ts hides assistant text when a listed tool call succeeded (presentation only; model context unchanged). Port of fork `quietLooksOf`.
+- Touch: view (+25), plugins (+3), plugin-host (+10).
+
+## Build order
+E6 → (Mermaid) · E5 graph-selection, E4 → (deep dive) · E1, E2, E5 transcript/plan → (readings) · E3, E7 → (coding).
+
+## Owner decisions
+- E1: optional `modelText` (host-prefixed); one generic `plugin-marker` customType (minor, recommended).
+- E2: one panel open at a time; tabs when several plugins register.
+- E3: safety limits as listed; wakes are `background` purpose unless learner-click-triggered.
+- E4: frontend `app.createSession` only (no backend `sessions.create` in v1).
+- E7: hide same-message text and the following text-only message.
+- Old coding-workspace data: drop.
+- Old readings data: migrate (store → plugin data dir; markers → `plugin-marker`).
+- Upstreaming: propose E1, E2, E5, E6 later; E3 stays fork-only (minor, recommended).
