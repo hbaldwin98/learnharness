@@ -15,6 +15,7 @@ import { useOptionalInteractionLayers } from "./interaction-layers";
 import { isInteractionScopeEligible } from "./plugin-input-focus";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
+import { ResumeCards } from "@/components/lh/resume-cards"; // fork: chrome
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { PathInput } from "@/components/path-input";
 import { AttachFilesButton } from "@/components/attach-files-button";
@@ -329,6 +330,7 @@ export function Home({
 							</div>
 						}
 					/>
+					<ResumeCards /> {/* fork: chrome */}
 				</div>
 			</div>
 

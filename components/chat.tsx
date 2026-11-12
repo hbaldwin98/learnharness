@@ -128,6 +128,7 @@ import {
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
+import { BreadcrumbPrefix, StatusPill } from "@/components/lh/breadcrumb"; // fork: chrome
 
 /** One width for everything: transcript, cards, and the bottom blob share this column. */
 /**
@@ -1648,6 +1649,7 @@ export function Chat({
 						if (renaming && e.target !== titleInputRef.current) titleInputRef.current?.blur();
 					}}
 				>
+					<BreadcrumbPrefix kind={kind} /> {/* fork: chrome */}
 					{renaming ? (
 						<>
 							<input
@@ -1697,6 +1699,7 @@ export function Chat({
 							{titleText}
 							</button>
 						</Hint>
+						<StatusPill probing={!!pending && !busy} working={busy} /> {/* fork: chrome */}
 							{/* flex-1 spacer: keeps the chips at the right edge AND stays a
 							    drag surface (no carve-out) — the freed bar is grippable. */}
 							<div className="min-w-4 flex-1" aria-hidden="true" />

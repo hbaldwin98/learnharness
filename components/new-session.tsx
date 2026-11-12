@@ -19,6 +19,8 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { newSessionDraftKey, useDraftPersistence } from "@/components/draft-persistence";
 import { SessionStarter } from "@/components/start-session";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
+import { NewSessionHero } from "@/components/lh/new-session-hero"; // fork: chrome
+import { ResumeCards } from "@/components/lh/resume-cards"; // fork: chrome
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
  *  bar lifts — resolved nodes as the learner SAW them at pick time. */
@@ -191,6 +193,7 @@ export function DraftShell({
 						<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
 						<div className="bg-background pb-4">
 							<div className={DOCK}>
+								<NewSessionHero mode={mode} /> {/* fork: chrome */}
 								<ComposerActions
 									picker={(picks.length > 0 || mode === "practice") && (
 										<NodePickerControl count={picks.length} onOpen={onOpenPicker} onClear={onClearPicks} />
@@ -220,6 +223,7 @@ export function DraftShell({
 									dictationSlot={<DictationBar dictation={dictation} />}
 									turns={[]}
 								/>
+								<ResumeCards /> {/* fork: chrome */}
 							</div>
 						</div>
 					</div>
