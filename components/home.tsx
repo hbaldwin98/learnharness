@@ -19,6 +19,7 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { PathInput } from "@/components/path-input";
 import { AttachFilesButton } from "@/components/attach-files-button";
 import { SessionStarter } from "@/components/start-session";
+import { HOME_DRAFT_KEY, useDraftPersistence } from "@/components/draft-persistence";
 import type { TurnUsage } from "@/src/core";
 
 /**
@@ -105,6 +106,13 @@ export function Home({
 	const [chainSelectOpen, setChainSelectOpen] = useState(false);
 	// The chain table is CONTROLLED off this id set (the lifted pick).
 	const pickedIds = useMemo(() => new Set(practiceProps.map((p) => p.id)), [practiceProps]);
+	// Fork: the draft survives navigation (components/draft-persistence.ts).
+	const draft = useDraftPersistence(HOME_DRAFT_KEY, { text: topic, picks: practiceProps, mode }, (saved) => {
+		topicRef.current = saved.text;
+		setTopic(saved.text);
+		if (saved.mode) setMode(saved.mode);
+		setPracticeProps(saved.picks);
+	});
 
 	/* FINISH DICTATION FIRST (owner, 2026-10-01): Enter may arrive while a
 	 * run is live with the topic still deferred in the run's buffer — stop
@@ -157,6 +165,7 @@ export function Home({
 				...(mode === "practice" ? { kind: "practice" } : {}),
 				...(practiceProps.length > 0 ? { graphContext: { propositions: practiceProps } } : {}),
 			}, fetch, JSON.stringify(catalog?.slots.strong));
+			draft.clear();
 			router.push(target);
 		} catch {
 			startingRef.current = false;

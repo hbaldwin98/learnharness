@@ -16,6 +16,7 @@ import { StatsBar } from "@/components/stats-bar";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
+import { newSessionDraftKey, useDraftPersistence } from "@/components/draft-persistence";
 import { SessionStarter } from "@/components/start-session";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
 
@@ -264,6 +265,11 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 		picksRef.current = next;
 		setPicks(next);
 	};
+	// Fork: the draft survives navigation (components/draft-persistence.ts).
+	const { clear: clearDraftOnStart } = useDraftPersistence(newSessionDraftKey(mode), { text, picks }, (saved) => {
+		applyText(saved.text);
+		applyPicks(saved.picks);
+	});
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [snapshot, setSnapshot] = useState<GraphSnapshot | null>(null);
 	const openPicker = () => {
@@ -318,7 +324,7 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 		void startDraftSession(draft, fetch, mode === "practice" ? "practice" : undefined, mode === "practice" ? picksRef.current : undefined,
 			starterRef.current, JSON.stringify(catalog?.slots.strong))
 			.then((target) => {
-				if (target) router.push(target);
+				if (target) { clearDraftOnStart(); router.push(target); }
 				else { startingRef.current = false; setBusy(false); }
 			})
 			.catch(() => {
@@ -326,7 +332,7 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 				setBusy(false);
 				setStartError(true);
 			});
-	}, [router, configured, zeroKeys, catalog, mode]);
+	}, [router, configured, zeroKeys, catalog, mode, clearDraftOnStart]);
 
 	return (
 		<>
