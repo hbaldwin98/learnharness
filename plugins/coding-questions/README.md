@@ -282,6 +282,18 @@ and thinking use **host in-memory drafts**: folding/remounting while the session
 lives retains drafts, but model destruction, reload, and app restart need not. The
 plugin has no custom durable answer store, backend RPCs, views, or settings.
 
+## Extension hooks for other plugins
+
+Trusted plugins in the same app can extend this one without a host service registry,
+through versioned process-global registries keyed by well-known symbols:
+
+- **Runner hook** (backend, `src/runner-hook.ts`, `Symbol.for("learnharness.coding-questions.runners.v1")`).
+  A plugin registers `{ id, run(request) }`; grading and practice submissions call the
+  most recently registered runner with `{ purpose, chatId, itemId, language, answer, tests, signal }`.
+  It returns `{ result }` (a `CodingTestResult`) or `{ unavailable: reason }`, in which case the
+  tests run locally as usual and the saved result carries a visible
+  `notice: "Tests ran locally (no sandbox): <reason>"`. With no runner, behavior is unchanged.
+
 ## Development
 
 In the extracted authoring kit, copy the shared **kit-root `types/` contents** into

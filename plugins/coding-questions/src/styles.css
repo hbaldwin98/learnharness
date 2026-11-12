@@ -109,3 +109,9 @@
 @media (prefers-reduced-motion: reduce) {
   .lh-coding-disclosure > button { transition: none; }
 }
+
+.lh-coding-test-result__notice {
+  margin: 4px 0;
+  font-size: 0.85em;
+  color: var(--color-amber-600, #d97706);
+}

@@ -14,6 +14,8 @@ export type CodingTestResult = {
   stdoutTruncated: boolean;
   stderrTruncated: boolean;
   message?: string;
+  /** Learner-visible execution note, e.g. a local fallback from a sandboxed runner. */
+  notice?: string;
 };
 
 /** Defensive reading of saved plugin data; never coerce or infer a missing result. */
@@ -26,5 +28,6 @@ export function readTestResult(value: unknown): CodingTestResult | null {
   if (result.status === "failed" && (result.exitCode === null || result.exitCode === 0)) return null;
   if (typeof result.stdout !== "string" || typeof result.stderr !== "string" || typeof result.stdoutTruncated !== "boolean" || typeof result.stderrTruncated !== "boolean") return null;
   if (result.message !== undefined && typeof result.message !== "string") return null;
+  if (result.notice !== undefined && typeof result.notice !== "string") return null;
   return result as CodingTestResult;
 }

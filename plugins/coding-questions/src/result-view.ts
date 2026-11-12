@@ -34,6 +34,13 @@ export function mountTestResult(container: HTMLElement, ui: Pick<PluginFrontendC
       ...(result.status === "passed" ? { color: "var(--color-green-500, #22c55e)" } : result.status === "failed" ? { color: "var(--color-red-500, #ef4444)" } : {}),
     }, { signal });
     if (disposed) { badge.dispose(); return dispose; }
+    if (result.notice) {
+      const notice = document.createElement("p");
+      notice.className = "lh-coding-test-result__notice";
+      notice.setAttribute("role", "note");
+      notice.textContent = result.notice;
+      root.append(notice);
+    }
     if (result.stdout !== "" || result.stderr !== "" || result.message || result.stdoutTruncated || result.stderrTruncated) {
       outputCleanup = mountDisclosure(root, "test-output", "Test output", signal, body => {
         if (result.message) {
