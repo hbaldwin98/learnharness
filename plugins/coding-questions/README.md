@@ -293,6 +293,13 @@ through versioned process-global registries keyed by well-known symbols:
   It returns `{ result }` (a `CodingTestResult`) or `{ unavailable: reason }`, in which case the
   tests run locally as usual and the saved result carries a visible
   `notice: "Tests ran locally (no sandbox): <reason>"`. With no runner, behavior is unchanged.
+- **Editor hook** (frontend, `src/editor-hook.ts`, `Symbol.for("learnharness.coding-questions.editors.v1")`).
+  A plugin registers `{ id, mount(editor) }`; every active answer/submission editor (never a
+  saved one) offers `{ kind, chatId, itemId, language, payload, toolbar, signal, isActive(),
+  readCode(), onCodeChange(listener), setDiagnostics(list) }`. `toolbar` is the extension's own
+  slot in the editor header; diagnostics use zero-based line/column ranges with
+  `error`/`warning`/`info` severity and are merged with the built-in syntax feedback.
+  Extensions mount on editors that exist when they register and on later ones.
 
 ## Development
 

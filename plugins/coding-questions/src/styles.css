@@ -110,6 +110,13 @@
   .lh-coding-disclosure > button { transition: none; }
 }
 
+.lh-coding-question__toolbar {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
 .lh-coding-test-result__notice {
   margin: 4px 0;
   font-size: 0.85em;
