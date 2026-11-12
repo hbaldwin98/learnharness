@@ -1,0 +1,35 @@
+/** Richer contextual action placements (fork extension E5). Browser-safe types and
+ * limits; the host owns the popover, capture and invocation. */
+
+/** UTF-8 byte cap on selected text. Longer selections show a disabled
+ * "Shorten selection" button instead of running the action. */
+export const PLUGIN_SELECTION_TEXT_LIMIT = 4096;
+
+/** One tutor-message text selection, captured when the action is clicked. */
+export interface PluginTranscriptSelection {
+	/** Selected rendered text, at most PLUGIN_SELECTION_TEXT_LIMIT UTF-8 bytes. */
+	readonly text: string;
+	/** Native id of the persisted tutor message containing the selection. */
+	readonly messageId: string;
+	/** Content part index within that message, when the host can resolve it. */
+	readonly partIndex?: number;
+}
+/** Invoked from the host selection popover over a session transcript. The
+ * surface is "transcript", not "session": it carries no whole-session `view`. */
+export interface PluginTranscriptSelectionActionContext {
+	placement: "transcript-selection";
+	surface: "transcript";
+	sessionId: string;
+	kind: "teaching" | "practice";
+	selection: PluginTranscriptSelection;
+}
+/** Place an action in the transcript selection popover of every session. */
+export interface PluginTranscriptSelectionPlacement {
+	id: string;
+	actionId: string;
+	location: "transcript-selection";
+}
+
+export function selectionTextBytes(text: string): number {
+	return new TextEncoder().encode(text).length;
+}

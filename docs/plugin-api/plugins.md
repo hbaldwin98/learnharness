@@ -125,10 +125,10 @@ export type PluginActionContext = ({
 } | {
     placement: "graph";
     surface: "graph";
-};
+} | PluginTranscriptSelectionActionContext;
 ```
 
-**Related types:** [PluginPageActionContext](plugins.md#pluginpageactioncontext).
+**Related types:** [PluginPageActionContext](plugins.md#pluginpageactioncontext), [PluginTranscriptSelectionActionContext](plugin-action-contexts.md#plugintranscriptselectionactioncontext).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
@@ -180,8 +180,10 @@ export type PluginActionPlacement = {
     location: "top-bar";
     sessions?: ("teaching" | "practice")[];
     views?: string[];
-};
+} | PluginTranscriptSelectionPlacement;
 ```
+
+**Related types:** [PluginTranscriptSelectionPlacement](plugin-action-contexts.md#plugintranscriptselectionplacement).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 

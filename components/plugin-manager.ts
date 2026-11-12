@@ -371,7 +371,7 @@ export class PluginFrontendManager {
 				if (!this.current(life)) return () => {};
 				if (!placement || typeof placement.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(placement.id)) throw new Error("Plugin placement id must be a route-safe string");
 				if (!life.actions.has(placement.actionId)) throw new Error("Plugin placement must reference a registered action");
-				if (!["top-bar", "sidebar", "graph"].includes(placement.location)) throw new Error("Unknown plugin action placement");
+				if (!["top-bar", "sidebar", "graph", "transcript-selection"].includes(placement.location)) throw new Error("Unknown plugin action placement");
 				if (placement.location === "top-bar") {
 					if (placement.sessions !== undefined && (!Array.isArray(placement.sessions) || placement.sessions.some(kind => kind !== "teaching" && kind !== "practice"))) throw new Error("Invalid plugin top-bar session targets");
 					if (placement.views !== undefined && (!Array.isArray(placement.views) || placement.views.some(id => typeof id !== "string" || !id))) throw new Error("Invalid plugin top-bar view targets");

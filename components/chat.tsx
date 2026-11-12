@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useChatSession } from "@/components/session";
 import { usePlugins } from "./plugins";
 import { PluginFieldSessionProvider } from "./plugin-field-accessory";
+import { usePluginSelectionActions } from "./plugin-selection-popover";
 import { PluginSubmissionRunner, SubmissionModelEpoch, type SubmissionAttempt } from "./plugin-submission-runner";
 import { submissionImages, type BuiltinSubmissionCapture, type PrepareBuiltinSubmission, type PrepareThinkingSubmission, type PreparePluginQuestionSubmission, type PreparePluginProblemSubmission } from "./plugin-submission-adapters";
 import { SubmittedImages } from "./submitted-images";
@@ -1054,7 +1055,8 @@ export function Chat({
 	}, [toggleQuestionThread]);
 	// Advancing the lesson does not close or disable an old conversation.
 	const sideActions = useMemo(() => createSideQuestionActions({ open: openSideThread }), [openSideThread]);
-	const selectionActions = useMemo(() => [citeAction, ...sideActions], [citeAction, sideActions]);
+	const pluginSelectionActions = usePluginSelectionActions(chatId, kind === "practice" ? "practice" : "teaching");
+	const selectionActions = useMemo(() => [citeAction, ...sideActions, ...pluginSelectionActions], [citeAction, sideActions, pluginSelectionActions]);
 	const router = useRouter();
 	const transcriptElementRef = useRef<HTMLElement | null>(null);
 	transcriptElementRef.current = transcriptElement;

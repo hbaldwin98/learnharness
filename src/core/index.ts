@@ -110,3 +110,4 @@ export type * from "./plugin-ui.ts";
 export type * from "./plugin-tree.ts";
 export * from "./plugin-agents.ts";
 export * from "./plugin-fields.ts";
+export * from "./plugin-action-contexts.ts";

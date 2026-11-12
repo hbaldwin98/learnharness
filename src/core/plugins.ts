@@ -23,6 +23,8 @@ export type * from "./plugin-submissions.ts";
 // Fork extension points (docs/fork-extension-points.md).
 import type { PluginFieldsFrontendContext } from "./plugin-fields.ts";
 export type * from "./plugin-fields.ts";
+import type { PluginTranscriptSelectionActionContext, PluginTranscriptSelectionPlacement } from "./plugin-action-contexts.ts";
+export type * from "./plugin-action-contexts.ts";
 
 export const PLUGIN_API_VERSION = 1 as const;
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -218,7 +220,8 @@ export type PluginActionContext =
 	| ({ placement: "top-bar" } & Exclude<PluginPageActionContext, { surface: "app" }>)
 	| ({ placement: "keyboard" } & PluginPageActionContext)
 	| { placement: "sidebar"; surface: "sidebar" }
-	| { placement: "graph"; surface: "graph" };
+	| { placement: "graph"; surface: "graph" }
+	| PluginTranscriptSelectionActionContext;
 export interface PluginAction {
 	id: string;
 	name: string;
@@ -235,7 +238,8 @@ export interface PluginAction {
 /** Registration alone never creates chrome. Each placement is explicit. */
 export type PluginActionPlacement =
 	| { id: string; actionId: string; location: "sidebar" | "graph" }
-	| { id: string; actionId: string; location: "top-bar"; sessions?: ("teaching" | "practice")[]; views?: string[] };
+	| { id: string; actionId: string; location: "top-bar"; sessions?: ("teaching" | "practice")[]; views?: string[] }
+	| PluginTranscriptSelectionPlacement;
 export type PluginSettingsRegistration = PluginView["mount"] | import("./plugin-ui.ts").PluginSettingsSchema;
 export interface PluginCodeBlockProps {
 	language: string;

@@ -709,3 +709,9 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   question's thinking field and the native practice field. `run(field)` receives a live
   handle whose `read`/`write`/`insert` go through that field's own draft state; it throws once
   the field unmounts or is replaced, the accessory is unregistered or the plugin is disabled.
+- **Transcript-selection actions** — [`transcript-selection` placement](plugin-api/plugin-action-contexts.md).
+  `placeAction({ id, actionId, location: "transcript-selection" })` adds the action to the
+  host selection popover over tutor text in every session. `run` receives
+  `{ placement: "transcript-selection", surface: "transcript", sessionId, kind, selection: { text, messageId } }`;
+  selections over 4 KB (UTF-8) show a disabled "Shorten selection" button. The `plan-node` and
+  `graph-selection` placements from the design are not available yet.

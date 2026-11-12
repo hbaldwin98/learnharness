@@ -31,6 +31,7 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 - [events](events.md)
 - [native-messages](native-messages.md)
 - [phases](phases.md)
+- [plugin-action-contexts](plugin-action-contexts.md)
 - [plugin-agents](plugin-agents.md)
 - [plugin-fields](plugin-fields.md)
 - [plugin-problems](plugin-problems.md)
@@ -178,6 +179,9 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginToolRenderer](plugins.md#plugintoolrenderer) | `plugins` |
 | [PluginToolRenderProps](plugins.md#plugintoolrenderprops) | `plugins` |
 | [PluginTools](plugins.md#plugintools) | `plugins` |
+| [PluginTranscriptSelection](plugin-action-contexts.md#plugintranscriptselection) | `plugin-action-contexts` |
+| [PluginTranscriptSelectionActionContext](plugin-action-contexts.md#plugintranscriptselectionactioncontext) | `plugin-action-contexts` |
+| [PluginTranscriptSelectionPlacement](plugin-action-contexts.md#plugintranscriptselectionplacement) | `plugin-action-contexts` |
 | [PluginTreeColumn](plugin-tree.md#plugintreecolumn) | `plugin-tree` |
 | [PluginTreeContent](plugin-tree.md#plugintreecontent) | `plugin-tree` |
 | [PluginTreeProps](plugin-tree.md#plugintreeprops) | `plugin-tree` |
@@ -263,4 +267,4 @@ These are reachable through public data, event, inheritance or helper-type relat
 
 Standard JavaScript/DOM types (`Promise`, `AbortSignal`, `File`, `HTMLElement`, and utility types) use their standard contracts. Pi model/messages/tools and TypeBox schemas use the exact peer versions declared by the bundled SDK's `package.json`. Supply those peers when typechecking; they are development types, not permission to import private LearnHarness runtime modules.
 
-Coverage: **145 public types**, **58 supporting declarations**, **911 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
+Coverage: **148 public types**, **58 supporting declarations**, **922 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
