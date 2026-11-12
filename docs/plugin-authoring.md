@@ -767,3 +767,8 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   field (re-render from `field.onChange`, debouncing yourself); optional
   `onKeyDown(event, field)` runs before host key handling (return `true` to claim the key, e.g.
   Enter inside a fence); `field.setCaret(offset)` places the caret after the host applies a write.
+- **Plugin themes** — manifest `themes: ["<file>.json", …]` (root files in the host theme
+  format: `{ name, mode, colors }`). Valid files are offered read-only in Settings → Appearance
+  as `<pluginId>-<file stem>` themes (labelled "plugin", no remove button) and get the
+  first-paint inline style like imported themes. Invalid files are skipped. Disabling the plugin
+  removes them; a selected one then renders as Default.

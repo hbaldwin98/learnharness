@@ -53,6 +53,9 @@ export interface PluginManifest {
 	/** Bundled Node CommonJS module. Node builtins are available. */
 	backend?: string;
 	styles?: string;
+	/** Fork E9: root `.json` theme files (host theme format), offered read-only in
+	 * Settings → Appearance while the plugin is enabled. */
+	themes?: string[];
 }
 export interface PluginInfo {
 	id: string;
@@ -418,9 +421,11 @@ export function parsePluginManifest(value: unknown, folder: string, appVersion: 
 	for (const [key, ext] of [["main", ".js"], ["backend", ".cjs"], ["styles", ".css"]] as const) {
 		if (m[key] !== undefined && (typeof m[key] !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(m[key]) || !m[key].endsWith(ext))) throw new Error(`Manifest ${key} must name a root ${ext} file`);
 	}
+	if (m.themes !== undefined && (!Array.isArray(m.themes) || m.themes.some(file => typeof file !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(file)) || new Set(m.themes).size !== m.themes.length)) throw new Error("Manifest themes must name distinct root .json files");
 	if (!m.main && !m.backend) throw new Error("A plugin needs a main or backend entry");
 	if (m.styles && !m.main) throw new Error("styles requires a frontend main entry");
 	return { apiVersion: 1, id: folder, name: m.name as string, version: m.version as string, minAppVersion: m.minAppVersion as string,
 		...(m.description !== undefined ? { description: m.description as string } : {}), ...(m.author !== undefined ? { author: m.author as string } : {}),
-		...(m.main ? { main: m.main as string } : {}), ...(m.backend ? { backend: m.backend as string } : {}), ...(m.styles ? { styles: m.styles as string } : {}) };
+		...(m.main ? { main: m.main as string } : {}), ...(m.backend ? { backend: m.backend as string } : {}), ...(m.styles ? { styles: m.styles as string } : {}),
+		...(Array.isArray(m.themes) && m.themes.length ? { themes: [...m.themes as string[]] } : {}) };
 }

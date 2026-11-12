@@ -604,6 +604,15 @@ export function createPluginHost(deps: PluginHostDependencies) {
 				return result;
 			} catch (error) { requireCurrent(); throw error; }
 		},
+		/** Fork E9: theme files of enabled, active plugins (validated by the caller). */
+		themeFiles(): { pluginId: string; file: string; text: string }[] {
+			if (disposed) return [];
+			return [...packages.values()].flatMap(pkg => {
+				const manifest = pkg.info.manifest;
+				if (!pkg.info.enabled || pkg.info.status !== "active" || pkg.blocked || !manifest?.themes) return [];
+				return manifest.themes.flatMap(file => { const bytes = pkg.files.get(file); return bytes ? [{ pluginId: pkg.info.id, file, text: bytes.toString("utf8") }] : []; });
+			});
+		},
 		asset(id: string, segments: string[]): { bytes: Uint8Array; contentType: string } {
 			assertOpen();
 			const pkg = get(id), manifest = pkg.info.manifest;

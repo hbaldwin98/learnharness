@@ -10,12 +10,13 @@
  */
 
 import { BUILTIN_THEMES, isBuiltinThemeId, isThemeId, parseThemeFile, themeIdFromName } from "@/src/core";
-import { themeStore } from "@/src/server";
+import { getPluginHost, listPluginThemes, themeStore } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-	return Response.json({ themes: [...BUILTIN_THEMES, ...themeStore.listThemes()] });
+	// Fork E9: read-only themes of enabled plugins follow the imported ones.
+	return Response.json({ themes: [...BUILTIN_THEMES, ...themeStore.listThemes(), ...listPluginThemes(await getPluginHost().catch(() => undefined))] });
 }
 
 export async function POST(request: Request) {
@@ -24,7 +25,8 @@ export async function POST(request: Request) {
 	const parsed = parseThemeFile(body);
 	if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
 	const base = themeIdFromName(parsed.theme.name);
-	const taken = (id: string) => isBuiltinThemeId(id) || themeStore.readTheme(id) !== null;
+	const plugins = listPluginThemes(await getPluginHost().catch(() => undefined));
+	const taken = (id: string) => isBuiltinThemeId(id) || themeStore.readTheme(id) !== null || plugins.some(theme => theme.id === id);
 	let id = base;
 	for (let n = 2; taken(id); n++) {
 		const suffix = `-${n}`;

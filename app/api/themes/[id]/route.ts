@@ -6,7 +6,7 @@
  */
 
 import { isBuiltinThemeId } from "@/src/core";
-import { readSettingsRecord, themeStore, writeSettingsRecord } from "@/src/server";
+import { getPluginHost, readPluginTheme, readSettingsRecord, themeStore, writeSettingsRecord } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,7 @@ export async function DELETE(_request: Request, ctx: { params: Promise<{ id: str
 	const { id } = await ctx.params;
 	if (isBuiltinThemeId(id)) return Response.json({ error: `"${id}" is a built-in theme` }, { status: 400 });
 	const theme = themeStore.readTheme(id);
+	if (!theme && readPluginTheme(await getPluginHost().catch(() => undefined), id)) return Response.json({ error: `"${id}" is provided by a plugin; disable the plugin to remove it` }, { status: 400 });
 	if (!theme) return Response.json({ error: `unknown theme "${id}"` }, { status: 404 });
 	themeStore.deleteTheme(id);
 	const record = readSettingsRecord();

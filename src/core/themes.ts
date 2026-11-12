@@ -72,6 +72,8 @@ export interface ThemeFile {
 export interface Theme extends ThemeFile {
 	id: string;
 	builtin: boolean;
+	/** Fork E9: the plugin supplying this read-only theme. */
+	plugin?: string;
 }
 
 /** The theme a record without `appearance.theme` renders. */

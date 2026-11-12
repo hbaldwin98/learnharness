@@ -1602,6 +1602,7 @@ export interface PluginManifest {
     main?: string;
     backend?: string;
     styles?: string;
+    themes?: string[];
 }
 ```
 
@@ -1617,6 +1618,7 @@ export interface PluginManifest {
 - [main](#pluginmanifest-main)
 - [backend](#pluginmanifest-backend)
 - [styles](#pluginmanifest-styles)
+- [themes](#pluginmanifest-themes)
 
 ### PluginManifest apiVersion
 
@@ -1680,6 +1682,15 @@ backend?: string;
 
 ```ts
 styles?: string;
+```
+
+### PluginManifest themes
+
+Fork E9: root `.json` theme files (host theme format), offered read-only in
+Settings → Appearance while the plugin is enabled.
+
+```ts
+themes?: string[];
 ```
 
 ## PluginNotification

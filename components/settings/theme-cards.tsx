@@ -158,17 +158,17 @@ export function ThemeCards({
 								)}
 							>
 								<Preview theme={theme} />
-								<span className={cn("flex items-center justify-between gap-2", !theme.builtin && "pr-6")}>
+								<span className={cn("flex items-center justify-between gap-2", !theme.builtin && !theme.plugin && "pr-6")}>
 									<span className="flex min-w-0 items-center gap-1.5 font-prose text-base">
 										{selected && <CheckIcon className="size-3.5 shrink-0" strokeWidth={2.5} />}
 										<span className="truncate">{theme.name}</span>
 									</span>
 									<span className="shrink-0 rounded-sm border border-border px-1.5 font-ui text-xs uppercase tracking-wider text-muted-foreground">
-										{theme.builtin ? theme.mode : "custom"}
+										{theme.builtin ? theme.mode : theme.plugin ? "plugin" : "custom"}
 									</span>
 								</span>
 							</button>
-							{!theme.builtin && (
+							{!theme.builtin && !theme.plugin && (
 								<button
 									type="button"
 									aria-label={`Remove ${theme.name}`}

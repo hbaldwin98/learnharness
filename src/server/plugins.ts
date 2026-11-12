@@ -108,6 +108,8 @@ function runtime(): Runtime {
 }
 
 export async function initializePlugins(): Promise<void> { await runtime().ready; }
+/** Fork E9: the already-created host, synchronously (undefined before startup). */
+export function peekPluginHost(): Host | undefined { return (globalThis as typeof globalThis & PluginGlobal).__lhPlugins?.host; }
 export async function getPluginHost(): Promise<Host> {
 	const { host, ready } = runtime();
 	await ready;

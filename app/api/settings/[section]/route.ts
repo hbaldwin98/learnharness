@@ -42,6 +42,8 @@ import {
 	readSettingsRecord,
 	refreshWorkerRequestAdmission,
 	themeStore,
+	getPluginHost,
+	readPluginTheme,
 	validateChatSettings,
 	validateModelsSettings,
 	writeSettingsRecord,
@@ -94,7 +96,7 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 	if (section === "appearance") {
 		const appearance = parsed.settings as AppearanceSettings;
 		const theme = appearance.theme;
-		if (theme !== undefined && !isBuiltinThemeId(theme) && themeStore.readTheme(theme) === null) {
+		if (theme !== undefined && !isBuiltinThemeId(theme) && themeStore.readTheme(theme) === null && readPluginTheme(await getPluginHost().catch(() => undefined), theme) === null) {
 			if (theme !== record.appearance?.theme) {
 				return Response.json({ error: `unknown theme "${theme}"` }, { status: 400 });
 			}

@@ -10,6 +10,8 @@
 import { effectiveColors, isBuiltinThemeId, resolveTheme, themeVars, type AppearanceSettings, type Theme } from "../core";
 import { themeStore } from "../store/themes.ts";
 import { readSettings } from "../store/settings.ts";
+import { readPluginTheme } from "./plugin-themes.ts";
+import { peekPluginHost } from "./plugins.ts";
 
 /** Everything the layout needs for a flash-free first paint. */
 export interface ThemeBoot {
@@ -23,7 +25,8 @@ export interface ThemeBoot {
 export function readThemeBoot(): ThemeBoot {
 	const appearance = readSettings()?.appearance;
 	const id = appearance?.theme;
-	const custom = id && !isBuiltinThemeId(id) ? themeStore.readTheme(id) : null;
+	// Fork E9: an enabled plugin's theme is selectable like an imported one.
+	const custom = id && !isBuiltinThemeId(id) ? themeStore.readTheme(id) ?? readPluginTheme(peekPluginHost(), id) : null;
 	const theme = resolveTheme(id, custom ? [custom] : []);
 	return { appearance, theme, vars: themeVars(effectiveColors(theme, appearance), theme.mode) };
 }
