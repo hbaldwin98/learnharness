@@ -9,5 +9,5 @@ Style-only Core plugin: the Graphite chrome for LearnHarness.
   1360px. The choice is saved in this browser.
 
 The stylesheet sets no colours. It reads the active theme's tokens, so it works
-with any theme, light or dark. The Graphite palette is `theme/graphite.json`
-(import it in Settings → Appearance → Theme).
+with any theme, light or dark. The Graphite palette ships as the plugin theme
+`graphite.json` (theme id `graphite-graphite`), listed in Settings → Appearance.

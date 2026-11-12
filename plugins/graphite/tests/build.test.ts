@@ -23,7 +23,9 @@ describe("graphite package", () => {
     for (const rgb of css.match(/rgb\([^)]*\)/g) ?? []) assert.match(rgb, /^rgb\(0 0 0 \/ 0\.\d+\)$/);
   });
   it("ships a valid theme file", () => {
-    const theme = JSON.parse(fs.readFileSync(path.join(root, "theme", "graphite.json"), "utf8"));
+    const theme = JSON.parse(fs.readFileSync(path.join(root, "dist", "graphite.json"), "utf8"));
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
+    assert.deepEqual(manifest.themes, ["graphite.json"]);
     assert.equal(theme.mode, "dark");
     assert.equal(Object.keys(theme.colors).length, 12);
   });

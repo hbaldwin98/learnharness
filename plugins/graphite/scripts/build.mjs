@@ -19,7 +19,7 @@ const result = await build({
 for (const input of Object.keys(result.metafile.inputs)) {
   if (!input.startsWith("src/")) throw new Error(`Unexpected runtime input in Graphite bundle: ${input}`);
 }
-for (const [from, to] of [["manifest.json", "manifest.json"], ["src/styles.css", "styles.css"], ["README.md", "README.md"], ["LICENSE", "LICENSE"]]) {
+for (const [from, to] of [["manifest.json", "manifest.json"], ["graphite.json", "graphite.json"], ["src/styles.css", "styles.css"], ["README.md", "README.md"], ["LICENSE", "LICENSE"]]) {
   fs.copyFileSync(path.join(root, from), path.join(output, to));
 }
 // Geist + Geist Mono variable fonts (latin + latin-ext, upright), SIL OFL 1.1.
