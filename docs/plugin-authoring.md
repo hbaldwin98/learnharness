@@ -757,3 +757,8 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   steer from the plugin to that session is undelivered, beyond 6 wakes/hour/session, for
   `modelText` over 8 KB, and in `steer-only` mode without a live run. Queued steers are dropped
   when the plugin is disabled.
+- **Learner-text fences** — learner answer text (answered card) and thinking text (thinking
+  blocks) stay plain, but a line-delimited ` ``` ` fence renders through the host code-block
+  registry: the built-in `mermaid` renderer, otherwise the plugin `registerCodeBlock` renderer
+  for that language (with `incomplete: true` for a trailing unclosed fence). Fences without a
+  renderer stay plain text. No API change: an existing code-block renderer applies automatically.

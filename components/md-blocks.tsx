@@ -144,7 +144,7 @@ export function codeSource(children: ReactNode): string {
  *  zoom pill — the zoom/pan home is the session overlay. While the fence is
  *  still streaming (the trailing open fence), a quiet skeleton instead of a
  *  doomed parse. */
-function MermaidInline({ chart }: { chart: string }) {
+export function MermaidInline({ chart }: { chart: string }) {
 	const displayOnly = useContext(MarkdownDisplayOnlyContext);
 	const [svg, setSvg] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);

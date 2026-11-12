@@ -116,3 +116,4 @@ export * from "./plugin-panels.ts";
 export * from "./plugin-hidden-text.ts";
 export * from "./plugin-sessions.ts";
 export * from "./plugin-turns.ts";
+export * from "./learner-fences.ts";
