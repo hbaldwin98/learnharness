@@ -18,6 +18,7 @@ import { deliverJobResult, setPluginJobRecovery } from "./jobs.ts";
 import { createPluginHost } from "./plugin-host.ts";
 import { createPluginTransport } from "./plugin-transport.ts";
 import { createPluginDocumentConverter } from "./plugin-documents.ts";
+import { createPluginMarkerService } from "./plugin-markers.ts";
 import type { AgentBuildOptions } from "../agent/teacher-agent.ts";
 import { stores } from "./stores.ts";
 import { isTurnRunning } from "./turn-liveness.ts";
@@ -72,6 +73,7 @@ function runtime(): Runtime {
 				onChange: workerActivity,
 			});
 			return { learning, inference: inference.inference, agents, workers,
+				markers: createPluginMarkerService(manifest.id, { chatStore: stores.chatStore, signal }),
 				createBackgroundTool(context, definition) {
 					return createPluginBackgroundTool({
 						pluginId: manifest.id, context, definition, workers, signal, jobStore: stores.jobStore,

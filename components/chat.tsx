@@ -6,6 +6,7 @@ import { useChatSession } from "@/components/session";
 import { usePlugins } from "./plugins";
 import { PluginFieldSessionProvider } from "./plugin-field-accessory";
 import { usePluginSelectionActions } from "./plugin-selection-popover";
+import { PluginMarkerPart } from "./plugin-marker";
 import { PluginSubmissionRunner, SubmissionModelEpoch, type SubmissionAttempt } from "./plugin-submission-runner";
 import { submissionImages, type BuiltinSubmissionCapture, type PrepareBuiltinSubmission, type PrepareThinkingSubmission, type PreparePluginQuestionSubmission, type PreparePluginProblemSubmission } from "./plugin-submission-adapters";
 import { SubmittedImages } from "./submitted-images";
@@ -1798,6 +1799,8 @@ export function Chat({
 												const submitted = readPluginProblemSubmission(part.data);
 												return <PluginProblemSubmitted key={pi} data={part.data} snapshot={submitted ? pluginProblemById(nativeMessages, submitted.problemId) : null} chatId={chatId} />;
 											}
+											case "data-plugin-marker":
+												return <PluginMarkerPart key={pi} data={part.data} messageId={m.id} sessionId={chatId} />;
 											case "data-practice-thinking":
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-next":

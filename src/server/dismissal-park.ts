@@ -29,6 +29,7 @@ import { ChatInputError, dismissAppends, emit } from "../core";
 import { assertPluginQuestionInputAllowed } from "../core/input-events.ts";
 import { preparePluginQuestionDismissal, type PluginQuestionDismissInput } from "./plugin-questions.ts";
 import type { ChatStore } from "../core/ports.ts";
+import { applyParkedPluginMarkers } from "./plugin-markers.ts";
 
 /** The parked dismissal body — exactly the parsed input the dismiss route
  *  accepted ({type:"dismiss", toolCallId, answer} or
@@ -67,6 +68,8 @@ export function takeParkedDismissal(chatId: string): ParkedDismissal | null {
  *  is dropped, silence is the correct outcome. Emits "record-changed"
  *  exactly when something was written. */
 export function applyParkedDismissal(chatStore: ChatStore, chatId: string): void {
+	// Fork E1: plugin markers parked during the turn land first, in this same window.
+	applyParkedPluginMarkers(chatStore, chatId);
 	const input = takeParkedDismissal(chatId);
 	if (input === null) return;
 	const record = chatStore.getChat(chatId);

@@ -251,7 +251,7 @@ Backend activation scope, once per enabled plugin per server, not per window.
 Trusted Node code must cooperate with cancellation; no forced process isolation.
 
 ```ts
-export interface PluginBackendContext {
+export interface PluginBackendContext extends PluginMarkersBackendContext {
     readonly manifest: PluginManifest;
     readonly directory: string;
     readonly dataDirectory: string;
@@ -274,7 +274,7 @@ export interface PluginBackendContext {
 }
 ```
 
-**Related types:** [PluginAgentService](plugin-agents.md#pluginagentservice), [PluginBackgroundTool](plugin-workers.md#pluginbackgroundtool), [PluginCleanup](plugins.md#plugincleanup), [PluginInference](plugins.md#plugininference), [PluginInstructions](plugins.md#plugininstructions), [PluginLearningData](plugins.md#pluginlearningdata), [PluginManifest](plugins.md#pluginmanifest), [PluginProblemTypeDefinition](plugin-problems.md#pluginproblemtypedefinition), [PluginQuestionTypeDefinition](plugin-questions.md#pluginquestiontypedefinition), [PluginToolContext](plugins.md#plugintoolcontext), [PluginTools](plugins.md#plugintools), [PluginWorkerService](plugin-workers.md#pluginworkerservice), [ServerEvent](events.md#serverevent).
+**Related types:** [PluginAgentService](plugin-agents.md#pluginagentservice), [PluginBackgroundTool](plugin-workers.md#pluginbackgroundtool), [PluginCleanup](plugins.md#plugincleanup), [PluginInference](plugins.md#plugininference), [PluginInstructions](plugins.md#plugininstructions), [PluginLearningData](plugins.md#pluginlearningdata), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersBackendContext](plugin-markers.md#pluginmarkersbackendcontext), [PluginProblemTypeDefinition](plugin-problems.md#pluginproblemtypedefinition), [PluginQuestionTypeDefinition](plugin-questions.md#pluginquestiontypedefinition), [PluginToolContext](plugins.md#plugintoolcontext), [PluginTools](plugins.md#plugintools), [PluginWorkerService](plugin-workers.md#pluginworkerservice), [ServerEvent](events.md#serverevent).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
@@ -662,7 +662,7 @@ Frontend activation scope, once per enabled plugin per window. Registrations,
 subscriptions and UI expire with this activation; backend work is server-owned.
 
 ```ts
-export interface PluginFrontendContext extends PluginFieldsFrontendContext {
+export interface PluginFrontendContext extends PluginFieldsFrontendContext, PluginMarkersFrontendContext {
     readonly manifest: PluginManifest;
     readonly signal: AbortSignal;
     cleanup(dispose: PluginCleanup): void;
@@ -703,7 +703,7 @@ export interface PluginFrontendContext extends PluginFieldsFrontendContext {
 }
 ```
 
-**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext), [PluginManifest](plugins.md#pluginmanifest), [PluginNotification](plugins.md#pluginnotification), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
+**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersFrontendContext](plugin-markers.md#pluginmarkersfrontendcontext), [PluginNotification](plugins.md#pluginnotification), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 

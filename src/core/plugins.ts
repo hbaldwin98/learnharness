@@ -25,6 +25,8 @@ import type { PluginFieldsFrontendContext } from "./plugin-fields.ts";
 export type * from "./plugin-fields.ts";
 import type { PluginTranscriptSelectionActionContext, PluginTranscriptSelectionPlacement } from "./plugin-action-contexts.ts";
 export type * from "./plugin-action-contexts.ts";
+import type { PluginMarkersBackendContext, PluginMarkersFrontendContext } from "./plugin-markers.ts";
+export type * from "./plugin-markers.ts";
 
 export const PLUGIN_API_VERSION = 1 as const;
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -138,7 +140,7 @@ export interface PluginTools {
 }
 /** Backend activation scope, once per enabled plugin per server, not per window.
  * Trusted Node code must cooperate with cancellation; no forced process isolation. */
-export interface PluginBackendContext {
+export interface PluginBackendContext extends PluginMarkersBackendContext {
 	readonly manifest: PluginManifest;
 	/** Absolute code directory: app core-plugins/<id> or community plugins/<id>/dist. */
 	readonly directory: string;
@@ -280,7 +282,7 @@ export interface PluginToolRenderer {
 }
 /** Frontend activation scope, once per enabled plugin per window. Registrations,
  * subscriptions and UI expire with this activation; backend work is server-owned. */
-export interface PluginFrontendContext extends PluginFieldsFrontendContext {
+export interface PluginFrontendContext extends PluginFieldsFrontendContext, PluginMarkersFrontendContext {
 	readonly manifest: PluginManifest;
 	/** Aborted when this window's activation ends. Use shorter per-mount signals
 	 * for view widgets and cooperative async work. */

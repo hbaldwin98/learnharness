@@ -42,6 +42,8 @@ export interface PluginHostDependencies {
 	createServices(info: { manifest: PluginManifest; directory: string; dataDirectory: string; signal: AbortSignal; cleanup: (fn: PluginCleanup) => void }): {
 		learning: PluginLearningData; inference: PluginInference; agents: PluginAgentService; workers: PluginWorkerService;
 		createBackgroundTool: PluginBackendContext["createBackgroundTool"];
+		/** Fork extension services; absent ones reject when used. */
+		markers?: PluginBackendContext["markers"];
 	};
 	/** One process-wide pure converter; no backend services are needed for uploads. */
 	convertDocument?: (request: Request, signal: AbortSignal) => ReturnType<PluginFrontendContext["documents"]["toMarkdown"]>;
@@ -247,6 +249,7 @@ export function createPluginHost(deps: PluginHostDependencies) {
 				cleanup(() => services.workers.dispose());
 				const ctx: PluginBackendContext = {
 					manifest, directory: pkg.directory, dataDirectory, signal: activation.controller.signal, cleanup, ...services,
+					markers: services.markers ?? { append: async () => { throw new Error("Plugin markers are unavailable"); } },
 					createBackgroundTool(context, definition) { requireLive(); return services.createBackgroundTool(context, definition); },
 					registerInstructions(contribution: PluginInstructions) {
 						requireLive();

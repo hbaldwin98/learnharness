@@ -84,7 +84,9 @@ export interface LhMarkerMessage {
 		| "problem-dismissed"
 		| "compaction"
 		| "side-question"
-		| "side-question-told";
+		| "side-question-told"
+		/** Fork E1: plugin-owned transcript entry (core/plugin-markers.ts). */
+		| "plugin-marker";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -138,7 +140,8 @@ export function asAgentMessages(messages: readonly LhMessage[]): AgentMessage[] 
 export function isSideQuestionMarker(m: LhMessage | AgentMessage | undefined): boolean {
 	if ((m as { role?: string } | undefined)?.role !== "custom") return false;
 	const type = (m as LhMarkerMessage).customType;
-	return type === "side-question" || type === "side-question-told";
+	// Fork E1: plugin markers are tail-neutral in exactly the same way.
+	return type === "side-question" || type === "side-question-told" || type === "plugin-marker";
 }
 
 function tailIgnoringSideQuestions<T>(messages: readonly T[]): readonly T[] {
@@ -699,6 +702,8 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			// Empty side markers carry no model-facing exchange.
 			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed") continue;
 			if (marker.customType === "side-question" && !marker.content) continue;
+			// Plugin markers reach the model only with host-framed modelText.
+			if (marker.customType === "plugin-marker" && !marker.content) continue;
 			// The head supersedes every compaction marker, not only its own
 			// stored position. Without a resolved head, preserve the existing
 			// full-history fallback, including the summary text.
@@ -988,7 +993,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "custom") {
 		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "plugin-problem-submission", "practice-next"].includes(message.customType)) return "learner";
-		return ["graph-context", "plan-block", "problem-dismissed", "compaction", "side-question", "side-question-told"].includes(message.customType) ? "neutral" : "unrecognizable";
+		return ["graph-context", "plan-block", "problem-dismissed", "compaction", "side-question", "side-question-told", "plugin-marker"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
 		const pluginAnswer = readPluginQuestionAnswer(message.details);

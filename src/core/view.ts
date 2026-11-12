@@ -494,6 +494,11 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			// loud transcript pills. Its quiet speech-bubble reopens the saved
 			// conversation in the floating/docked companion.
 			return;
+		case "plugin-marker": {
+			// Fork E1: the registered plugin renderer (or a muted fallback) presents it.
+			out.push({ id: marker.id, role: "user", parts: [{ type: "data-plugin-marker", id: `pm_${marker.id}`, data: marker.details }] });
+			return;
+		}
 		case "problem-dismissed":
 			// UI-only (the ask-style dismissal): the synthesized conclude
 			// pair — which rides the NEXT input — carries the record's face.

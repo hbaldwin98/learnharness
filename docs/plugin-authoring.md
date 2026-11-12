@@ -715,3 +715,11 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   `{ placement: "transcript-selection", surface: "transcript", sessionId, kind, selection: { text, messageId } }`;
   selections over 4 KB (UTF-8) show a disabled "Shorten selection" button. The `plan-node` and
   `graph-selection` placements from the design are not available yet.
+- **Transcript markers** — [`markers.append` / `registerMarkerRenderer`](plugin-api/plugin-markers.md).
+  The backend appends a `plugin-marker` entry (`details: { pluginId, typeId, data }`, data ≤ 64 KB)
+  to a native session; idle sessions are written at once, busy ones receive it right after the
+  running turn persists. It never starts a turn. With `modelText` the model reads
+  `[plugin <id>] <modelText>` from its next request; without it the marker is invisible to the
+  model. Markers are tail-neutral (they never change continuation/dismissal/retry state). The
+  frontend renderer registered for the same `typeId` mounts it; without one the host shows a
+  muted "Plugin content (<id>)" line.

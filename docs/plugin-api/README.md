@@ -34,6 +34,7 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 - [plugin-action-contexts](plugin-action-contexts.md)
 - [plugin-agents](plugin-agents.md)
 - [plugin-fields](plugin-fields.md)
+- [plugin-markers](plugin-markers.md)
 - [plugin-problems](plugin-problems.md)
 - [plugin-questions](plugin-questions.md)
 - [plugin-shortcuts](plugin-shortcuts.md)
@@ -108,6 +109,14 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginLearningData](plugins.md#pluginlearningdata) | `plugins` |
 | [PluginManifest](plugins.md#pluginmanifest) | `plugins` |
 | [PluginMarkdownProps](plugin-ui.md#pluginmarkdownprops) | `plugin-ui` |
+| [PluginMarkerDetails](plugin-markers.md#pluginmarkerdetails) | `plugin-markers` |
+| [PluginMarkerInput](plugin-markers.md#pluginmarkerinput) | `plugin-markers` |
+| [PluginMarkerReceipt](plugin-markers.md#pluginmarkerreceipt) | `plugin-markers` |
+| [PluginMarkerRenderer](plugin-markers.md#pluginmarkerrenderer) | `plugin-markers` |
+| [PluginMarkerRenderProps](plugin-markers.md#pluginmarkerrenderprops) | `plugin-markers` |
+| [PluginMarkersBackendContext](plugin-markers.md#pluginmarkersbackendcontext) | `plugin-markers` |
+| [PluginMarkerService](plugin-markers.md#pluginmarkerservice) | `plugin-markers` |
+| [PluginMarkersFrontendContext](plugin-markers.md#pluginmarkersfrontendcontext) | `plugin-markers` |
 | [PluginMenuItem](plugin-ui.md#pluginmenuitem) | `plugin-ui` |
 | [PluginMenuProps](plugin-ui.md#pluginmenuprops) | `plugin-ui` |
 | [PluginModelPickerProps](plugin-ui.md#pluginmodelpickerprops) | `plugin-ui` |
@@ -267,4 +276,4 @@ These are reachable through public data, event, inheritance or helper-type relat
 
 Standard JavaScript/DOM types (`Promise`, `AbortSignal`, `File`, `HTMLElement`, and utility types) use their standard contracts. Pi model/messages/tools and TypeBox schemas use the exact peer versions declared by the bundled SDK's `package.json`. Supply those peers when typechecking; they are development types, not permission to import private LearnHarness runtime modules.
 
-Coverage: **148 public types**, **58 supporting declarations**, **922 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
+Coverage: **156 public types**, **58 supporting declarations**, **941 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
