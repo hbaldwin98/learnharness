@@ -114,3 +114,4 @@ export * from "./plugin-action-contexts.ts";
 export * from "./plugin-markers.ts";
 export * from "./plugin-panels.ts";
 export * from "./plugin-hidden-text.ts";
+export * from "./plugin-sessions.ts";

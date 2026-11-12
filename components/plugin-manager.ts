@@ -361,7 +361,8 @@ export class PluginFrontendManager {
 		const thisManager = this;
 		let ui: import("@/src/core/plugin-ui").PluginUi | undefined;
 		const fork = createForkFrontendContext(this.fork, { pluginId: life.id, pluginName: manifest.name, signal: life.controller.signal,
-			isCurrent: () => this.current(life), addCleanup: cleanup => this.addCleanup(life, cleanup), report: error => this.report(life, error) });
+			isCurrent: () => this.current(life), addCleanup: cleanup => this.addCleanup(life, cleanup), report: error => this.report(life, error),
+			fetch: (...args) => this.host.fetch(...args), navigate: path => this.host.navigate(path) });
 		const context: PluginFrontendContext = {
 			...fork,
 			manifest, signal: life.controller.signal,

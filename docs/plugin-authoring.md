@@ -739,3 +739,11 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   `details` (return object or no details). The transcript then hides the text of the assistant
   message containing the call and of the next assistant message if it is text-only. Reasoning
   and tool cards still render; the model context and saved record are unchanged.
+- **Seeded sessions** — [`app.createSession(spec, { open })`](plugin-api/plugin-sessions.md)
+  (frontend only). Creates a native teaching/practice session through the normal create route:
+  `nodeIds` (validated against the graph, ≤ 64) become its map context; `opening` is stored as
+  a `plugin-marker` (typeId `session-opening`, `displayText` shown to the learner, `modelText`
+  read by the tutor as `[plugin <id>] …`) and is the only record of plugin origin. `start: true`
+  runs the first turn server-side immediately (interactive purpose), opened or not; if the turn
+  is refused the opening is still saved. `idempotencyKey` is permanent per plugin: the same key
+  returns the same session while it exists.

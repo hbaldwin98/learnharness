@@ -60,6 +60,13 @@ export interface PluginMarkerDetails {
 	typeId: string;
 	data: unknown;
 	idempotencyKey?: string;
+	/** Host-owned learner-visible text (E3 steers, E4 openings); shown when no
+	 * renderer is registered for the typeId. */
+	displayText?: string;
+	/** Host-owned request cause for markers that start turns (E3/E4). */
+	trigger?: "learner" | "background";
+	/** Host-owned: the session this steer targets (E3 delivery routing). */
+	chatId?: string;
 }
 
 const TYPE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -91,4 +98,13 @@ export function readPluginMarkerDetails(details: unknown): PluginMarkerDetails |
 	if (!details || typeof details !== "object") return null;
 	const value = details as Partial<PluginMarkerDetails>;
 	return typeof value.pluginId === "string" && typeof value.typeId === "string" ? value as PluginMarkerDetails : null;
+}
+
+/** Fork E3/E4: a wake whose every input is a learner-triggered plugin marker runs
+ * with interactive (foreground) purpose instead of background. */
+export function learnerTriggeredSteers(input: { type: string; steers?: readonly unknown[] }): boolean {
+	return input.type === "steers" && !!input.steers?.length && input.steers.every(steer => {
+		const message = steer as { role?: string; customType?: string; details?: { trigger?: unknown } | null };
+		return message.role === "custom" && message.customType === "plugin-marker" && message.details?.trigger === "learner";
+	});
 }

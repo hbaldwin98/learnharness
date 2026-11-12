@@ -25,6 +25,9 @@ export interface PluginMarkerDetails {
     typeId: string;
     data: unknown;
     idempotencyKey?: string;
+    displayText?: string;
+    trigger?: "learner" | "background";
+    chatId?: string;
 }
 ```
 
@@ -34,6 +37,9 @@ export interface PluginMarkerDetails {
 - [typeId](#pluginmarkerdetails-typeid)
 - [data](#pluginmarkerdetails-data)
 - [idempotencyKey](#pluginmarkerdetails-idempotencykey)
+- [displayText](#pluginmarkerdetails-displaytext)
+- [trigger](#pluginmarkerdetails-trigger)
+- [chatId](#pluginmarkerdetails-chatid)
 
 ### PluginMarkerDetails pluginId
 
@@ -57,6 +63,31 @@ data: unknown;
 
 ```ts
 idempotencyKey?: string;
+```
+
+### PluginMarkerDetails displayText
+
+Host-owned learner-visible text (E3 steers, E4 openings); shown when no
+renderer is registered for the typeId.
+
+```ts
+displayText?: string;
+```
+
+### PluginMarkerDetails trigger
+
+Host-owned request cause for markers that start turns (E3/E4).
+
+```ts
+trigger?: "learner" | "background";
+```
+
+### PluginMarkerDetails chatId
+
+Host-owned: the session this steer targets (E3 delivery routing).
+
+```ts
+chatId?: string;
 ```
 
 ## PluginMarkerInput

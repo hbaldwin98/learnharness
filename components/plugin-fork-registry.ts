@@ -11,6 +11,9 @@ export interface ForkActivationScope {
 	/** Register cleanup on the activation; returns an early remover that runs it. */
 	addCleanup(cleanup: PluginCleanup): () => void;
 	report(error: unknown): void;
+	/** Host transport/navigation for app-level fork methods. */
+	fetch?: typeof fetch;
+	navigate?(path: string): void;
 }
 export interface ForkEntry<T> {
 	readonly pluginId: string;

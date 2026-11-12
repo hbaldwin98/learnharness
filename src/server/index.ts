@@ -58,6 +58,7 @@ export { subscriptionControlsResponse, subscriptionBrowserResponse } from "./web
 export { sessionCost } from "./pricing.ts";
 export { initializePlugins, getPluginHost, getPluginAgentContributions, getPluginQuestionTypeResolver, pluginTransport } from "./plugins.ts";
 export { createPluginDocumentRoute } from "./plugin-transport.ts";
+export { pluginSessionCreation } from "./plugin-session-route.ts";
 export { pluginProblemAvailabilityOf, type ProblemTypeResolver } from "./plugin-problems.ts";
 export { pluginQuestionAvailabilityOf, reconcilePluginQuestionCompatibility, preparePluginQuestionDismissal, type QuestionTypeResolver } from "./plugin-questions.ts";
 export { claudeCodeInstallationResponse } from "./claude-code.ts";

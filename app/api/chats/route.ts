@@ -2,6 +2,7 @@ import { chainsForSelection, formatChainLine } from "@/src/core";
 import { newGraphContextMessage, type GraphContextPick } from "@/src/core";
 import { compactionInFlight, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
+import { pluginSessionCreation } from "@/src/server";
 
 /** The session picker's list: record-derived summaries (phase, pending
  *  question) + live liveness — a running turn marks the session busy
@@ -20,7 +21,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; plugin?: unknown };
+	// Fork E4: a plugin-seeded session (app.createSession) reuses this route.
+	const plugin = body.plugin === undefined ? undefined : await pluginSessionCreation(body.plugin);
+	if (plugin instanceof Response) return plugin;
+	if (plugin) { body.title = plugin.request.title; body.kind = plugin.request.spec.kind; body.graphContext = plugin.request.graphContext; }
 	const title = typeof body.title === "string" ? body.title : "";
 	// Practice sessions (owner, 2026-10-04): kind "practice" marks the
 	// record — the practice agent + its tools from turn 1, no extraction.
@@ -67,5 +72,6 @@ export async function POST(req: Request) {
 		);
 		stores.chatStore.saveMessages(chat.id, [newGraphContextMessage(picks, chainLines)]);
 	}
+	await plugin?.finish(chat.id);
 	return Response.json({ id: chat.id, title: chat.title });
 }

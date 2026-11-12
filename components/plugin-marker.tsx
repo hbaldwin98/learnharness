@@ -28,6 +28,10 @@ export function PluginMarkerPart({ data, messageId, sessionId }: { data: unknown
 		// details identity follows the record message; key/entry select the renderer.
 	}, [manager, entry, messageId, sessionId, key]);
 	if (!details) return null;
+	if ((!entry || error) && details.displayText) {
+		// Host-owned learner-visible text (plugin steers and session openings).
+		return <div data-testid="plugin-marker-text" data-plugin-marker={key} className="my-2 ml-auto max-w-[80%] whitespace-pre-wrap rounded-2xl bg-secondary px-4 py-2 text-[15px]">{details.displayText}</div>;
+	}
 	if (!entry || error) {
 		return (
 			<div data-testid="plugin-marker-fallback" data-plugin-marker={key} className="my-2 font-ui text-xs text-muted-foreground">

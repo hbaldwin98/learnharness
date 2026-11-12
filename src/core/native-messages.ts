@@ -993,6 +993,11 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "custom") {
 		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "plugin-problem-submission", "practice-next"].includes(message.customType)) return "learner";
+		// Fork E3/E4: turn-starting plugin markers carry their host-set trigger.
+		if (message.customType === "plugin-marker") {
+			const trigger = (message.details as { trigger?: unknown } | null)?.trigger;
+			return trigger === "learner" ? "learner" : trigger === "background" ? "automatic" : "neutral";
+		}
 		return ["graph-context", "plan-block", "problem-dismissed", "compaction", "side-question", "side-question-told", "plugin-marker"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
