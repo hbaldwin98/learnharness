@@ -23,7 +23,7 @@ export type * from "./plugin-submissions.ts";
 // Fork extension points (docs/fork-extension-points.md).
 import type { PluginFieldsFrontendContext } from "./plugin-fields.ts";
 export type * from "./plugin-fields.ts";
-import type { PluginTranscriptSelectionActionContext, PluginTranscriptSelectionPlacement } from "./plugin-action-contexts.ts";
+import type { PluginGraphSelectionActionContext, PluginGraphSelectionPlacement, PluginTranscriptSelectionActionContext, PluginTranscriptSelectionPlacement } from "./plugin-action-contexts.ts";
 export type * from "./plugin-action-contexts.ts";
 import type { PluginMarkersBackendContext, PluginMarkersFrontendContext } from "./plugin-markers.ts";
 export type * from "./plugin-markers.ts";
@@ -227,7 +227,8 @@ export type PluginActionContext =
 	| ({ placement: "keyboard" } & PluginPageActionContext)
 	| { placement: "sidebar"; surface: "sidebar" }
 	| { placement: "graph"; surface: "graph" }
-	| PluginTranscriptSelectionActionContext;
+	| PluginTranscriptSelectionActionContext
+	| PluginGraphSelectionActionContext;
 export interface PluginAction {
 	id: string;
 	name: string;
@@ -247,7 +248,8 @@ export type PluginActionPlacement =
 	| { id: string; actionId: string; location: "top-bar"; sessions?: ("teaching" | "practice")[]; views?: string[];
 		/** Fork E2: on a session page, clicking also opens this plugin's session panel (by panel id) before running the action. */
 		opens?: string }
-	| PluginTranscriptSelectionPlacement;
+	| PluginTranscriptSelectionPlacement
+	| PluginGraphSelectionPlacement;
 export type PluginSettingsRegistration = PluginView["mount"] | import("./plugin-ui.ts").PluginSettingsSchema;
 export interface PluginCodeBlockProps {
 	language: string;

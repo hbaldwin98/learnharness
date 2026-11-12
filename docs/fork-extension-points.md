@@ -86,4 +86,11 @@ E6 → (Mermaid) · E5 graph-selection, E4 → (deep dive) · E1, E2, E5 transcr
 - E7: hide same-message text and the following text-only message.
 - Old coding-workspace data: drop.
 - Old readings data: migrate (store → plugin data dir; markers → `plugin-marker`).
+- E3 details: steer stored as an E1 plugin-marker (modelText to tutor, displayText in details); `steer()` takes `trigger: "learner" | "background"` (learner → interactive purpose); "recently touched" = opened or updated within 30 min; `steer-only` with no live run rejects.
+- E4 details: opening stored as an E1 plugin-marker; `start: true` always starts the first turn server-side; plugin origin only in that marker's details; `idempotencyKey` scoped per plugin, permanent.
+- E5 details: `graph-selection` = Chains toolbar button (pick mode → ticked nodes in tick order, browse → all shown; chainIds = chains containing them) and graph node card (that node). `plan-node` deferred until a feature needs it.
+- Builder minor choices accepted: E5 context `surface: "transcript"`; E1 busy-turn markers land at turn settle; marker cards on learner side; panel right, 360/240px, max 70%; >4KB selection → disabled "Shorten selection"; E6 buttons before paperclip / before Submit.
+- E8 learner-text fences (added 2026-11-12 for Mermaid): learner answer/thinking text stays plain, but ``` fenced blocks render through the host code-block registry (built-in mermaid + plugin `registerCodeBlock`). Port of fork `learner-text.tsx`; applies in thinking-block, answered-card and the other learner-text displays the old fork covered.
+- E6 extensions (added for Mermaid): `run(field, { anchor: HTMLElement })` so menus can anchor to the button; optional `preview?: { mount(container, field) }` slot rendered under the field (plugin debounces); optional `onKeyDown?(event, field): boolean` (true = handled) for Enter-inside-fence; `field.setCaret(offset)` for post-insert caret placement.
+- Mermaid prompt guidance lives entirely in the plugin, including practice "judge structure, not text".
 - Upstreaming: propose E1, E2, E5, E6 later; E3 stays fork-only (minor, recommended).

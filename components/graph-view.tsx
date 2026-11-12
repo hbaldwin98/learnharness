@@ -66,6 +66,8 @@
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NotesImportControl, NotesImportErrors, NotesImportNotices, useNotesImport } from "@/components/notes-import.tsx";
 import { PluginGraphActions } from "@/components/plugin-chrome";
+import { PluginGraphSelectionActions } from "@/components/plugin-selection-popover";
+import { chainIdsContaining } from "@/src/core";
 import { SettingsSlider as SettingSlider } from "@/components/settings/controls";
 import Link from "next/link";
 import { FileTextIcon, ListTreeIcon, Loader2Icon, SearchIcon, SettingsIcon, WaypointsIcon } from "lucide-react";
@@ -1629,6 +1631,7 @@ export function GraphView({
 					className="lh-no-drag absolute z-10 w-80 max-w-[calc(100%-1rem)] rounded-xl border bg-card p-4 text-left shadow-lg"
 				>
 					<NodeCardText name={selected.node.name} statement={selected.node.statement} />
+					<PluginGraphSelectionActions surface="graph" nodeIds={[selected.node.id]} chainIds={chainIdsContaining([selected.node.id], snapshot?.chains ?? [])} className="mt-3" />
 					{selected.sourceIds.length > 0 ? (
 						<div className="mt-3 flex flex-col gap-1">
 							<div className="text-xs text-muted-foreground">Sessions</div>

@@ -36,6 +36,7 @@ features living in plugins so future upstream syncs are a cheap rebase.
 | Remote control / PWA | host commit | — |
 | Graphite breadcrumb/resume cards/hero | host commit | — |
 | Auto-updater → fork releases | host commit (config) | — |
+| Interview mode (branch `interview-mode`, 9 commits, never in main) | plugin (owner 2026-11-12) | audit after the other features |
 
 ## Extension points (generic, designed to be upstreamable)
 

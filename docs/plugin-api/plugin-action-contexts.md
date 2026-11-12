@@ -4,9 +4,96 @@
 
 [API index](README.md) · [Contextual action placements](../plugin-authoring.md#fork-extension-points)
 
+- [PluginGraphSelectionActionContext](#plugingraphselectionactioncontext)
+- [PluginGraphSelectionPlacement](#plugingraphselectionplacement)
 - [PluginTranscriptSelection](#plugintranscriptselection)
 - [PluginTranscriptSelectionActionContext](#plugintranscriptselectionactioncontext)
 - [PluginTranscriptSelectionPlacement](#plugintranscriptselectionplacement)
+
+## PluginGraphSelectionActionContext
+
+Public SDK type, exported as `PluginGraphSelectionActionContext`. Import with `import type`; the SDK has no runtime exports.
+
+Invoked from the Chains toolbar (`surface: "chains"`) or the graph's selected
+node card (`surface: "graph"`). Chains pick mode supplies the ticked nodes in
+tick order; browse mode supplies every node currently shown. The node card
+supplies its one node. `chainIds` are the chains containing any of them.
+
+```ts
+export interface PluginGraphSelectionActionContext {
+    placement: "graph-selection";
+    surface: "graph" | "chains";
+    nodeIds: readonly string[];
+    chainIds: readonly string[];
+}
+```
+
+**Member index** (including nested object members; inherited members are defined in the linked base types):
+
+- [placement](#plugingraphselectionactioncontext-placement)
+- [surface](#plugingraphselectionactioncontext-surface)
+- [nodeIds](#plugingraphselectionactioncontext-nodeids)
+- [chainIds](#plugingraphselectionactioncontext-chainids)
+
+### PluginGraphSelectionActionContext placement
+
+```ts
+placement: "graph-selection";
+```
+
+### PluginGraphSelectionActionContext surface
+
+```ts
+surface: "graph" | "chains";
+```
+
+### PluginGraphSelectionActionContext nodeIds
+
+```ts
+nodeIds: readonly string[];
+```
+
+### PluginGraphSelectionActionContext chainIds
+
+```ts
+chainIds: readonly string[];
+```
+
+## PluginGraphSelectionPlacement
+
+Public SDK type, exported as `PluginGraphSelectionPlacement`. Import with `import type`; the SDK has no runtime exports.
+
+```ts
+export interface PluginGraphSelectionPlacement {
+    id: string;
+    actionId: string;
+    location: "graph-selection";
+}
+```
+
+**Member index** (including nested object members; inherited members are defined in the linked base types):
+
+- [id](#plugingraphselectionplacement-id)
+- [actionId](#plugingraphselectionplacement-actionid)
+- [location](#plugingraphselectionplacement-location)
+
+### PluginGraphSelectionPlacement id
+
+```ts
+id: string;
+```
+
+### PluginGraphSelectionPlacement actionId
+
+```ts
+actionId: string;
+```
+
+### PluginGraphSelectionPlacement location
+
+```ts
+location: "graph-selection";
+```
 
 ## PluginTranscriptSelection
 

@@ -713,8 +713,12 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   `placeAction({ id, actionId, location: "transcript-selection" })` adds the action to the
   host selection popover over tutor text in every session. `run` receives
   `{ placement: "transcript-selection", surface: "transcript", sessionId, kind, selection: { text, messageId } }`;
-  selections over 4 KB (UTF-8) show a disabled "Shorten selection" button. The `plan-node` and
-  `graph-selection` placements from the design are not available yet.
+  selections over 4 KB (UTF-8) show a disabled "Shorten selection" button.
+- **Graph-selection actions** — `placeAction({ id, actionId, location: "graph-selection" })` adds
+  the action to the Chains toolbar (`surface: "chains"`: pick mode → ticked node ids in tick
+  order, browse mode → every node shown) and to the graph's selected-node card
+  (`surface: "graph"`: that one node). `run` receives `{ nodeIds, chainIds }`, where `chainIds`
+  are the chains containing any of those nodes. The `plan-node` placement is deferred.
 - **Transcript markers** — [`markers.append` / `registerMarkerRenderer`](plugin-api/plugin-markers.md).
   The backend appends a `plugin-marker` entry (`details: { pluginId, typeId, data }`, data ≤ 64 KB)
   to a native session; idle sessions are written at once, busy ones receive it right after the

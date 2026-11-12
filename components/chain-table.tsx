@@ -54,6 +54,8 @@
  * Read-only toward the graph.
  */
 
+import { PluginGraphSelectionActions } from "@/components/plugin-selection-popover";
+import { chainIdsContaining } from "@/src/core";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
 	ChevronDownIcon,
@@ -296,6 +298,9 @@ export function ChainTableBody({
 		return list;
 	}, [visibleChains, byId, sessions, fileSources, sort, directory, sourceRecords, searching, matchesSource, sourceInventoryPending]);
 
+	// Fork E5: pick mode → ticked nodes in tick order; browse → every node shown.
+	const pluginNodeIds = useMemo(() => selectMode ? [...selection]
+		: [...new Set(visibleChains.flatMap(chain => [...chain.premises, chain.conclusion]))], [selectMode, selection, visibleChains]);
 	// The derived shape under the floating bar (the agents' ACTUAL input).
 	const derived = useMemo(() => {
 		const selectedNodes = [...selection].map((id) => byId.get(id)).filter((n): n is GraphNode => n !== undefined);
@@ -323,6 +328,7 @@ export function ChainTableBody({
 				</span>
 				{onOrganizationChange && <button type="button" aria-label="Add folder" data-testid="add-source-folder"
 					onClick={() => setCreatingFolder(true)} className="lh-no-drag rounded-lg p-2 text-muted-foreground hover:bg-accent"><FolderPlusIcon className="size-4" /></button>}
+				<PluginGraphSelectionActions surface="chains" nodeIds={pluginNodeIds} chainIds={chainIdsContaining(pluginNodeIds, chains)} />
 				<div className="relative shrink-0">
 					<SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
 					<input

@@ -37,3 +37,26 @@ test("transcript-selection placements are accepted, filtered by location and run
 		assert.ok(Object.isFrozen(transcriptSelectionContext("s", "teaching", capture("a")).selection));
 	} finally { await manager.dispose(); }
 });
+
+test("graph-selection placements filter by location and contexts carry frozen node and chain ids", async () => {
+	const { graphSelectionContext } = await import("../components/plugin-selection-popover.tsx");
+	const { chainIdsContaining } = await import("../src/core/index.ts");
+	let ctx!: PluginFrontendContext;
+	const manager = new PluginFrontendManager({ fetch: async () => Response.json({}), pathname: () => "/", navigate() {}, async importModule() { return { activate(context) {
+		ctx = context;
+		context.registerAction({ id: "dive", name: "Deep dive", run() {} });
+		context.placeAction({ id: "g", actionId: "dive", location: "graph-selection" });
+	} }; } });
+	try {
+		manager.reconcile([info("one")]); await tick();
+		assert.ok(ctx);
+		const probe: PluginActionContext = { placement: "graph-selection", surface: "chains", nodeIds: [], chainIds: [] };
+		assert.deepEqual(placedPluginActions(manager.getSnapshot().plugins, probe).map(item => item.key), ["one/g"]);
+		assert.deepEqual(placedPluginActions(manager.getSnapshot().plugins, { placement: "graph", surface: "graph" }), []);
+		const chains = [{ id: "c1", premises: ["a"], conclusion: "b" }, { id: "c2", premises: ["x"], conclusion: "y" }, { id: "c3", premises: ["b"], conclusion: "z" }];
+		assert.deepEqual(chainIdsContaining(["b"], chains), ["c1", "c3"]);
+		const context = graphSelectionContext("chains", ["b", "a"], ["c1"]);
+		assert.deepEqual(context, { placement: "graph-selection", surface: "chains", nodeIds: ["b", "a"], chainIds: ["c1"] });
+		assert.ok(Object.isFrozen(context.nodeIds));
+	} finally { await manager.dispose(); }
+});

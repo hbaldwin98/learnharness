@@ -125,10 +125,10 @@ export type PluginActionContext = ({
 } | {
     placement: "graph";
     surface: "graph";
-} | PluginTranscriptSelectionActionContext;
+} | PluginTranscriptSelectionActionContext | PluginGraphSelectionActionContext;
 ```
 
-**Related types:** [PluginPageActionContext](plugins.md#pluginpageactioncontext), [PluginTranscriptSelectionActionContext](plugin-action-contexts.md#plugintranscriptselectionactioncontext).
+**Related types:** [PluginGraphSelectionActionContext](plugin-action-contexts.md#plugingraphselectionactioncontext), [PluginPageActionContext](plugins.md#pluginpageactioncontext), [PluginTranscriptSelectionActionContext](plugin-action-contexts.md#plugintranscriptselectionactioncontext).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
@@ -181,10 +181,10 @@ export type PluginActionPlacement = {
     sessions?: ("teaching" | "practice")[];
     views?: string[];
     opens?: string;
-} | PluginTranscriptSelectionPlacement;
+} | PluginTranscriptSelectionPlacement | PluginGraphSelectionPlacement;
 ```
 
-**Related types:** [PluginTranscriptSelectionPlacement](plugin-action-contexts.md#plugintranscriptselectionplacement).
+**Related types:** [PluginGraphSelectionPlacement](plugin-action-contexts.md#plugingraphselectionplacement), [PluginTranscriptSelectionPlacement](plugin-action-contexts.md#plugintranscriptselectionplacement).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 

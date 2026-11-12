@@ -33,3 +33,24 @@ export interface PluginTranscriptSelectionPlacement {
 export function selectionTextBytes(text: string): number {
 	return new TextEncoder().encode(text).length;
 }
+
+/** Invoked from the Chains toolbar (`surface: "chains"`) or the graph's selected
+ * node card (`surface: "graph"`). Chains pick mode supplies the ticked nodes in
+ * tick order; browse mode supplies every node currently shown. The node card
+ * supplies its one node. `chainIds` are the chains containing any of them. */
+export interface PluginGraphSelectionActionContext {
+	placement: "graph-selection";
+	surface: "graph" | "chains";
+	nodeIds: readonly string[];
+	chainIds: readonly string[];
+}
+export interface PluginGraphSelectionPlacement {
+	id: string;
+	actionId: string;
+	location: "graph-selection";
+}
+/** Ids of chains with any member (premise or conclusion) in nodeIds. */
+export function chainIdsContaining(nodeIds: readonly string[], chains: readonly { id: string; premises: readonly string[]; conclusion: string }[]): string[] {
+	const wanted = new Set(nodeIds);
+	return chains.filter(chain => wanted.has(chain.conclusion) || chain.premises.some(id => wanted.has(id))).map(chain => chain.id);
+}

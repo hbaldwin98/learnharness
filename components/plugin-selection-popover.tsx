@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
 import { PuzzleIcon } from "lucide-react";
-import { PLUGIN_SELECTION_TEXT_LIMIT, selectionTextBytes, type PluginAction, type PluginTranscriptSelectionActionContext } from "@/src/core";
+import { PLUGIN_SELECTION_TEXT_LIMIT, selectionTextBytes, type PluginAction, type PluginGraphSelectionActionContext, type PluginTranscriptSelectionActionContext } from "@/src/core";
 import { usePlugins } from "@/components/plugins";
 import { placedPluginActions, pluginActionDisabled, type PlacedPluginAction } from "@/components/plugin-chrome";
 import type { SelectionAction } from "@/components/selection-toolbar";
@@ -44,4 +44,37 @@ export function usePluginSelectionActions(sessionId: string, kind: "teaching" | 
 	const { manager, snapshot } = usePlugins();
 	return useMemo(() => pluginSelectionActions(placedPluginActions(snapshot.plugins, PROBE), sessionId, kind,
 		(item, context) => { void manager?.runAction(item.pluginId, item.action, context); }), [manager, snapshot.plugins, sessionId, kind]);
+}
+
+const GRAPH_PROBE: PluginGraphSelectionActionContext = { placement: "graph-selection", surface: "graph", nodeIds: [], chainIds: [] };
+
+export function graphSelectionContext(surface: "graph" | "chains", nodeIds: readonly string[], chainIds: readonly string[]): PluginGraphSelectionActionContext {
+	return Object.freeze({ placement: "graph-selection", surface, nodeIds: Object.freeze([...nodeIds]), chainIds: Object.freeze([...chainIds]) });
+}
+
+/** `graph-selection` actions for the Chains toolbar or the graph node card.
+ * Hidden when nothing is selected/shown. */
+export function PluginGraphSelectionActions({ surface, nodeIds, chainIds, className }: {
+	surface: "graph" | "chains"; nodeIds: readonly string[]; chainIds: readonly string[]; className?: string;
+}) {
+	const { manager, snapshot } = usePlugins();
+	const items = placedPluginActions(snapshot.plugins, GRAPH_PROBE);
+	if (!items.length || !nodeIds.length) return null;
+	const context = graphSelectionContext(surface, nodeIds, chainIds);
+	return (
+		<div data-testid="plugin-graph-selection-actions" className={`lh-no-drag flex shrink-0 flex-wrap items-center gap-1 ${className ?? ""}`}>
+			{items.map(item => {
+				const Icon = svgIcon(item.action);
+				return (
+					<button key={item.key} type="button" data-plugin-action={item.key} title={item.action.name}
+						disabled={item.busy || pluginActionDisabled(item.action, context)}
+						onClick={() => { void manager?.runAction(item.pluginId, item.action, graphSelectionContext(surface, nodeIds, chainIds)); }}
+						className="flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-card/80 px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40">
+						<Icon className="size-3.5" />
+						<span className="truncate">{item.action.name}</span>
+					</button>
+				);
+			})}
+		</div>
+	);
 }
