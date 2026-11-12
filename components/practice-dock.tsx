@@ -12,7 +12,7 @@ import { isInteractionScopeEligible } from "./plugin-input-focus";
 import { PathInput } from "@/components/path-input";
 import type { PrepareThinkingSubmission } from "./plugin-submission-adapters";
 import { cn } from "@/lib/utils";
-import { PluginFieldAccessories } from "@/components/plugin-field-accessory";
+import { usePluginLearnerField } from "@/components/plugin-field-accessory";
 
 /**
  * The practice dock (practice sessions, owner design 2026-10-04): an
@@ -79,6 +79,7 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 	const thinkingRef = useRef(thinking); thinkingRef.current = thinking;
 	const editRevision = useRef(0);
 	const editorRef = useRef<HTMLDivElement>(null);
+	const plugin = usePluginLearnerField({ kind: "practice-answer", read: () => thinkingRef.current, write: v => { thinkingRef.current = v; editRevision.current++; setThinking(v); }, editorRef });
 	useLayoutEffect(() => {
 		if (!viewReader) return;
 		const read = () => thinkingRef.current;
@@ -175,6 +176,7 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 					}}
 					onKeyDown={(e) => {
 						if (!isInteractionScopeEligible(e.currentTarget, controller)) return;
+						if (plugin.onKeyDown(e)) return;
 						// Esc ends dictation — stopPropagation claims it (the
 						// keyboard machine) so the window chain doesn't also fire.
 						if (e.key === "Escape" && onEscape) {
@@ -196,6 +198,7 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 						"field-sizing-content lh-input max-h-64 min-h-16 w-full resize-none bg-transparent px-2.5 pb-2 outline-none placeholder:text-muted-foreground",
 					)}
 				/>
+				{plugin.preview}
 				{/* The submit row (owner round 4, 2026-10-05): IDENTICAL to the
 				    question dock's — hint left, the SAME Button (h-9, px-3.5),
 				    one p-1 row. Corner radii concentric: shell 16 − m-1.5 (6) =
@@ -204,7 +207,7 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 					<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
 						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
 					</span>
-					<PluginFieldAccessories kind="practice-answer" read={() => thinkingRef.current} write={v => { thinkingRef.current = v; editRevision.current++; setThinking(v); }} editorRef={editorRef} />
+					{plugin.accessories}
 					<Button
 						type="button"
 						data-testid="practice-send"

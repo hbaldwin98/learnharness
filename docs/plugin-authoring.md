@@ -762,3 +762,8 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   registry: the built-in `mermaid` renderer, otherwise the plugin `registerCodeBlock` renderer
   for that language (with `incomplete: true` for a trailing unclosed fence). Fences without a
   renderer stay plain text. No API change: an existing code-block renderer applies automatically.
+- **Field accessory extensions** — `run(field, { anchor })` gets the host button for anchoring
+  menus; optional `preview.mount(container, field)` mounts once in a slot under each matching
+  field (re-render from `field.onChange`, debouncing yourself); optional
+  `onKeyDown(event, field)` runs before host key handling (return `true` to claim the key, e.g.
+  Enter inside a fence); `field.setCaret(offset)` places the caret after the host applies a write.

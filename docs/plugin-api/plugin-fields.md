@@ -6,6 +6,8 @@
 
 - [PLUGIN_LEARNER_FIELD_KINDS](#plugin_learner_field_kinds) — supporting declaration
 - [PluginFieldAccessory](#pluginfieldaccessory)
+- [PluginFieldAccessoryRunContext](#pluginfieldaccessoryruncontext)
+- [PluginFieldPreview](#pluginfieldpreview)
 - [PluginFieldsFrontendContext](#pluginfieldsfrontendcontext)
 - [PluginLearnerField](#pluginlearnerfield)
 - [PluginLearnerFieldBinding](#pluginlearnerfieldbinding)
@@ -34,11 +36,13 @@ export interface PluginFieldAccessory {
     label: string;
     icon: string;
     fields?: PluginLearnerFieldKind[];
-    run(field: PluginLearnerField): void | Promise<void>;
+    run(field: PluginLearnerField, context: PluginFieldAccessoryRunContext): void | Promise<void>;
+    preview?: PluginFieldPreview;
+    onKeyDown?(event: KeyboardEvent, field: PluginLearnerField): boolean;
 }
 ```
 
-**Related types:** [PluginLearnerField](plugin-fields.md#pluginlearnerfield), [PluginLearnerFieldKind](plugin-fields.md#pluginlearnerfieldkind).
+**Related types:** [PluginFieldAccessoryRunContext](plugin-fields.md#pluginfieldaccessoryruncontext), [PluginFieldPreview](plugin-fields.md#pluginfieldpreview), [PluginLearnerField](plugin-fields.md#pluginlearnerfield), [PluginLearnerFieldKind](plugin-fields.md#pluginlearnerfieldkind).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
@@ -47,6 +51,8 @@ export interface PluginFieldAccessory {
 - [icon](#pluginfieldaccessory-icon)
 - [fields](#pluginfieldaccessory-fields)
 - [run](#pluginfieldaccessory-run)
+- [preview](#pluginfieldaccessory-preview)
+- [onKeyDown](#pluginfieldaccessory-onkeydown)
 
 ### PluginFieldAccessory id
 
@@ -86,14 +92,94 @@ Invoked on click. The host prevents repeat invocation while a run is pending
 and reports thrown/rejected errors.
 
 ```ts
-run(field: PluginLearnerField): void | Promise<void>;
+run(field: PluginLearnerField, context: PluginFieldAccessoryRunContext): void | Promise<void>;
 ```
 
 | Parameter | Type |
 | --- | --- |
 | `field` | `PluginLearnerField` |
+| `context` | `PluginFieldAccessoryRunContext` |
 
 **Returns:** `void \| Promise<void>`.
+
+### PluginFieldAccessory preview
+
+Optional preview slot under each matching field.
+
+```ts
+preview?: PluginFieldPreview;
+```
+
+### PluginFieldAccessory onKeyDown
+
+Optional key handling inside matching fields, before host handling.
+Return true when handled: the host then skips its own handling and
+prevents the default. Errors count as unhandled and are reported.
+
+```ts
+onKeyDown?(event: KeyboardEvent, field: PluginLearnerField): boolean;
+```
+
+| Parameter | Type |
+| --- | --- |
+| `event` | `KeyboardEvent` |
+| `field` | `PluginLearnerField` |
+
+**Returns:** `boolean`.
+
+## PluginFieldAccessoryRunContext
+
+Public SDK type, exported as `PluginFieldAccessoryRunContext`. Import with `import type`; the SDK has no runtime exports.
+
+```ts
+export interface PluginFieldAccessoryRunContext {
+    readonly anchor: HTMLElement;
+}
+```
+
+**Member index** (including nested object members; inherited members are defined in the linked base types):
+
+- [anchor](#pluginfieldaccessoryruncontext-anchor)
+
+### PluginFieldAccessoryRunContext anchor
+
+The accessory's host button, for anchoring menus (e.g. ui.openMenu).
+
+```ts
+readonly anchor: HTMLElement;
+```
+
+## PluginFieldPreview
+
+Public SDK type, exported as `PluginFieldPreview`. Import with `import type`; the SDK has no runtime exports.
+
+```ts
+export interface PluginFieldPreview {
+    mount(container: HTMLElement, field: PluginLearnerField): void | (() => void | Promise<void>) | Promise<void | (() => void | Promise<void>)>;
+}
+```
+
+**Related types:** [PluginLearnerField](plugin-fields.md#pluginlearnerfield).
+
+**Member index** (including nested object members; inherited members are defined in the linked base types):
+
+- [mount](#pluginfieldpreview-mount)
+
+### PluginFieldPreview mount
+
+Mount once per field (and accessory registration) in a host slot under the
+field; re-render from field.onChange (the plugin debounces). Return cleanup.
+
+```ts
+mount(container: HTMLElement, field: PluginLearnerField): void | (() => void | Promise<void>) | Promise<void | (() => void | Promise<void>)>;
+```
+
+| Parameter | Type |
+| --- | --- |
+| `container` | `HTMLElement` |
+| `field` | `PluginLearnerField` |
+
+**Returns:** `void \| (() => void \| Promise<void>) \| Promise<void \| (() => void \| Promise<void>)>`.
 
 ## PluginFieldsFrontendContext
 
@@ -143,6 +229,8 @@ export interface PluginLearnerField {
     read(): string;
     write(text: string): void;
     insert(text: string): void;
+    setCaret(offset: number): void;
+    onChange(listener: (text: string) => void): () => void;
     readonly signal: AbortSignal;
 }
 ```
@@ -156,6 +244,8 @@ export interface PluginLearnerField {
 - [read](#pluginlearnerfield-read)
 - [write](#pluginlearnerfield-write)
 - [insert](#pluginlearnerfield-insert)
+- [setCaret](#pluginlearnerfield-setcaret)
+- [onChange](#pluginlearnerfield-onchange)
 - [signal](#pluginlearnerfield-signal)
 
 ### PluginLearnerField kind
@@ -209,6 +299,34 @@ insert(text: string): void;
 
 **Returns:** `void`.
 
+### PluginLearnerField setCaret
+
+Place the caret at a character offset of the draft (clamped) and focus the field.
+
+```ts
+setCaret(offset: number): void;
+```
+
+| Parameter | Type |
+| --- | --- |
+| `offset` | `number` |
+
+**Returns:** `void`.
+
+### PluginLearnerField onChange
+
+Observe draft changes (any source) until unsubscribe or handle expiry.
+
+```ts
+onChange(listener: (text: string) => void): () => void;
+```
+
+| Parameter | Type |
+| --- | --- |
+| `listener` | `(text: string) => void` |
+
+**Returns:** `() => void`.
+
 ### PluginLearnerField signal
 
 ```ts
@@ -228,6 +346,8 @@ export interface PluginLearnerFieldBinding {
     read(): string;
     write(text: string): void;
     insert(text: string): void;
+    setCaret(offset: number): void;
+    subscribe(listener: (text: string) => void): () => void;
 }
 ```
 
@@ -240,6 +360,8 @@ export interface PluginLearnerFieldBinding {
 - [read](#pluginlearnerfieldbinding-read)
 - [write](#pluginlearnerfieldbinding-write)
 - [insert](#pluginlearnerfieldbinding-insert)
+- [setCaret](#pluginlearnerfieldbinding-setcaret)
+- [subscribe](#pluginlearnerfieldbinding-subscribe)
 
 ### PluginLearnerFieldBinding kind
 
@@ -284,6 +406,30 @@ insert(text: string): void;
 | `text` | `string` |
 
 **Returns:** `void`.
+
+### PluginLearnerFieldBinding setCaret
+
+```ts
+setCaret(offset: number): void;
+```
+
+| Parameter | Type |
+| --- | --- |
+| `offset` | `number` |
+
+**Returns:** `void`.
+
+### PluginLearnerFieldBinding subscribe
+
+```ts
+subscribe(listener: (text: string) => void): () => void;
+```
+
+| Parameter | Type |
+| --- | --- |
+| `listener` | `(text: string) => void` |
+
+**Returns:** `() => void`.
 
 ## PluginLearnerFieldKind
 

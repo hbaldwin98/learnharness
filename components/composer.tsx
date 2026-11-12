@@ -7,7 +7,7 @@ import { PathInput } from "@/components/path-input";
 import { AttachFilesButton } from "@/components/attach-files-button";
 import { useOptionalInteractionLayers } from "./interaction-layers";
 import { isInteractionScopeEligible } from "./plugin-input-focus";
-import { PluginFieldAccessories } from "./plugin-field-accessory";
+import { usePluginLearnerField } from "./plugin-field-accessory";
 
 /**
  * The chat composer — content row ONLY (the persistent rounded shell lives in
@@ -89,7 +89,8 @@ export function ChatSessionComposer({
 		onChange(next);
 	}, [onChange]);
 
-	return (
+	const plugin = usePluginLearnerField({ kind: "composer", read: () => draftRef.current, write: applyDraft, editorRef: inputRef });
+	return (<>
 		<Composer
 			busy={busy}
 			value={draft}
@@ -103,9 +104,11 @@ export function ChatSessionComposer({
 			placeholder={placeholder}
 			nextProblem={nextProblem}
 			onNext={onNext}
-			accessory={<PluginFieldAccessories kind="composer" read={() => draftRef.current} write={applyDraft} editorRef={inputRef} />}
+			accessory={plugin.accessories}
+			onFieldKeyDown={plugin.onKeyDown}
 		/>
-	);
+		{plugin.preview}
+	</>);
 }
 
 export function Composer({
@@ -124,6 +127,7 @@ export function Composer({
 	defaultDropTarget = true,
 	fileInsertion = true,
 	accessory,
+	onFieldKeyDown,
 }: {
 	busy: boolean;
 	value: string;
@@ -154,6 +158,8 @@ export function Composer({
 	fileInsertion?: boolean;
 	/** Fork: plugin learner-field accessories, rendered before the paperclip. */
 	accessory?: React.ReactNode;
+	/** Fork: plugin field key handling; true = handled. */
+	onFieldKeyDown?: (event: React.KeyboardEvent) => boolean;
 }) {
 	const controller = useOptionalInteractionLayers();
 	const act = () => {
@@ -181,6 +187,7 @@ export function Composer({
 				fileInsertion={fileInsertion}
 				onKeyDown={(e) => {
 					if (!isInteractionScopeEligible(e.currentTarget, controller)) return;
+					if (onFieldKeyDown?.(e)) return;
 					// Esc ends dictation before anything else Esc might someday mean
 					// here (the dictate decisions: click-again or Esc to stop).
 					// stopPropagation claims the Esc (keyboard wave A): the

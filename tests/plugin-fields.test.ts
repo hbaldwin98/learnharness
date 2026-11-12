@@ -17,9 +17,15 @@ test("field accessories validate, bind receivers and freeze field kinds", () => 
 	assert.throws(() => preparePluginFieldAccessory(accessory({ fields: [] })), /fields/);
 	assert.throws(() => preparePluginFieldAccessory(accessory({ fields: ["nope" as never] })), /fields/);
 	assert.throws(() => preparePluginFieldAccessory(accessory({ fields: ["composer", "composer"] })), /fields/);
+	assert.throws(() => preparePluginFieldAccessory(accessory({ preview: {} as never })), /preview/);
+	assert.throws(() => preparePluginFieldAccessory(accessory({ onKeyDown: 1 as never })), /onKeyDown/);
+	const keyed = { ...accessory({ preview: { mount() {} } }), onKeyDown() { assert.equal(this, keyed); return true; } };
+	const preparedKeys = preparePluginFieldAccessory(keyed);
+	assert.equal(preparedKeys.onKeyDown!({} as KeyboardEvent, {} as never), true);
+	assert.equal(typeof preparedKeys.preview!.mount, "function");
 	const owner = { ...accessory({ fields: ["composer"] }), run() { assert.equal(this, owner); } };
 	const prepared = preparePluginFieldAccessory(owner);
-	void prepared.run({} as never);
+	void prepared.run({} as never, { anchor: {} as HTMLElement });
 	assert.ok(Object.isFrozen(prepared) && Object.isFrozen(prepared.fields));
 	assert.equal(fieldAccessoryApplies(prepared, "composer"), true);
 	assert.equal(fieldAccessoryApplies(prepared, "thinking"), false);
@@ -29,15 +35,27 @@ test("field accessories validate, bind receivers and freeze field kinds", () => 
 test("learner field handles write through the binding and throw once stale", () => {
 	let draft = "ab";
 	const controller = new AbortController();
-	const field = createPluginLearnerField({ kind: "thinking", sessionId: "s", read: () => draft, write: v => { draft = v; }, insert: v => { draft += v; } }, controller.signal);
+	const carets: number[] = [];
+	const listeners = new Set<(t: string) => void>();
+	const field = createPluginLearnerField({ kind: "thinking", sessionId: "s", read: () => draft, write: v => { draft = v; }, insert: v => { draft += v; },
+		setCaret: o => carets.push(o), subscribe: l => { listeners.add(l); return () => listeners.delete(l); } }, controller.signal);
+	const seen: string[] = [];
+	field.onChange(t => seen.push(t));
 	assert.equal(field.read(), "ab");
 	field.write("x"); field.insert("y");
 	assert.equal(draft, "xy");
+	field.setCaret(99); field.setCaret(-3); field.setCaret(1.7);
+	assert.deepEqual(carets, [2, 0, 1]);
+	assert.throws(() => field.setCaret(NaN), TypeError);
+	for (const l of listeners) l("changed");
+	assert.deepEqual(seen, ["changed"]);
 	assert.throws(() => field.write(1 as never), TypeError);
 	controller.abort();
 	assert.throws(() => field.read(), /stale/);
 	assert.throws(() => field.write("z"), /stale/);
 	assert.throws(() => field.insert("z"), /stale/);
+	assert.throws(() => field.setCaret(0), /stale/);
+	assert.equal(listeners.size, 0); // expiry unsubscribes
 	assert.equal(draft, "xy");
 });
 

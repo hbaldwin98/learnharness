@@ -44,7 +44,7 @@ import {
 } from "@/src/core";
 import type { PrepareBuiltinSubmission } from "./plugin-submission-adapters";
 import { CONFIDENCE_COLORS, confidenceRailStyle } from "@/components/confidence-rail";
-import { PluginFieldAccessories } from "@/components/plugin-field-accessory";
+import { usePluginLearnerField } from "@/components/plugin-field-accessory";
 
 /**
  * The question dock — a pending quiz/ask REPLACES the chat composer: the
@@ -493,6 +493,8 @@ function QuestionDockForm({
 	const [kbdIdx, setKbdIdx] = useState<number | null>(null);
 	const otherInputRef = useRef<HTMLDivElement>(null);
 	const thinkingRef = useRef<HTMLDivElement>(null);
+	const answerPlugin = usePluginLearnerField({ kind: "question-answer", read: () => answerTextRef.current, write: v => { answerTextRef.current = v; setText(v); }, editorRef: answerEditorRef });
+	const thinkingPlugin = usePluginLearnerField({ kind: "thinking", read: () => thinkingTextRef.current, write: v => { thinkingTextRef.current = v; setThinking(v); }, editorRef: thinkingRef });
 	// One row past the options is the trailing row: quiz → don't-know,
 	// ask → Other (a question never has both). Text mode (ask/explain)
 	// has no rows — the composer IS the answer surface.
@@ -918,6 +920,7 @@ function QuestionDockForm({
 							}}
 							onKeyDown={(e) => {
 								if (!isInteractionScopeEligible(e.currentTarget, controller)) return;
+								if (answerPlugin.onKeyDown(e)) return;
 								// Esc ends dictation (the dictate decisions: click-again
 								// or Esc) — stopPropagation claims it (keyboard wave
 								// A) so the window chain doesn't also abort a turn.
@@ -948,6 +951,7 @@ function QuestionDockForm({
 							}}
 							onKeyDown={(e) => {
 								if (!isInteractionScopeEligible(e.currentTarget, controller)) return;
+								if (thinkingPlugin.onKeyDown(e)) return;
 								// Esc ends dictation (the dictate decisions: click-again
 								// or Esc) — stopPropagation claims it (keyboard wave
 								// A) so the window chain doesn't also abort a turn.
@@ -975,13 +979,12 @@ function QuestionDockForm({
 							)}
 						/>
 					)}
+					{qd.mode === "text" ? answerPlugin.preview : thinkingPlugin.preview}
 					<div className="flex items-center justify-between gap-2 p-1">
 						<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
 								{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
 						</span>
-						{qd.mode === "text"
-							? <PluginFieldAccessories kind="question-answer" read={() => answerTextRef.current} write={v => { answerTextRef.current = v; setText(v); }} editorRef={answerEditorRef} />
-							: <PluginFieldAccessories kind="thinking" read={() => thinkingTextRef.current} write={v => { thinkingTextRef.current = v; setThinking(v); }} editorRef={thinkingRef} />}
+						{qd.mode === "text" ? answerPlugin.accessories : thinkingPlugin.accessories}
 						<Button
 							type="submit"
 							disabled={!canSubmit || compactionRunning || preparing}
