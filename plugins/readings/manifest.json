@@ -1,0 +1,11 @@
+{
+  "apiVersion": 1,
+  "id": "readings",
+  "name": "Readings",
+  "version": "0.1.0",
+  "minAppVersion": "0.6.1",
+  "description": "Opt-in companion documents beside your lessons: primers, overviews, deep dives and recaps, written in the background from model knowledge or web research, with Discuss to ask questions inside a reading. Writing and answering use your configured model and may incur cost.",
+  "main": "main.js",
+  "backend": "backend.cjs",
+  "styles": "styles.css"
+}
