@@ -230,6 +230,7 @@ export interface PluginLearnerField {
     write(text: string): void;
     insert(text: string): void;
     setCaret(offset: number): void;
+    caret(): number;
     onChange(listener: (text: string) => void): () => void;
     readonly signal: AbortSignal;
 }
@@ -245,6 +246,7 @@ export interface PluginLearnerField {
 - [write](#pluginlearnerfield-write)
 - [insert](#pluginlearnerfield-insert)
 - [setCaret](#pluginlearnerfield-setcaret)
+- [caret](#pluginlearnerfield-caret)
 - [onChange](#pluginlearnerfield-onchange)
 - [signal](#pluginlearnerfield-signal)
 
@@ -313,6 +315,17 @@ setCaret(offset: number): void;
 
 **Returns:** `void`.
 
+### PluginLearnerField caret
+
+The caret offset in the field's source text (file-path chips count by
+their source length); the draft length when the field has no live editor.
+
+```ts
+caret(): number;
+```
+
+**Returns:** `number`.
+
 ### PluginLearnerField onChange
 
 Observe draft changes (any source) until unsubscribe or handle expiry.
@@ -347,6 +360,7 @@ export interface PluginLearnerFieldBinding {
     write(text: string): void;
     insert(text: string): void;
     setCaret(offset: number): void;
+    caret(): number;
     subscribe(listener: (text: string) => void): () => void;
 }
 ```
@@ -361,6 +375,7 @@ export interface PluginLearnerFieldBinding {
 - [write](#pluginlearnerfieldbinding-write)
 - [insert](#pluginlearnerfieldbinding-insert)
 - [setCaret](#pluginlearnerfieldbinding-setcaret)
+- [caret](#pluginlearnerfieldbinding-caret)
 - [subscribe](#pluginlearnerfieldbinding-subscribe)
 
 ### PluginLearnerFieldBinding kind
@@ -418,6 +433,14 @@ setCaret(offset: number): void;
 | `offset` | `number` |
 
 **Returns:** `void`.
+
+### PluginLearnerFieldBinding caret
+
+```ts
+caret(): number;
+```
+
+**Returns:** `number`.
 
 ### PluginLearnerFieldBinding subscribe
 

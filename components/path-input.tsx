@@ -22,6 +22,8 @@ export const INSERT_CITATION_EVENT = "lh:insert-citation";
 export const INSERT_TEXT_EVENT = "lh:insert-text";
 /** detail: { offset } — move the caret to a value offset and focus (fork: plugin field accessories). */
 export const SET_CARET_EVENT = "lh:set-caret";
+/** detail: { offset? } — report the saved caret (source-text offset) into detail (fork: plugin field accessories). */
+export const GET_CARET_EVENT = "lh:get-caret";
 export const UPDATE_CITATION_EVENT = "lh:update-citation";
 export type CitationInsertedRange = { start: number; end: number; spaceBefore: boolean; spaceAfter: boolean };
 export type InsertCitationDetail = { link: string; onInserted?: (range: CitationInsertedRange) => void };
@@ -151,6 +153,12 @@ export const PathInput = React.forwardRef<HTMLDivElement, PathInputProps>(functi
 		function insertTextEvent(event: Event) {
 			const detail = (event as CustomEvent<{ text?: unknown; inserted?: boolean } | null>).detail;
 			if (detail && typeof detail.text === "string" && !composing.current) { replace(detail.text); detail.inserted = true; }
+		}
+		function getCaretEvent(event: Event) {
+			const detail = (event as CustomEvent<{ offset?: number } | null>).detail;
+			if (!detail) return;
+			remember();
+			detail.offset = clampPathSelection(current, saved).focus;
 		}
 		function setCaretEvent(event: Event) {
 			const offset = (event as CustomEvent<{ offset?: unknown } | null>).detail?.offset;
@@ -303,6 +311,7 @@ export const PathInput = React.forwardRef<HTMLDivElement, PathInputProps>(functi
 		root.addEventListener(INSERT_CITATION_EVENT, insertCitationEvent);
 		root.addEventListener(INSERT_TEXT_EVENT, insertTextEvent);
 		root.addEventListener(SET_CARET_EVENT, setCaretEvent);
+		root.addEventListener(GET_CARET_EVENT, getCaretEvent);
 		root.addEventListener(UPDATE_CITATION_EVENT, updateCitationEvent);
 		root.addEventListener("beforeinput", beforeInput);
 		root.addEventListener("input", input);
@@ -321,6 +330,7 @@ export const PathInput = React.forwardRef<HTMLDivElement, PathInputProps>(functi
 			root.removeEventListener(INSERT_CITATION_EVENT, insertCitationEvent);
 			root.removeEventListener(INSERT_TEXT_EVENT, insertTextEvent);
 			root.removeEventListener(SET_CARET_EVENT, setCaretEvent);
+			root.removeEventListener(GET_CARET_EVENT, getCaretEvent);
 			root.removeEventListener(UPDATE_CITATION_EVENT, updateCitationEvent);
 			root.removeEventListener("beforeinput", beforeInput);
 			root.removeEventListener("input", input);

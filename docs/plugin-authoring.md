@@ -776,3 +776,5 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   and the standard composer's `dictation`) fires once per committed transcript chunk, before
   `onTranscript`, with the commit time in epoch ms, so a plugin can run its own pause detection.
   `onTranscript` is unchanged.
+- **Field caret** — `field.caret()` returns the caret offset in the field's source text (a
+  file-path chip counts by its source length), or the draft length without a live editor.

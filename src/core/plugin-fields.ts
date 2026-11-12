@@ -24,6 +24,9 @@ export interface PluginLearnerField {
 	insert(text: string): void;
 	/** Place the caret at a character offset of the draft (clamped) and focus the field. */
 	setCaret(offset: number): void;
+	/** The caret offset in the field's source text (file-path chips count by
+	 * their source length); the draft length when the field has no live editor. */
+	caret(): number;
 	/** Observe draft changes (any source) until unsubscribe or handle expiry. */
 	onChange(listener: (text: string) => void): () => void;
 	readonly signal: AbortSignal;
@@ -94,6 +97,7 @@ export interface PluginLearnerFieldBinding {
 	write(text: string): void;
 	insert(text: string): void;
 	setCaret(offset: number): void;
+	caret(): number;
 	subscribe(listener: (text: string) => void): () => void;
 }
 /** Create a stale-checked handle; every call rechecks `signal` before touching the field. */
@@ -109,6 +113,11 @@ export function createPluginLearnerField(binding: PluginLearnerFieldBinding, sig
 			live();
 			if (typeof offset !== "number" || !Number.isFinite(offset)) throw new TypeError("Caret offset must be a finite number");
 			binding.setCaret(Math.max(0, Math.min(Math.trunc(offset), binding.read().length)));
+		},
+		caret: () => {
+			live();
+			const offset = binding.caret();
+			return Math.max(0, Math.min(Number.isFinite(offset) ? Math.trunc(offset) : 0, binding.read().length));
 		},
 		onChange: (listener: (value: string) => void) => {
 			live();

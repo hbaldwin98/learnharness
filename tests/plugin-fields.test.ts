@@ -32,13 +32,13 @@ test("field accessories validate, bind receivers and freeze field kinds", () => 
 	assert.equal(fieldAccessoryApplies(accessory(), "practice-answer"), true);
 });
 
-test("learner field handles write through the binding and throw once stale", () => {
+test("learner field handles write through the binding and throw once stale", async () => {
 	let draft = "ab";
 	const controller = new AbortController();
 	const carets: number[] = [];
 	const listeners = new Set<(t: string) => void>();
 	const field = createPluginLearnerField({ kind: "thinking", sessionId: "s", read: () => draft, write: v => { draft = v; }, insert: v => { draft += v; },
-		setCaret: o => carets.push(o), subscribe: l => { listeners.add(l); return () => listeners.delete(l); } }, controller.signal);
+		setCaret: o => carets.push(o), caret: () => 99, subscribe: l => { listeners.add(l); return () => listeners.delete(l); } }, controller.signal);
 	const seen: string[] = [];
 	field.onChange(t => seen.push(t));
 	assert.equal(field.read(), "ab");
@@ -47,6 +47,8 @@ test("learner field handles write through the binding and throw once stale", () 
 	field.setCaret(99); field.setCaret(-3); field.setCaret(1.7);
 	assert.deepEqual(carets, [2, 0, 1]);
 	assert.throws(() => field.setCaret(NaN), TypeError);
+	assert.equal(field.caret(), 2); // clamped to the draft
+	assert.equal((await import("../components/plugin-field-accessory.tsx")).readFieldCaret(null), null);
 	for (const l of listeners) l("changed");
 	assert.deepEqual(seen, ["changed"]);
 	assert.throws(() => field.write(1 as never), TypeError);
@@ -55,6 +57,7 @@ test("learner field handles write through the binding and throw once stale", () 
 	assert.throws(() => field.write("z"), /stale/);
 	assert.throws(() => field.insert("z"), /stale/);
 	assert.throws(() => field.setCaret(0), /stale/);
+	assert.throws(() => field.caret(), /stale/);
 	assert.equal(listeners.size, 0); // expiry unsubscribes
 	assert.equal(draft, "xy");
 });

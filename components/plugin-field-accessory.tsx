@@ -6,7 +6,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPluginLearnerField, fieldAccessoryApplies, type PluginFieldAccessory, type PluginLearnerField, type PluginLearnerFieldKind } from "@/src/core";
 import { usePlugins } from "@/components/plugins";
-import { INSERT_TEXT_EVENT, SET_CARET_EVENT } from "@/components/path-input";
+import { GET_CARET_EVENT, INSERT_TEXT_EVENT, SET_CARET_EVENT } from "@/components/path-input";
 import { FIELD_ACCESSORIES } from "@/components/plugin-fork-context";
 import type { ForkEntry, PluginForkRegistry } from "@/components/plugin-fork-registry";
 
@@ -35,6 +35,14 @@ export function insertIntoField(editor: HTMLElement | null | undefined, text: st
 
 type Accessory = Readonly<PluginFieldAccessory>;
 type AccessoryEntry = ForkEntry<Accessory>;
+
+/** Read the editor's saved caret (source-text offset); null without a live editor. */
+export function readFieldCaret(editor: HTMLElement | null | undefined): number | null {
+	if (!editor?.isConnected) return null;
+	const detail: { offset?: number } = {};
+	editor.dispatchEvent(new CustomEvent(GET_CARET_EVENT, { detail }));
+	return typeof detail.offset === "number" ? detail.offset : null;
+}
 
 /** Move the caret after React applies pending draft writes. */
 export function setFieldCaret(editor: HTMLElement | null | undefined, offset: number) {
@@ -78,6 +86,7 @@ export function usePluginLearnerField({ kind, read, write, editorRef }: {
 			write: value => binding.current.write(value),
 			insert: value => insertIntoField(editorRef?.current, value, binding.current.read, binding.current.write),
 			setCaret: offset => setFieldCaret(editorRef?.current, offset),
+			caret: () => readFieldCaret(editorRef?.current) ?? binding.current.read().length,
 			subscribe: listener => { listeners.current.add(listener); return () => { listeners.current.delete(listener); }; },
 		}, AbortSignal.any([lifetime.signal, entry.signal]));
 	}, [lifetime, sessionId, kind, editorRef]);
