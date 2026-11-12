@@ -15,6 +15,7 @@ import type { PluginAgentService } from "../core/plugin-agents.ts";
 import type { PluginWorkerService } from "../core/plugin-workers.ts";
 import type { ServerEvent } from "../core/events.ts";
 import { safePluginDataDirectory } from "../store/plugin-data-paths.ts";
+import { markHidesTurnText, validateHidesTurnText } from "../core/plugin-hidden-text.ts";
 
 /** Expected host/transport failure. Exceptions thrown by plugin handlers stay ordinary 500 errors. */
 export class PluginHostError extends Error {
@@ -54,7 +55,7 @@ export interface PluginHostDependencies {
 	installationErrors?: Record<string, string>;
 }
 interface Instructions { agents: Set<PluginAgentKind>; text: string }
-interface Tools { agents: Set<PluginAgentKind>; create: PluginTools["create"] }
+interface Tools { agents: Set<PluginAgentKind>; create: PluginTools["create"]; hides?: ReadonlySet<string> }
 type QuestionDefinition = NativePluginQuestionDefinition;
 /** Frozen per-turn provenance, admitted atomically with ordinary package contributions. */
 export interface PluginQuestionContribution {
@@ -263,7 +264,7 @@ export function createPluginHost(deps: PluginHostDependencies) {
 						requireLive();
 						const agents = targets(contribution?.agents);
 						if (typeof contribution.create !== "function") throw new Error("Plugin tools require a native tool factory");
-						const registered = { agents, create: contribution.create.bind(contribution) };
+						const registered = { agents, create: contribution.create.bind(contribution), hides: validateHidesTurnText(contribution.hidesTurnText) };
 						activation.tools.add(registered);
 						return () => { activation.tools.delete(registered); };
 					},
@@ -455,7 +456,7 @@ export function createPluginHost(deps: PluginHostDependencies) {
 									if (live(pkg, activation) && !combined.aborted) onUpdate(update);
 								} : undefined);
 								combined.throwIfAborted();
-								return output;
+								return factory.hides?.has(tool.name) ? markHidesTurnText(output) : output;
 							},
 						});
 					}

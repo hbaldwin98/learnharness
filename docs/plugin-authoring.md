@@ -730,3 +730,8 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   survives turns and streaming and is aborted on leaving the session, close/switch, unregister or
   disable. A `top-bar` placement may declare `opens: "<panel id>"` to open that panel on click
   (the action still runs).
+- **Hiding turn text** — [`registerTools({ ..., hidesTurnText })`](plugin-api/plugin-hidden-text.md).
+  A successful call to a listed tool gets a host flag (`lhHidesTurnText`) in its result
+  `details` (return object or no details). The transcript then hides the text of the assistant
+  message containing the call and of the next assistant message if it is text-only. Reasoning
+  and tool cards still render; the model context and saved record are unchanged.

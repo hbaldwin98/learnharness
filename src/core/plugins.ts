@@ -29,6 +29,8 @@ import type { PluginMarkersBackendContext, PluginMarkersFrontendContext } from "
 export type * from "./plugin-markers.ts";
 import type { PluginPanelsAppContext, PluginPanelsFrontendContext } from "./plugin-panels.ts";
 export type * from "./plugin-panels.ts";
+import type { PluginHiddenTurnTextTools } from "./plugin-hidden-text.ts";
+export type * from "./plugin-hidden-text.ts";
 
 export const PLUGIN_API_VERSION = 1 as const;
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -133,7 +135,7 @@ export interface PluginToolContext {
 	readonly agent: PluginAgentKind;
 }
 /** A fresh native Pi loadout per conversation turn; no private app imports. */
-export interface PluginTools {
+export interface PluginTools extends PluginHiddenTurnTextTools {
 	agents: PluginAgentKind[];
 	/** Create fresh native tools for the matching turn's frozen chat/agent context.
 	 * Factory/admission errors omit this plugin's contribution for that turn rather

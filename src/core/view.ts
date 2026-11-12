@@ -41,6 +41,7 @@ import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
 import type { PlanBlockData } from "./contracts/chat.ts";
+import { hiddenTurnTextIds } from "./plugin-hidden-text.ts";
 
 /** One projected transcript part consumed by host renderers and phase/input
  * scanners. type selects the part vocabulary; common fields are optional
@@ -141,6 +142,8 @@ function lastSuccessfulPlanInit(parts: LhViewPart[]): number {
  *  view messages. Pure: the same input always projects to the same list. */
 export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
 	const out: LhViewMessage[] = [];
+	// Fork E7: text hidden by a plugin tool's successful call (presentation only).
+	const hiddenText = hiddenTurnTextIds(messages);
 	// Output calls become text rather than tool parts, so read settled
 	// failures up front: a failed call must retain the normal error path.
 	const outputErrors = new Map<string, ToolResultMessage>();
@@ -245,6 +248,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
+					if (hiddenText.has(m.id)) continue;
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });

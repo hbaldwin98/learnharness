@@ -1998,13 +1998,13 @@ Public SDK type, exported as `PluginTools`. Import with `import type`; the SDK h
 A fresh native Pi loadout per conversation turn; no private app imports.
 
 ```ts
-export interface PluginTools {
+export interface PluginTools extends PluginHiddenTurnTextTools {
     agents: PluginAgentKind[];
     create(context: PluginToolContext): AgentTool<any>[];
 }
 ```
 
-**Related types:** [PluginAgentKind](plugins.md#pluginagentkind), [PluginToolContext](plugins.md#plugintoolcontext).
+**Related types:** [PluginAgentKind](plugins.md#pluginagentkind), [PluginHiddenTurnTextTools](plugin-hidden-text.md#pluginhiddenturntexttools), [PluginToolContext](plugins.md#plugintoolcontext).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
