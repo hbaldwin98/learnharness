@@ -73,7 +73,11 @@ export interface WorkspaceDeps {
 interface Live {
 	record: WorkspaceRecord;
 	diagnostics: DiagnosticsSession | null;
+	/** Progress text for the pane (a Run or an image build). */
 	running: string | null;
+	/** A Run is in progress (image builds for the language server don't block Run). */
+	runBusy: boolean;
+	diagnosticsStarting?: boolean;
 	listen: ListenState;
 	docker: DockerStatus;
 	/** Editors currently mounted for this item (several windows may show it). */
@@ -118,10 +122,15 @@ export function createWorkspaces(deps: WorkspaceDeps) {
 
 	async function startDiagnostics(item: Live) {
 		const spec = languageSpec(item.record.language);
-		if (!spec || item.diagnostics || item.docker !== "running") return;
+		if (!spec || item.diagnostics || item.diagnosticsStarting || item.docker !== "running") return;
+		item.diagnosticsStarting = true;
+		try { await startDiagnosticsNow(item, spec); } finally { item.diagnosticsStarting = false; }
+	}
+
+	async function startDiagnosticsNow(item: Live, spec: LanguageSpec) {
 		const key = { chatId: item.record.chatId, itemId: item.record.itemId };
-		const image = await deps.runner.ensureImage(spec.image, line => { item.running = line; publish(item); }).catch(error => ({ ok: false as const, output: String(error) }));
-		item.running = null;
+		const image = await deps.runner.ensureImage(spec.image, line => { if (!item.runBusy) { item.running = line; publish(item); } }).catch(error => ({ ok: false as const, output: String(error) }));
+		if (!item.runBusy) item.running = null;
 		if (!image.ok) { publish(item); return; }
 		if (item.diagnostics || item.opened === 0) return;
 		item.diagnostics = deps.startDiagnostics(key, spec, item.record.code, () => publish(item));
@@ -190,7 +199,7 @@ export function createWorkspaces(deps: WorkspaceDeps) {
 				};
 				record.tests = input.tests ?? record.tests;
 				record.language = input.language;
-				item = { record, diagnostics: null, running: null, listen: newListenState(now()), docker: "missing", opened: 0 };
+				item = { record, diagnostics: null, running: null, runBusy: false, listen: newListenState(now()), docker: "missing", opened: 0 };
 				live.set(keyString(key), item);
 			}
 			item.opened++;
@@ -225,6 +234,16 @@ export function createWorkspaces(deps: WorkspaceDeps) {
 			await session?.stop().catch(() => {});
 		},
 
+		/** The container went away (idle sweep): stop its language server; it restarts on the next open or Run. */
+		async containerRemoved(key: ItemKey) {
+			const item = get(key);
+			if (!item?.diagnostics) return;
+			const session = item.diagnostics;
+			item.diagnostics = null;
+			await session.stop().catch(() => {});
+			publish(item);
+		},
+
 		presence(key: ItemKey) {
 			const item = get(key);
 			if (item) item.listen.presentAt = now();
@@ -233,10 +252,11 @@ export function createWorkspaces(deps: WorkspaceDeps) {
 		async run(key: ItemKey, code: string, signal?: AbortSignal): Promise<RunRecord> {
 			const item = require(key);
 			const r = item.record;
-			if (item.running) throw new Error("A run is already in progress");
+			if (item.runBusy) throw new Error("A run is already in progress");
 			if (!r.tests) throw new Error("This item has no tests to run");
 			this.code(key, code);
 			const spec = languageSpec(r.language);
+			item.runBusy = true;
 			item.running = "Starting…";
 			publish(item);
 			let result: CodingTestResult;
@@ -251,10 +271,11 @@ export function createWorkspaces(deps: WorkspaceDeps) {
 				result = await deps.runner.runRecipe({ key, image: spec.image, answer: r.code, tests: r.tests, ...(signal ? { signal } : {}) });
 				void startDiagnostics(item);
 			} catch (error) {
-				if (signal?.aborted) { item.running = null; publish(item); throw error; }
+				if (signal?.aborted) { item.running = null; item.runBusy = false; publish(item); throw error; }
 				result = { status: "error", exitCode: null, stdout: "", stderr: "", stdoutTruncated: false, stderrTruncated: false, message: error instanceof Error ? error.message : String(error) };
 			} finally {
 				item.running = null;
+				item.runBusy = false;
 			}
 			const record: RunRecord = { at: iso(), result };
 			r.runs.push(record);

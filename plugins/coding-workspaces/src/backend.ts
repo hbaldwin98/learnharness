@@ -46,7 +46,7 @@ export function activate(ctx: PluginBackendContext): () => Promise<void> {
 	let settings = readSettings(settingsFile);
 	const runner = createDockerRunner({
 		imageRoot: path.join(ctx.directory, "docker"),
-		onIdleRemoved: key => { void workspaces.close(key); },
+		onIdleRemoved: key => { void workspaces.containerRemoved(key); },
 	});
 	const workspaces = createWorkspaces({
 		runner,
