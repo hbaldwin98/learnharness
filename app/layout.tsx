@@ -3,6 +3,7 @@ import { JetBrains_Mono, Source_Sans_3 } from "next/font/google";
 import { connection } from "next/server";
 import "katex/dist/katex.min.css";
 import "./globals.css";
+import "./phone.css"; // fork: phone layout
 import { AppShell, SidebarProvider } from "@/components/sidebar";
 import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";

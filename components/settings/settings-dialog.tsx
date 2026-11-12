@@ -33,7 +33,7 @@ import {
 	type ReactNode,
 	type RefObject,
 } from "react";
-import { BotIcon, KeyIcon, KeyboardIcon, PaletteIcon, PlugIcon, PuzzleIcon, SettingsIcon, WaypointsIcon, type LucideIcon } from "lucide-react";
+import { BotIcon, KeyIcon, KeyboardIcon, PaletteIcon, PlugIcon, PuzzleIcon, SettingsIcon, SmartphoneIcon, WaypointsIcon, type LucideIcon } from "lucide-react";
 import { HostDialog } from "@/components/host-dialog";
 import { useInteractionLayers, type CloseOutcome } from "@/components/interaction-layers";
 import {
@@ -55,6 +55,7 @@ import { KeysSection } from "./keys-section.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
+import { RemoteSection } from "./remote-section.tsx"; // fork: phone remote control
 import { PluginsSection } from "./plugins-section.tsx";
 import { PluginSettingsPage } from "./plugin-settings-page.tsx";
 import { usePlugins } from "@/components/plugins";
@@ -70,6 +71,7 @@ const SECTIONS = [
 	{ id: "appearance", label: "Appearance", icon: PaletteIcon },
 	{ id: "graph", label: "Graph", icon: WaypointsIcon },
 	{ id: "keyboard", label: "Keyboard", icon: KeyboardIcon, hint: "Stored on this device" },
+	{ id: "remote", label: "Remote", icon: SmartphoneIcon }, // fork: phone remote control
 	{ id: "general", label: "General", icon: SettingsIcon },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"] | "plugins" | "core-plugins" | `plugin:${string}`;
@@ -517,6 +519,11 @@ export function SettingsDialogBody({
 									testid="section-keyboard"
 								>
 									<KeyboardSection />
+								</SettingsSection>
+							)}
+							{active === "remote" && (
+								<SettingsSection title="Remote" testid="section-remote">
+									<RemoteSection />
 								</SettingsSection>
 							)}
 						</div>

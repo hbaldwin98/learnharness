@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { ChatInput, LhMessage, QuestionAnswerData } from "@/src/core";
 import { SessionModel, type SessionState } from "@/components/session-core";
+import { frameBatched } from "@/components/phone"; // fork: phone layout
 
 export interface UseChatSessionOptions {
 	chatId: string;
@@ -44,7 +45,7 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 	// error banner. The empty-session bug, 2026-09-26.)
 	const [version, bump] = useReducer((n: number) => n + 1, 0);
 	useEffect(() => {
-		model.onChange = bump;
+		model.onChange = frameBatched(bump); // fork: phones re-render once per frame
 		return () => {
 			model.onChange = undefined;
 		};
