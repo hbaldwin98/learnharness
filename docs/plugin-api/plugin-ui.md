@@ -445,6 +445,7 @@ Public SDK type, exported as `PluginDictationProps`. Import with `import type`; 
 export interface PluginDictationProps {
     disabled?: boolean;
     onTranscript: PluginUiCallback<string>;
+    onCommit?: (text: string, at: number) => void;
 }
 ```
 
@@ -454,6 +455,7 @@ export interface PluginDictationProps {
 
 - [disabled](#plugindictationprops-disabled)
 - [onTranscript](#plugindictationprops-ontranscript)
+- [onCommit](#plugindictationprops-oncommit)
 
 ### PluginDictationProps disabled
 
@@ -466,6 +468,23 @@ disabled?: boolean;
 ```ts
 onTranscript: PluginUiCallback<string>;
 ```
+
+### PluginDictationProps onCommit
+
+Fork E10: called once per committed transcript chunk, before onTranscript,
+with the commit time (epoch ms) — for plugin pause/silence detection.
+Observational: failures are reported and never block delivery.
+
+```ts
+onCommit?: (text: string, at: number) => void;
+```
+
+| Parameter | Type |
+| --- | --- |
+| `text` | `string` |
+| `at` | `number` |
+
+**Returns:** `void`.
 
 ## PluginKnowledgePickerProps
 

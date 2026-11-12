@@ -772,3 +772,7 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   as `<pluginId>-<file stem>` themes (labelled "plugin", no remove button) and get the
   first-paint inline style like imported themes. Invalid files are skipped. Disabling the plugin
   removes them; a selected one then renders as Default.
+- **Dictation commit events** — `PluginDictationProps.onCommit(text, at)` (for `mountDictation`
+  and the standard composer's `dictation`) fires once per committed transcript chunk, before
+  `onTranscript`, with the commit time in epoch ms, so a plugin can run its own pause detection.
+  `onTranscript` is unchanged.

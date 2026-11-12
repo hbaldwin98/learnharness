@@ -31,7 +31,7 @@ features living in plugins so future upstream syncs are a cheap rebase.
 | Graphite colours + CSS/fonts | theme JSON + style plugin | (E8 stable hooks, optional) |
 | Readings + overview + Discuss | plugin | E1 markers, E2 side panel, E5 selection/plan-node action context |
 | Coding workspaces | plugin | E1, E2, E3 plugin steer/turn, E7 hide turn text |
-| Deep dive from practice | plugin | E4 seeded session create, E5 graph/chains selection context |
+| Deep dive from practice | part of the readings plugin (owner 2026-11-12: old behaviour = generate a node reading, not a session) | E5 graph-selection; host commit: Home/new-session persist their draft across navigation ("return to your picks") |
 | Local + phone dictation | host commit | — |
 | Remote control / PWA | host commit | — |
 | Graphite breadcrumb/resume cards/hero | host commit | — |

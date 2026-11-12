@@ -49,6 +49,10 @@ export interface PluginComposerProps {
 export interface PluginDictationProps {
 	disabled?: boolean;
 	onTranscript: PluginUiCallback<string>;
+	/** Fork E10: called once per committed transcript chunk, before onTranscript,
+	 * with the commit time (epoch ms) — for plugin pause/silence detection.
+	 * Observational: failures are reported and never block delivery. */
+	onCommit?: (text: string, at: number) => void;
 }
 export interface PluginDictationHandle extends PluginWidgetHandle<PluginDictationProps> {
 	/** Start recording when idle, or stop and keep speech when active. One recording

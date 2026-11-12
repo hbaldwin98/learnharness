@@ -54,12 +54,18 @@ export function PluginComposer({ value, onChange, onSend, busy = false, onStop, 
 		placeholder={placeholder} autoFocus={autoFocus} defaultDropTarget={false} fileInsertion={false} />;
 }
 
-export function PluginDictation({ onTranscript, disabled, onError = reportDefault, actionRef, signal }: PluginDictationProps & Extra & { actionRef?: RefObject<Dictation | null> }) {
+/** Fork E10: one commit notification per transcript chunk; failures are reported only. */
+export function notifyCommit(onCommit: ((text: string, at: number) => void) | undefined, text: string, onError: (error: unknown) => void) {
+	if (typeof onCommit !== "function") return;
+	try { onCommit(text, Date.now()); } catch (error) { onError(error); }
+}
+
+export function PluginDictation({ onTranscript, onCommit, disabled, onError = reportDefault, actionRef, signal }: PluginDictationProps & Extra & { actionRef?: RefObject<Dictation | null> }) {
 	const root = useRef<HTMLDivElement>(null);
-	const latest = useRef(onTranscript);
-	latest.current = onTranscript;
+	const latest = useRef({ onTranscript, onCommit });
+	latest.current = { onTranscript, onCommit };
 	const delivery = useRef(createTranscriptDelivery());
-	const dictation = usePluginDictation({ append: (text) => delivery.current.append(() => latest.current(text), onError), disabled });
+	const dictation = usePluginDictation({ append: (text) => { notifyCommit(latest.current.onCommit, text, onError); return delivery.current.append(() => latest.current.onTranscript(text), onError); }, disabled });
 	useAbortDictation(signal, dictation.cancel);
 	useEffect(() => {
 		if (actionRef) actionRef.current = dictation;
@@ -78,7 +84,7 @@ export function PluginStandardComposer({ composer, model, thinking, dictation: d
 	const thinkingCommand = useRef<PickerCommand | null>(null);
 	const dictation = usePluginDictation({
 		disabled: dictationProps.disabled,
-		append: (text) => delivery.current.append(() => latest.current.dictationProps.onTranscript(text), onError),
+		append: (text) => { notifyCommit(latest.current.dictationProps.onCommit, text, onError); return delivery.current.append(() => latest.current.dictationProps.onTranscript(text), onError); },
 	});
 	useAbortDictation(signal, dictation.cancel);
 	useEffect(() => {
