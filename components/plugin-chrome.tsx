@@ -9,12 +9,15 @@ import { useSidebar } from "@/components/sidebar";
 import { useInteractionLayers } from "@/components/interaction-layers";
 import { MenuShell } from "@/components/menu-shell";
 import { Hint } from "@/components/ui/hint";
+import { pluginPanelStore } from "@/components/plugin-panel-store";
 
 export interface PlacedPluginAction {
 	key: string;
 	pluginId: string;
 	action: PluginAction;
 	busy: boolean;
+	/** Fork E2: session panel id this top-bar placement opens. */
+	opens?: string;
 }
 
 /** Registration is not placement. View targets always belong to the placing plugin. */
@@ -29,7 +32,8 @@ export function placedPluginActions(plugins: readonly FrontendPlugin[], context:
 				if (context.surface === "plugin-view" && (context.pluginId !== plugin.info.id || !placement.views?.includes(context.viewId))) return [];
 			}
 			const action = plugin.actions.find(item => item.id === placement.actionId);
-			return action ? [{ key: `${plugin.info.id}/${placement.id}`, pluginId: plugin.info.id, action, busy: plugin.actionBusy.includes(action.id) }] : [];
+			return action ? [{ key: `${plugin.info.id}/${placement.id}`, pluginId: plugin.info.id, action, busy: plugin.actionBusy.includes(action.id),
+				...(placement.location === "top-bar" && placement.opens ? { opens: placement.opens } : {}) }] : [];
 		});
 	});
 }
@@ -60,7 +64,9 @@ function ActionButton({ item, context, captureContext, className, iconOnly = fal
 		<button type="button" role={menuItem ? "menuitem" : undefined} data-plugin-action={item.key} title={item.action.name} aria-label={item.action.name}
 			disabled={item.busy || pluginActionDisabled(item.action, context)} aria-busy={item.busy || undefined}
 			className={`${className} disabled:pointer-events-none disabled:opacity-40`}
-			onClick={() => { void manager?.runAction(item.pluginId, item.action, () => { const captured = captureContext ? captureContext() : context; if (captured) onRun?.(); return captured; }); }}>
+			onClick={() => { void manager?.runAction(item.pluginId, item.action, () => { const captured = captureContext ? captureContext() : context; if (captured) onRun?.();
+				if (captured && item.opens && captured.surface === "session") pluginPanelStore.setOpen(captured.sessionId, `${item.pluginId}/${item.opens}`);
+				return captured; }); }}>
 			<ActionIcon action={item.action} />
 			{!iconOnly && <span className="min-w-0 truncate">{item.action.name}</span>}
 		</button>

@@ -180,6 +180,7 @@ export type PluginActionPlacement = {
     location: "top-bar";
     sessions?: ("teaching" | "practice")[];
     views?: string[];
+    opens?: string;
 } | PluginTranscriptSelectionPlacement;
 ```
 
@@ -192,6 +193,7 @@ export type PluginActionPlacement = {
 - [location](#pluginactionplacement-location) — 2 signatures/variants
 - [sessions](#pluginactionplacement-sessions)
 - [views](#pluginactionplacement-views)
+- [opens](#pluginactionplacement-opens)
 
 ### PluginActionPlacement id
 
@@ -233,6 +235,14 @@ sessions?: ("teaching" | "practice")[];
 
 ```ts
 views?: string[];
+```
+
+### PluginActionPlacement opens
+
+Fork E2: on a session page, clicking also opens this plugin's session panel (by panel id) before running the action.
+
+```ts
+opens?: string;
 ```
 
 ## PluginAgentKind
@@ -662,7 +672,7 @@ Frontend activation scope, once per enabled plugin per window. Registrations,
 subscriptions and UI expire with this activation; backend work is server-owned.
 
 ```ts
-export interface PluginFrontendContext extends PluginFieldsFrontendContext, PluginMarkersFrontendContext {
+export interface PluginFrontendContext extends PluginFieldsFrontendContext, PluginMarkersFrontendContext, PluginPanelsFrontendContext {
     readonly manifest: PluginManifest;
     readonly signal: AbortSignal;
     cleanup(dispose: PluginCleanup): void;
@@ -693,7 +703,7 @@ export interface PluginFrontendContext extends PluginFieldsFrontendContext, Plug
     onNotification(listener: (event: PluginNotification) => void): () => void;
     onAppEvent(listener: (event: ServerEvent) => void): () => void;
     onResync(listener: () => void): () => void;
-    app: {
+    app: PluginPanelsAppContext & {
         pathname(): string;
         openSession(id: string): void;
         openHome(): void;
@@ -703,7 +713,7 @@ export interface PluginFrontendContext extends PluginFieldsFrontendContext, Plug
 }
 ```
 
-**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersFrontendContext](plugin-markers.md#pluginmarkersfrontendcontext), [PluginNotification](plugins.md#pluginnotification), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
+**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersFrontendContext](plugin-markers.md#pluginmarkersfrontendcontext), [PluginNotification](plugins.md#pluginnotification), [PluginPanelsAppContext](plugin-panels.md#pluginpanelsappcontext), [PluginPanelsFrontendContext](plugin-panels.md#pluginpanelsfrontendcontext), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
@@ -1071,7 +1081,7 @@ Host navigation in this window; openView/openSettings target this plugin.
 Navigation methods are inert after activation expiry and do not await mounts.
 
 ```ts
-app: {
+app: PluginPanelsAppContext & {
     pathname(): string;
     openSession(id: string): void;
     openHome(): void;

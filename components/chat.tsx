@@ -7,6 +7,7 @@ import { usePlugins } from "./plugins";
 import { PluginFieldSessionProvider } from "./plugin-field-accessory";
 import { usePluginSelectionActions } from "./plugin-selection-popover";
 import { PluginMarkerPart } from "./plugin-marker";
+import { PluginSessionPanelHost } from "./plugin-session-panel";
 import { PluginSubmissionRunner, SubmissionModelEpoch, type SubmissionAttempt } from "./plugin-submission-runner";
 import { submissionImages, type BuiltinSubmissionCapture, type PrepareBuiltinSubmission, type PrepareThinkingSubmission, type PreparePluginQuestionSubmission, type PreparePluginProblemSubmission } from "./plugin-submission-adapters";
 import { SubmittedImages } from "./submitted-images";
@@ -2227,6 +2228,7 @@ export function Chat({
 				<AbortTurnDialog mode={abortAsk} onClose={closeAbortAsk} onConfirm={confirmAbort} busy={busy} />
 				</div>
 			</div>
+			<PluginSessionPanelHost sessionId={chatId} kind={kind === "practice" ? "practice" : "teaching"} />
 		</div>
 		</CitationActionsContext.Provider>
 		</JobsContext.Provider>

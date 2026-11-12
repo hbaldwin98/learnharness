@@ -35,6 +35,7 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 - [plugin-agents](plugin-agents.md)
 - [plugin-fields](plugin-fields.md)
 - [plugin-markers](plugin-markers.md)
+- [plugin-panels](plugin-panels.md)
 - [plugin-problems](plugin-problems.md)
 - [plugin-questions](plugin-questions.md)
 - [plugin-shortcuts](plugin-shortcuts.md)
@@ -125,6 +126,8 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginNativeQuestionViewDraft](plugin-view-context.md#pluginnativequestionviewdraft) | `plugin-view-context` |
 | [PluginNotification](plugins.md#pluginnotification) | `plugins` |
 | [PluginPageActionContext](plugins.md#pluginpageactioncontext) | `plugins` |
+| [PluginPanelsAppContext](plugin-panels.md#pluginpanelsappcontext) | `plugin-panels` |
+| [PluginPanelsFrontendContext](plugin-panels.md#pluginpanelsfrontendcontext) | `plugin-panels` |
 | [PluginPendingInput](plugin-agents.md#pluginpendinginput) | `plugin-agents` |
 | [PluginProblemEditorHandle](plugin-problems.md#pluginproblemeditorhandle) | `plugin-problems` |
 | [PluginProblemEditorProps](plugin-problems.md#pluginproblemeditorprops) | `plugin-problems` |
@@ -161,6 +164,8 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 | [PluginQuestionValidationContext](plugin-questions.md#pluginquestionvalidationcontext) | `plugin-questions` |
 | [PluginQuestionValidationResult](plugin-questions.md#pluginquestionvalidationresult) | `plugin-questions` |
 | [PluginQuestionVariant](plugin-questions.md#pluginquestionvariant) | `plugin-questions` |
+| [PluginSessionPanel](plugin-panels.md#pluginsessionpanel) | `plugin-panels` |
+| [PluginSessionPanelContext](plugin-panels.md#pluginsessionpanelcontext) | `plugin-panels` |
 | [PluginSessionViewContext](plugin-view-context.md#pluginsessionviewcontext) | `plugin-view-context` |
 | [PluginSessionViewInput](plugin-view-context.md#pluginsessionviewinput) | `plugin-view-context` |
 | [PluginSettingsRegistration](plugins.md#pluginsettingsregistration) | `plugins` |
@@ -276,4 +281,4 @@ These are reachable through public data, event, inheritance or helper-type relat
 
 Standard JavaScript/DOM types (`Promise`, `AbortSignal`, `File`, `HTMLElement`, and utility types) use their standard contracts. Pi model/messages/tools and TypeBox schemas use the exact peer versions declared by the bundled SDK's `package.json`. Supply those peers when typechecking; they are development types, not permission to import private LearnHarness runtime modules.
 
-Coverage: **156 public types**, **58 supporting declarations**, **941 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
+Coverage: **160 public types**, **58 supporting declarations**, **955 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.

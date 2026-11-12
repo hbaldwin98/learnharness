@@ -723,3 +723,10 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   model. Markers are tail-neutral (they never change continuation/dismissal/retry state). The
   frontend renderer registered for the same `typeId` mounts it; without one the host shows a
   muted "Plugin content (<id>)" line.
+- **Session side panels** — [`registerSessionPanel` / `app.openSessionPanel`](plugin-api/plugin-panels.md).
+  A plugin body beside the transcript of matching sessions. One panel is open per session;
+  every offered panel appears as a host tab. The host owns the splitter, tabs, close button and
+  persistence (open panel per session, width per session and panel, in localStorage). The mount
+  survives turns and streaming and is aborted on leaving the session, close/switch, unregister or
+  disable. A `top-bar` placement may declare `opens: "<panel id>"` to open that panel on click
+  (the action still runs).

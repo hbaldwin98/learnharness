@@ -27,6 +27,8 @@ import type { PluginTranscriptSelectionActionContext, PluginTranscriptSelectionP
 export type * from "./plugin-action-contexts.ts";
 import type { PluginMarkersBackendContext, PluginMarkersFrontendContext } from "./plugin-markers.ts";
 export type * from "./plugin-markers.ts";
+import type { PluginPanelsAppContext, PluginPanelsFrontendContext } from "./plugin-panels.ts";
+export type * from "./plugin-panels.ts";
 
 export const PLUGIN_API_VERSION = 1 as const;
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -240,7 +242,9 @@ export interface PluginAction {
 /** Registration alone never creates chrome. Each placement is explicit. */
 export type PluginActionPlacement =
 	| { id: string; actionId: string; location: "sidebar" | "graph" }
-	| { id: string; actionId: string; location: "top-bar"; sessions?: ("teaching" | "practice")[]; views?: string[] }
+	| { id: string; actionId: string; location: "top-bar"; sessions?: ("teaching" | "practice")[]; views?: string[];
+		/** Fork E2: on a session page, clicking also opens this plugin's session panel (by panel id) before running the action. */
+		opens?: string }
 	| PluginTranscriptSelectionPlacement;
 export type PluginSettingsRegistration = PluginView["mount"] | import("./plugin-ui.ts").PluginSettingsSchema;
 export interface PluginCodeBlockProps {
@@ -282,7 +286,7 @@ export interface PluginToolRenderer {
 }
 /** Frontend activation scope, once per enabled plugin per window. Registrations,
  * subscriptions and UI expire with this activation; backend work is server-owned. */
-export interface PluginFrontendContext extends PluginFieldsFrontendContext, PluginMarkersFrontendContext {
+export interface PluginFrontendContext extends PluginFieldsFrontendContext, PluginMarkersFrontendContext, PluginPanelsFrontendContext {
 	readonly manifest: PluginManifest;
 	/** Aborted when this window's activation ends. Use shorter per-mount signals
 	 * for view widgets and cooperative async work. */
@@ -361,7 +365,7 @@ export interface PluginFrontendContext extends PluginFieldsFrontendContext, Plug
 	onResync(listener: () => void): () => void;
 	/** Host navigation in this window; openView/openSettings target this plugin.
 	 * Navigation methods are inert after activation expiry and do not await mounts. */
-	app: {
+	app: PluginPanelsAppContext & {
 		/** Read the current host pathname, not a captured invocation-page snapshot. */
 		pathname(): string;
 		/** Navigate to a native session by ID; does not create or run a session. */

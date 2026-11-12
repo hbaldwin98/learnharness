@@ -360,9 +360,10 @@ export class PluginFrontendManager {
 		}) as PluginFrontendContext["registerSettings"];
 		const thisManager = this;
 		let ui: import("@/src/core/plugin-ui").PluginUi | undefined;
+		const fork = createForkFrontendContext(this.fork, { pluginId: life.id, pluginName: manifest.name, signal: life.controller.signal,
+			isCurrent: () => this.current(life), addCleanup: cleanup => this.addCleanup(life, cleanup), report: error => this.report(life, error) });
 		const context: PluginFrontendContext = {
-			...createForkFrontendContext(this.fork, { pluginId: life.id, pluginName: manifest.name, signal: life.controller.signal,
-				isCurrent: () => this.current(life), addCleanup: cleanup => this.addCleanup(life, cleanup), report: error => this.report(life, error) }),
+			...fork,
 			manifest, signal: life.controller.signal,
 			cleanup: cleanup => { this.addCleanup(life, cleanup); },
 			registerView: view => register(life.views, view, "mount"),
@@ -375,6 +376,7 @@ export class PluginFrontendManager {
 				if (placement.location === "top-bar") {
 					if (placement.sessions !== undefined && (!Array.isArray(placement.sessions) || placement.sessions.some(kind => kind !== "teaching" && kind !== "practice"))) throw new Error("Invalid plugin top-bar session targets");
 					if (placement.views !== undefined && (!Array.isArray(placement.views) || placement.views.some(id => typeof id !== "string" || !id))) throw new Error("Invalid plugin top-bar view targets");
+					if (placement.opens !== undefined && (typeof placement.opens !== "string" || !placement.opens)) throw new Error("Invalid plugin top-bar panel target");
 					if (!placement.sessions?.length && !placement.views?.length) throw new Error("Plugin top-bar placement requires explicit session or view targets");
 				}
 				if (life.placements.has(placement.id)) throw new Error(`Duplicate plugin placement: ${placement.id}`);
@@ -469,6 +471,7 @@ export class PluginFrontendManager {
 			onAppEvent: listener => listen(life.events, listener),
 			onResync: listener => listen(life.resyncs, listener),
 			app: {
+				...fork.app,
 				pathname: () => this.host.pathname(),
 				openHome: () => { if (this.current(life)) this.host.navigate("/"); },
 				openSession: id => { if (this.current(life)) this.host.navigate(`/chat/${encodeURIComponent(id)}`); },
