@@ -18,6 +18,8 @@ import { InteractionLayersProvider } from "../components/interaction-layers.tsx"
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-themes-"));
 process.env.LH_DATA_DIR = TMP_DATA;
+// Fork: graphite starts enabled on fresh installs and contributes a theme; these presets-only lists predate it.
+fs.writeFileSync(path.join(TMP_DATA, "plugins-state.json"), JSON.stringify({ version: 1, enabled: { graphite: false } }));
 
 const { THEMES_DIR } = await import("../config.ts");
 const { PUT: putSection } = await import("../app/api/settings/[section]/route.ts");

@@ -38,7 +38,7 @@ export function isPluginHostError(error: unknown): error is { status: number; me
 export interface PluginHostDependencies {
 	directory: string;
 	/** App-owned flat built packages and a separate writable data root. */
-	core?: { directory: string; dataDirectory: string; ids: readonly string[] };
+	core?: { directory: string; dataDirectory: string; ids: readonly string[]; /** Fork: core IDs enabled when the user has made no explicit choice. */ defaultEnabled?: readonly string[] };
 	appVersion: string;
 	createServices(info: { manifest: PluginManifest; directory: string; dataDirectory: string; signal: AbortSignal; cleanup: (fn: PluginCleanup) => void }): {
 		learning: PluginLearningData; inference: PluginInference; agents: PluginAgentService; workers: PluginWorkerService;
@@ -386,7 +386,7 @@ export function createPluginHost(deps: PluginHostDependencies) {
 				}
 				continue;
 			}
-			candidate.info.enabled = state.enabled[id] === true;
+			candidate.info.enabled = state.enabled[id] ?? (origin === "core" && core!.defaultEnabled?.includes(id) === true);
 			packages.set(id, candidate);
 			if (candidate.info.enabled && !candidate.blocked) await activate(candidate);
 		}

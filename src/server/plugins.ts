@@ -9,6 +9,7 @@ import { registerJobAbort, unregisterJobAbort } from "../agent/subagents/aborts.
 import { createPluginAgentRecordStore } from "../store/plugin-agent-records.ts";
 import { createPluginTaskRecordStore, readPluginTaskRecord, recoverPluginTaskRecords } from "../store/plugin-task-records.ts";
 import corePluginIds from "../../core-plugins.json";
+import forkDefaultEnabled from "../../fork-default-enabled-plugins.json";
 import { assertGraphFormat } from "../store/graph-format.ts";
 import { createPluginLearningData } from "./plugin-learning.ts";
 import { createPluginInference } from "./plugin-inference.ts";
@@ -31,6 +32,7 @@ const core = {
 	directory: path.join(/* turbopackIgnore: true */ PATHS.root, "core-plugins"),
 	dataDirectory: path.join(/* turbopackIgnore: true */ PATHS.data, "core-plugin-data"),
 	ids: corePluginIds,
+	defaultEnabled: forkDefaultEnabled,
 };
 const coreData = { directory: core.dataDirectory, ids: core.ids };
 type Host = ReturnType<typeof createPluginHost>;
