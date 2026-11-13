@@ -23,10 +23,11 @@ export function activate(ctx: PluginFrontendContext): void {
         screen = new AbortController();
         const local = AbortSignal.any([signal, screen.signal]);
         container.replaceChildren();
-        if (openId) mountLive(container, ctx, local, openId, () => { openId = null; show(); });
-        else mountHome(container, ctx, local, (id) => { openId = id; show(); });
+        if (openId) mountLive(container, ctx, local, openId, () => { openId = null; ctx.app.viewState.set({}); show(); });
+        else mountHome(container, ctx, local, (id) => { openId = id; ctx.app.viewState.set({ interview: id }); show(); });
       };
       remount = show;
+      openId = ctx.app.viewState.get().interview ?? null;
       show();
       return () => { screen?.abort(); if (remount === show) remount = null; };
     },
@@ -37,10 +38,12 @@ export function activate(ctx: PluginFrontendContext): void {
     icon: MIC_ICON,
     run: () => {
       openId = null;
-      remount?.();
-      ctx.app.openView(VIEW_ID);
+      if (remount) { ctx.app.viewState.set({}); remount(); }
+      else ctx.app.viewState.open(VIEW_ID);
     },
   }));
+  // Back/Forward within the view (E11): ?interview=<id> is the open interview.
+  ctx.cleanup(ctx.app.viewState.onChange((state) => { openId = state.interview ?? null; remount?.(); }));
   ctx.cleanup(ctx.placeAction({ id: "interview-sidebar", actionId: "open-interview", location: "sidebar" }));
 
   ctx.cleanup(ctx.registerSettings((container, signal) => {
