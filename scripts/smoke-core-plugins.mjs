@@ -26,12 +26,15 @@ export async function verifyCorePlugins({ root, standalone, dataDirectory, url }
 	};
 	const initial = await request("/api/plugins");
 	assert.deepEqual(initial.plugins.filter(p => p.origin === "core").map(p => p.id).sort(), [...ids].sort());
+	// fork: fork-owned Core plugins start enabled (fork-default-enabled-plugins.json).
+	const forkDefaults = new Set(JSON.parse(fs.readFileSync(path.join(root, "fork-default-enabled-plugins.json"), "utf8")));
 	for (const id of ids) {
 		const info = initial.plugins.find(p => p.id === id);
-		assert.equal(info.enabled, false, id); assert.equal(info.status, "disabled", JSON.stringify(info));
+		const on = forkDefaults.has(id);
+		assert.equal(info.enabled, on, id); assert.equal(info.status, on ? "active" : "disabled", JSON.stringify(info));
 		assert.equal(fs.existsSync(path.join(dataDirectory, "plugins", id)), false, "core code must not be installed into user data");
 	}
-	assert.equal(fs.existsSync(path.join(dataDirectory, "core-plugin-data")), false, "disabled fresh discovery creates no core records");
+	for (const id of ids.filter(id => !forkDefaults.has(id))) assert.equal(fs.existsSync(path.join(dataDirectory, "core-plugin-data", id)), false, "disabled fresh discovery creates no core records");
 	const shadow = path.join(dataDirectory, "plugins", ids[0]);
 	fs.mkdirSync(path.join(shadow, "dist"), { recursive: true });
 	fs.writeFileSync(path.join(shadow, "dist", "manifest.json"), "{invalid shadow must never substitute for core}");
@@ -42,7 +45,8 @@ export async function verifyCorePlugins({ root, standalone, dataDirectory, url }
 		for (const id of ids) {
 			const catalog = await request(`/api/plugins/${id}`, { enabled: true });
 			const info = catalog.plugins.find(p => p.id === id); assert.equal(info.origin, "core"); assert.equal(info.status, "active", JSON.stringify(info));
-			assert.ok(fs.statSync(path.join(dataDirectory, "core-plugin-data", id)).isDirectory());
+			// fork: style-only plugins (no backend, e.g. graphite) never get a data directory.
+			if (info.manifest.backend) assert.ok(fs.statSync(path.join(dataDirectory, "core-plugin-data", id)).isDirectory());
 			for (const entry of [info.manifest.main, info.manifest.styles].filter(Boolean)) {
 				const response = await fetch(`${url}/api/plugins/${id}/assets/${entry}`);
 				const bytes = Buffer.from(await response.arrayBuffer()); assert.equal(response.status, 200, `${id}/${entry}`);
