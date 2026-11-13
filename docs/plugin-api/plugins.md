@@ -703,7 +703,7 @@ export interface PluginFrontendContext extends PluginFieldsFrontendContext, Plug
     onNotification(listener: (event: PluginNotification) => void): () => void;
     onAppEvent(listener: (event: ServerEvent) => void): () => void;
     onResync(listener: () => void): () => void;
-    app: PluginPanelsAppContext & PluginSessionsAppContext & {
+    app: PluginPanelsAppContext & PluginSessionsAppContext & PluginViewStateAppContext & {
         pathname(): string;
         openSession(id: string): void;
         openHome(): void;
@@ -713,7 +713,7 @@ export interface PluginFrontendContext extends PluginFieldsFrontendContext, Plug
 }
 ```
 
-**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersFrontendContext](plugin-markers.md#pluginmarkersfrontendcontext), [PluginNotification](plugins.md#pluginnotification), [PluginPanelsAppContext](plugin-panels.md#pluginpanelsappcontext), [PluginPanelsFrontendContext](plugin-panels.md#pluginpanelsfrontendcontext), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSessionsAppContext](plugin-sessions.md#pluginsessionsappcontext), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
+**Related types:** [PluginAction](plugins.md#pluginaction), [PluginActionPlacement](plugins.md#pluginactionplacement), [PluginCleanup](plugins.md#plugincleanup), [PluginCodeBlockRenderer](plugins.md#plugincodeblockrenderer), [PluginFieldsFrontendContext](plugin-fields.md#pluginfieldsfrontendcontext), [PluginManifest](plugins.md#pluginmanifest), [PluginMarkersFrontendContext](plugin-markers.md#pluginmarkersfrontendcontext), [PluginNotification](plugins.md#pluginnotification), [PluginPanelsAppContext](plugin-panels.md#pluginpanelsappcontext), [PluginPanelsFrontendContext](plugin-panels.md#pluginpanelsfrontendcontext), [PluginProblemRenderer](plugin-problems.md#pluginproblemrenderer), [PluginQuestionRenderer](plugin-questions.md#pluginquestionrenderer), [PluginSessionsAppContext](plugin-sessions.md#pluginsessionsappcontext), [PluginSettingsRegistration](plugins.md#pluginsettingsregistration), [PluginSettingsSchema](plugin-ui.md#pluginsettingsschema), [PluginSubmissionInterceptor](plugin-submissions.md#pluginsubmissioninterceptor), [PluginToolRenderer](plugins.md#plugintoolrenderer), [PluginUi](plugin-ui.md#pluginui), [PluginView](plugins.md#pluginview), [PluginViewStateAppContext](plugin-view-state.md#pluginviewstateappcontext), [PluginWidgetHandle](plugin-ui.md#pluginwidgethandle), [ServerEvent](events.md#serverevent).
 
 **Member index** (including nested object members; inherited members are defined in the linked base types):
 
@@ -1081,7 +1081,7 @@ Host navigation in this window; openView/openSettings target this plugin.
 Navigation methods are inert after activation expiry and do not await mounts.
 
 ```ts
-app: PluginPanelsAppContext & PluginSessionsAppContext & {
+app: PluginPanelsAppContext & PluginSessionsAppContext & PluginViewStateAppContext & {
     pathname(): string;
     openSession(id: string): void;
     openHome(): void;

@@ -4,6 +4,7 @@ import {
 	type PluginFieldAccessory, type PluginFieldsFrontendContext, type PluginMarkerRenderer, type PluginMarkersFrontendContext,
 	type PluginPanelsAppContext, type PluginPanelsFrontendContext, type PluginSessionPanel,
 	preparePluginSessionSpec, type PluginSessionsAppContext, type PluginSessionSpec,
+	preparePluginViewState, pluginViewStateQuery, type PluginViewState, type PluginViewStateAppContext,
 } from "../src/core/index.ts";
 import type { ForkActivationScope, PluginForkRegistry } from "./plugin-fork-registry.ts";
 import { pluginPanelStore, type PluginPanelStore } from "./plugin-panel-store.ts";
@@ -12,9 +13,31 @@ export const FIELD_ACCESSORIES = "field-accessories";
 export const MARKER_RENDERERS = "marker-renderers";
 export const SESSION_PANELS = "session-panels";
 
-export type PluginForkFrontendContext = PluginFieldsFrontendContext & PluginMarkersFrontendContext & PluginPanelsFrontendContext & { app: PluginPanelsAppContext & PluginSessionsAppContext };
+export type PluginForkFrontendContext = PluginFieldsFrontendContext & PluginMarkersFrontendContext & PluginPanelsFrontendContext & { app: PluginPanelsAppContext & PluginSessionsAppContext & PluginViewStateAppContext };
 
-export function createForkFrontendContext(registry: PluginForkRegistry, scope: ForkActivationScope, panels: PluginPanelStore = pluginPanelStore): PluginForkFrontendContext {
+/** The window URL/history seen by E11 view state (injectable for tests). */
+export interface ForkViewHistory {
+	pathname(): string;
+	search(): string;
+	/** Same-document URL change; Next.js syncs native pushState/replaceState. */
+	write(url: string, replace: boolean): void;
+	onPop(listener: () => void): () => void;
+}
+const browserViewHistory: ForkViewHistory = {
+	pathname: () => typeof window === "undefined" ? "" : window.location.pathname,
+	search: () => typeof window === "undefined" ? "" : window.location.search,
+	write: (url, replace) => { if (typeof window !== "undefined") window.history[replace ? "replaceState" : "pushState"](null, "", url); },
+	onPop: listener => {
+		if (typeof window === "undefined") return () => {};
+		window.addEventListener("popstate", listener);
+		return () => window.removeEventListener("popstate", listener);
+	},
+};
+
+export function createForkFrontendContext(registry: PluginForkRegistry, scope: ForkActivationScope, panels: PluginPanelStore = pluginPanelStore, history: ForkViewHistory = browserViewHistory): PluginForkFrontendContext {
+	const viewPrefix = `/plugins/${encodeURIComponent(scope.pluginId)}/`;
+	const onOwnView = () => { const path = history.pathname(); return path.startsWith(viewPrefix) && path.length > viewPrefix.length; };
+	const currentViewState = (): PluginViewState => onOwnView() ? Object.fromEntries(new URLSearchParams(history.search())) : {};
 	const sessionId = (value: unknown): string => { if (typeof value !== "string" || !value) throw new Error("Invalid session id"); return value; };
 	return {
 		registerFieldAccessory: (accessory: PluginFieldAccessory) => {
@@ -53,6 +76,27 @@ export function createForkFrontendContext(registry: PluginForkRegistry, scope: F
 				live();
 				if (options?.open) scope.navigate?.(`/chat/${encodeURIComponent(body.id)}`);
 				return body.id;
+			},
+			viewState: {
+				get: currentViewState,
+				set: (state, options) => {
+					const query = pluginViewStateQuery(preparePluginViewState(state));
+					if (scope.isCurrent() && onOwnView()) history.write(history.pathname() + query, options?.replace === true);
+				},
+				open: (viewId, state = {}) => {
+					if (typeof viewId !== "string" || !viewId) throw new Error("Invalid view id");
+					const query = pluginViewStateQuery(preparePluginViewState(state));
+					if (scope.isCurrent()) scope.navigate?.(viewPrefix + encodeURIComponent(viewId) + query);
+				},
+				onChange: listener => {
+					if (!scope.isCurrent()) return () => {};
+					if (typeof listener !== "function") throw new Error("View state listener must be a function");
+					const stop = history.onPop(() => {
+						if (!scope.isCurrent() || !onOwnView()) return;
+						try { listener(currentViewState()); } catch (error) { scope.report(error); }
+					});
+					return scope.addCleanup(stop);
+				},
 			},
 		},
 	};

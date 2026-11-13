@@ -32,6 +32,7 @@ export type * from "./plugin-panels.ts";
 import type { PluginHiddenTurnTextTools } from "./plugin-hidden-text.ts";
 export type * from "./plugin-hidden-text.ts";
 import type { PluginSessionsAppContext } from "./plugin-sessions.ts";
+import type { PluginViewStateAppContext } from "./plugin-view-state.ts";
 export type * from "./plugin-sessions.ts";
 import type { PluginTurnsBackendContext } from "./plugin-turns.ts";
 export type * from "./plugin-turns.ts";
@@ -376,7 +377,7 @@ export interface PluginFrontendContext extends PluginFieldsFrontendContext, Plug
 	onResync(listener: () => void): () => void;
 	/** Host navigation in this window; openView/openSettings target this plugin.
 	 * Navigation methods are inert after activation expiry and do not await mounts. */
-	app: PluginPanelsAppContext & PluginSessionsAppContext & {
+	app: PluginPanelsAppContext & PluginSessionsAppContext & PluginViewStateAppContext & {
 		/** Read the current host pathname, not a captured invocation-page snapshot. */
 		pathname(): string;
 		/** Navigate to a native session by ID; does not create or run a session. */

@@ -747,6 +747,12 @@ additive under `apiVersion: 1`; plugins that use them do not run on upstream Lea
   runs the first turn server-side immediately (interactive purpose), opened or not; if the turn
   is refused the opening is still saved. `idempotencyKey` is permanent per plugin: the same key
   returns the same session while it exists.
+- **View state in the URL** — [`app.viewState`](plugin-api/plugin-view-state.md) (frontend
+  only). A view keeps its place (an open reading, an open interview) in the URL query so
+  refresh, Back/Forward and links restore it: `get()` reads the query while one of the plugin's
+  views is open, `set(state, { replace })` pushes (or replaces) a history entry without
+  remounting, `open(viewId, state)` navigates to a view with state, and `onChange(listener)`
+  reports Back/Forward changes within the plugin's views. State is flat strings.
 - **Plugin steers (fork exception to the session-extension contract §1)** —
   [`turns.steer(chatId, input)`](plugin-api/plugin-turns.md), backend only. Stored as a
   `plugin-marker` (typeId `steer`: `displayText` shown, `modelText` read as `[plugin <id>] …`,

@@ -46,6 +46,7 @@ The SDK is **type-only**. Call the contexts supplied by LearnHarness, not runtim
 - [plugin-turns](plugin-turns.md)
 - [plugin-ui](plugin-ui.md)
 - [plugin-view-context](plugin-view-context.md)
+- [plugin-view-state](plugin-view-state.md)
 - [plugin-workers](plugin-workers.md)
 - [plugins](plugins.md)
 - [question-core](question-core.md)
@@ -277,6 +278,8 @@ These are reachable through public data, event, inheritance or helper-type relat
 - [ProblemInput](plugin-view-context.md#probleminput) — `plugin-view-context`
 - [QuestionInput](plugin-view-context.md#questioninput) — `plugin-view-context`
 - [Target](plugin-view-context.md#target) — `plugin-view-context`
+- [PluginViewState](plugin-view-state.md#pluginviewstate) — `plugin-view-state`
+- [PluginViewStateAppContext](plugin-view-state.md#pluginviewstateappcontext) — `plugin-view-state`
 - [ClientQuestion](question-core.md#clientquestion) — `question-core`
 - [QuestionKind](question-core.md#questionkind) — `question-core`
 - [QuestionMode](question-core.md#questionmode) — `question-core`
@@ -296,4 +299,4 @@ These are reachable through public data, event, inheritance or helper-type relat
 
 Standard JavaScript/DOM types (`Promise`, `AbortSignal`, `File`, `HTMLElement`, and utility types) use their standard contracts. Pi model/messages/tools and TypeBox schemas use the exact peer versions declared by the bundled SDK's `package.json`. Supply those peers when typechecking; they are development types, not permission to import private LearnHarness runtime modules.
 
-Coverage: **172 public types**, **58 supporting declarations**, **996 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.
+Coverage: **172 public types**, **60 supporting declarations**, **1001 declared member signatures/variants**. Generation contains no build timestamps or absolute source paths.

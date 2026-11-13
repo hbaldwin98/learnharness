@@ -26,6 +26,7 @@ const guides = {
 	"plugin-panels": ["Session side panels", "../plugin-authoring.md#fork-extension-points"],
 	"plugin-hidden-text": ["Hiding turn text", "../plugin-authoring.md#fork-extension-points"],
 	"plugin-sessions": ["Seeded sessions", "../plugin-authoring.md#fork-extension-points"],
+	"plugin-view-state": ["View state in the URL", "../plugin-authoring.md#fork-extension-points"],
 	"plugin-turns": ["Plugin steers (fork exception)", "../plugin-session-extension-contract.md#1-boundary"],
 };
 const declarationKind = node => ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isVariableDeclaration(node) || ts.isEnumDeclaration(node);
