@@ -1,0 +1,11 @@
+{
+  "apiVersion": 1,
+  "id": "interview",
+  "name": "Interview",
+  "version": "0.1.0",
+  "minAppVersion": "0.6.1",
+  "description": "Mock interviews: the strong model writes the interview, a cheap interviewer listens to your spoken answers and steers, and the strong model writes a debrief.",
+  "main": "main.js",
+  "backend": "backend.cjs",
+  "styles": "styles.css"
+}

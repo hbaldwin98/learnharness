@@ -1,0 +1,62 @@
+{
+  "name": "Narration: how a web request travels",
+  "setup": {
+    "topic": "Narrate how a web request travels from the browser to the server and back.",
+    "style": "narration",
+    "minutes": 15
+  },
+  "listening": { "silenceMs": 1500, "waitForSubmit": false },
+  "script": {
+    "topic": "Narrate how a web request travels from the browser to the server and back.",
+    "style": "narration",
+    "questions": [
+      {
+        "id": "q1",
+        "title": "URL to response",
+        "prompt": "Walk me through what happens after you type a URL and press Enter. Narrate it like you're explaining to a teammate.",
+        "format": "free",
+        "keyPoints": ["URL parsing and browser cache check", "DNS resolution", "TCP connection", "TLS handshake for HTTPS", "HTTP request and response", "rendering the response"],
+        "probes": ["Which transport does the DNS lookup usually use?", "What changes when the URL is HTTPS?"],
+        "redFlags": ["Skips DNS entirely", "Says the browser connects to the domain name directly"],
+        "minutes": 8
+      },
+      {
+        "id": "q2",
+        "title": "DNS transport",
+        "prompt": "Which transport does a typical DNS lookup use?",
+        "format": "multiple-choice",
+        "choices": [
+          { "text": "UDP on port 53, falling back to TCP for large replies", "correct": true },
+          { "text": "TCP on port 443", "correct": false },
+          { "text": "QUIC only", "correct": false }
+        ],
+        "keyPoints": ["UDP 53 with TCP fallback"],
+        "probes": [],
+        "redFlags": [],
+        "minutes": 2
+      },
+      {
+        "id": "q3",
+        "title": "Caching layers",
+        "prompt": "Where along that path can a response be cached?",
+        "format": "free",
+        "keyPoints": ["browser cache", "CDN or proxy cache", "DNS caching with TTLs"],
+        "probes": ["How does the browser decide a cached copy is still fresh?"],
+        "redFlags": ["Thinks only the server caches"],
+        "minutes": 5
+      }
+    ]
+  },
+  "chunks": [
+    { "atMs": 0, "text": "I'm ready, let's begin." },
+    { "atMs": 4000, "text": "Okay so first the browser parses the URL" },
+    { "atMs": 4900, "text": "and checks whether it already has a cached copy." },
+    { "atMs": 7200, "text": "If not it needs the IP address, so it does a DNS lookup." },
+    { "atMs": 8000, "text": "That goes to the resolver, then the root, the TLD, and the authoritative server." },
+    { "atMs": 11000, "text": "Then it opens a connection to the server" },
+    { "atMs": 14000, "text": "and sends the HTTP GET request, and the server sends back HTML which the browser renders." },
+    { "atMs": 18000, "text": "My answer: UDP on port 53, falling back to TCP for large replies" },
+    { "atMs": 22000, "text": "The browser caches responses based on Cache-Control headers, and a CDN can cache in between." },
+    { "atMs": 26000, "text": "I think that's everything." }
+  ]
+}
