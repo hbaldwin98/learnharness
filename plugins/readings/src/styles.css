@@ -8,7 +8,7 @@
 .rd-strong { font-weight: 600; }
 .rd-muted { color: var(--muted-foreground); font-size: .8rem; }
 .rd-fine { color: var(--muted-foreground); font-size: .7rem; }
-.rd-label { color: var(--muted-foreground); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+.rd-label { color: var(--muted-foreground); font-size: .72rem; }
 .rd-warn { color: #d97706; font-size: .8rem; }
 .rd-error { color: var(--destructive, #dc2626); font-size: .8rem; }
 .rd-error:empty { display: none; }
@@ -28,7 +28,7 @@
 .rd-list { display: flex; flex-direction: column; gap: .15rem; }
 .rd-item { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; text-align: left; background: none; border: 0; border-radius: .5rem; padding: .5rem; cursor: pointer; color: var(--foreground); }
 .rd-item:hover { background: var(--accent); }
-.rd-badge { border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; font-size: .7rem; text-transform: uppercase; color: var(--muted-foreground); }
+.rd-badge { border: 1px solid var(--border); border-radius: 999px; padding: 0 .5rem; font-size: .7rem; color: var(--muted-foreground); }
 .rd-title { font-size: 1.6rem; font-weight: 600; line-height: 1.25; margin: .25rem 0; }
 .rd-compact .rd-title { font-size: 1.15rem; }
 .rd-article, .rd-content, .rd-blocks, .rd-discuss, .rd-discuss-view { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }

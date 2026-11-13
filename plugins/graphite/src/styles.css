@@ -113,6 +113,17 @@ pre {
 	text-transform: none;
 }
 
+/* Dock labels written in capitals upstream ("YOUR THINKING"): lower-case
+   them, then capitalise the first letter. */
+[data-testid="practice-thinking-field"] > div:first-child,
+[data-testid="thinking-field"] > div:first-child {
+	text-transform: lowercase;
+}
+[data-testid="practice-thinking-field"] > div:first-child::first-letter,
+[data-testid="thinking-field"] > div:first-child::first-letter {
+	text-transform: uppercase;
+}
+
 .tracking-wide:not(.lh-keep-caps),
 .tracking-wider:not(.lh-keep-caps),
 .tracking-widest:not(.lh-keep-caps) {
@@ -138,12 +149,18 @@ aside:has([data-testid="new-session"]) > div {
 	border-right-color: var(--lh-graphite-line);
 }
 [data-testid="new-session"],
-[data-testid="new-session-practice"] {
+[data-testid="new-session-practice"],
+[data-testid="sidebar-actions"] [data-plugin-action] {
 	height: 32px;
 	padding: 0 10px;
 	gap: 10px;
 	font-size: 13px;
 	border-radius: 6px;
+}
+/* Plugin sidebar actions carry a 16px icon; the native doors use 12px. */
+[data-testid="sidebar-actions"] [data-plugin-action] > :first-child {
+	width: 12px;
+	height: 12px;
 }
 [data-testid="session-row"],
 [data-testid="session-row-kbd"] {

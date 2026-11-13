@@ -9,7 +9,7 @@
 .lh-iv-error { color: var(--destructive, #e5484d); margin: 0; }
 .lh-iv-error:empty { display: none; }
 .lh-iv-warn { color: var(--warning, #d9a43b); }
-.lh-iv-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); font-weight: 400; margin: 0; }
+.lh-iv-label { font-size: 0.7rem; color: var(--muted-foreground); font-weight: 400; margin: 0; }
 .lh-iv-title { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
 .lh-iv-strong-text { font-weight: 500; }
 .lh-iv-link { background: none; border: 0; padding: 0; color: var(--muted-foreground); cursor: pointer; font: inherit; }
@@ -44,7 +44,7 @@
 .lh-iv-callout { display: flex; gap: 0.625rem; border-radius: 10px; padding: 0.75rem 0.875rem; background: color-mix(in oklab, var(--ring) 14%, transparent); }
 .lh-iv-callout-label { white-space: nowrap; font-size: 0.75rem; font-weight: 600; padding-top: 0.125rem; }
 .lh-iv-quiet { font-style: italic; color: var(--muted-foreground); opacity: 0.75; }
-.lh-iv-thinking { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); animation: lh-iv-pulse 1.2s ease-in-out infinite; }
+.lh-iv-thinking { font-size: 0.75rem; color: var(--muted-foreground); animation: lh-iv-pulse 1.2s ease-in-out infinite; }
 @keyframes lh-iv-pulse { 50% { opacity: 0.4; } }
 @media (prefers-reduced-motion: reduce) { .lh-iv-thinking { animation: none; } }
 .lh-iv-choice-head { display: flex; justify-content: space-between; gap: 0.75rem; }
