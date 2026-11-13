@@ -37,14 +37,22 @@ export function activate(ctx: PluginFrontendContext): () => void {
 		createPractice: (title, nodeIds) => ctx.app.createSession({ kind: "practice", nodeIds, title }, { open: true }).then(() => undefined),
 	};
 
-	// ─── the reading page / library (one view; a pending id selects the page) ──
+	// ─── the reading page / library (one view; ?reading=<id> selects the page, E11) ──
 	let pageReading: string | null = null;
 	let rerenderPage: (() => void) | null = null;
+	const urlReading = () => ctx.app.viewState.get().reading ?? null;
 	function openPage(id: string | null) {
 		pageReading = id;
-		if (rerenderPage && ctx.app.pathname().includes("/plugins/")) rerenderPage();
-		ctx.app.openView("library");
+		const state: Record<string, string> = id ? { reading: id } : {};
+		if (rerenderPage) {
+			ctx.app.viewState.set(state);
+			rerenderPage();
+		} else ctx.app.viewState.open("library", state);
 	}
+	ctx.app.viewState.onChange((state) => {
+		pageReading = state.reading ?? null;
+		rerenderPage?.();
+	});
 	regs.push(
 		ctx.registerView({
 			id: "library",
@@ -52,6 +60,7 @@ export function activate(ctx: PluginFrontendContext): () => void {
 			mount(container, signal) {
 				const root = el("div", { class: "rd-page" });
 				container.append(root);
+				pageReading = urlReading();
 				let scope = new AbortController();
 				const render = () => {
 					scope.abort();
