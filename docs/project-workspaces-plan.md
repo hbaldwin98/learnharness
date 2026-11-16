@@ -27,6 +27,10 @@ fork's `coding-workspaces` plugin. Fork-only: new code goes in new files under
 - Listening triggers: existing triggers, plus a debounced host file-watch replacing editor-buffer activity.
 - Unattached workspaces are never deleted automatically; delete is an explicit pane action (folder removal asks twice; user-chosen folders are only detached, never deleted).
 
+- Step 1: the plugin API has no folder picker or "open path", so a custom folder is typed as an absolute path and the pane offers "Copy path" in place of "Open in IDE".
+- Step 1: removing a managed project asks twice (delete files? then confirm); custom folders are only forgotten.
+- Step 1: creating a project from the pane attaches it to the current session immediately.
+
 ## Components
 
 1. **Workspace registry** (`server/projects.ts`): `{ id, name, language, hostPath, managed, runCommand, createdAt }` in plugin data; session→workspace attachment map.
