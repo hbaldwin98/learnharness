@@ -143,6 +143,16 @@ export interface FileNote extends CodeAnnotation {
 	path: string;
 }
 
+/** A project the tutor suggested creating; nothing exists until the learner confirms. */
+export interface ProjectSuggestion {
+	chatId: string;
+	name: string;
+	image: string;
+	runCommand: string;
+	reason: string;
+	at: string;
+}
+
 /** Language-server problems across a project's source files (0-based LSP positions). */
 export interface ProjectProblems {
 	status: "ready" | "crashed" | "unavailable";
@@ -186,6 +196,8 @@ export interface ProjectsState {
 	proposals: EditProposal[];
 	/** Tutor notes on the attached project's files (live first, then outdated). */
 	notes: FileNote[];
+	/** The tutor's suggestion to create a project for this chat, awaiting the learner. */
+	suggestion: ProjectSuggestion | null;
 	projects: ProjectInfo[];
 }
 
@@ -218,6 +230,7 @@ export const OPS = {
 	projectReadFile: "projects.read-file",
 	noteDismiss: "projects.note-dismiss",
 	projectProblems: "projects.problems",
+	suggestionDecide: "projects.suggestion-decide",
 	terminalOpen: "terminal.open",
 	terminalWrite: "terminal.write",
 	terminalResize: "terminal.resize",
@@ -228,4 +241,4 @@ export const OPS = {
 export const TOPICS = { state: "state", settings: "settings", projects: "projects", terminal: "terminal" } as const;
 
 /** Marker type ids. */
-export const MARKERS = { trace: "trace", annotation: "annotation", quiet: "quiet", proposal: "proposal" } as const;
+export const MARKERS = { trace: "trace", annotation: "annotation", quiet: "quiet", proposal: "proposal", suggestion: "suggestion" } as const;

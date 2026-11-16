@@ -13,6 +13,7 @@ import { createTerminals } from "./terminals.ts";
 import { PROJECT_TASK_INSTRUCTIONS, registerProjectTask } from "./project-task.ts";
 import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
 import { createProjectTools, PROJECT_INSTRUCTIONS } from "./project-tools.ts";
+import { createSuggestions } from "./suggestions.ts";
 import { createProjectDiagnostics, problemsText, type ProjectDiagnostics } from "./project-diagnostics.ts";
 
 const obj = (value: unknown): Record<string, unknown> => {
@@ -59,6 +60,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 	});
 	const proposals = createProposals(path.join(ctx.dataDirectory, "proposals"));
 	const notes = createFileNotes(path.join(ctx.dataDirectory, "file-notes"));
+	const suggestions = createSuggestions(path.join(ctx.dataDirectory, "suggestions.json"));
 	const runtime = createProjectRuntime({
 		runsDirectory: path.join(ctx.dataDirectory, "project-runs"),
 		dockerStatus: () => runner.status(),
@@ -98,6 +100,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			runtime: base.attached ? await runtime.state(base.attached.id) : null,
 			proposals: base.attached ? proposals.pending(base.attached.id) : [],
 			notes: base.attached?.exists ? notes.list(base.attached.id, base.attached.hostPath) : [],
+			suggestion: base.attached ? null : suggestions.get(chatId),
 		};
 	}
 	/** The project the chat is attached to (errors when none). */
@@ -206,6 +209,28 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			changed();
 			return state(chatId);
 		}),
+		handle(OPS.suggestionDecide, async input => {
+			const chatId = str(input.chatId, "chatId");
+			const suggestion = suggestions.get(chatId);
+			if (!suggestion) throw new Error("There is no suggestion to decide");
+			const accept = input.accept === true;
+			let outcome = "dismissed by the learner";
+			if (accept) {
+				const folder = optStr(input.folder, "folder");
+				const created = projects.create({ name: suggestion.name, image: suggestion.image, runCommand: suggestion.runCommand, ...(folder?.trim() ? { folder } : {}) });
+				projects.attach(chatId, created.id);
+				outcome = `created and attached ("${created.name}", ${created.image}); its folder is empty — start building`;
+			}
+			suggestions.clear(chatId);
+			await ctx.markers.append(chatId, {
+				typeId: MARKERS.suggestion,
+				details: { name: suggestion.name, accepted: accept },
+				modelText: `Your suggested project workspace was ${outcome}.`,
+				idempotencyKey: `suggestion:${chatId}:${suggestion.at}`,
+			}).catch(error => console.error("[coding-workspaces] suggestion marker failed", error));
+			changed();
+			return state(chatId);
+		}),
 		handle(OPS.projectProblems, input => problems(attachedTo(str(input.chatId, "chatId")))),
 		handle(OPS.terminalOpen, async input => {
 			const project = attachedTo(str(input.chatId, "chatId"));
@@ -241,6 +266,12 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 				: "git is not installed on the learner's machine, so changes cannot be shown; read the files instead.",
 			run: (project, command) => runtime.run(refOf(project), command),
 			problems: async project => problemsText(await problems(project)),
+			suggest: (chatId, input) => {
+				if (projects.forChat(chatId)) throw new Error("This session already has a project workspace attached");
+				const suggestion = suggestions.suggest({ chatId, ...input });
+				changed();
+				return suggestion;
+			},
 			propose: (chatId, project, input) => {
 				const proposal = proposals.propose({ projectId: project.id, root: project.hostPath, chatId, ...input });
 				changed();

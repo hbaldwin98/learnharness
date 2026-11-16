@@ -1,6 +1,7 @@
 import { Type } from "typebox";
 import type { PluginTools } from "learnharness-plugin-api";
-import type { EditProposal, FileNote, ProjectInfo, ProjectRun } from "../shared/protocol.ts";
+import type { EditProposal, FileNote, ProjectInfo, ProjectRun, ProjectSuggestion } from "../shared/protocol.ts";
+import { CODE_IMAGES } from "./languages.ts";
 import { numbered, readText, walkFiles } from "./project-files.ts";
 
 type Tool = ReturnType<PluginTools["create"]>[number];
@@ -12,6 +13,7 @@ export interface ProjectToolDeps {
 	run(project: ProjectInfo, command: string): Promise<ProjectRun>;
 	/** Language-server problems across the project, as text. */
 	problems(project: ProjectInfo): Promise<string>;
+	suggest(chatId: string, input: { name: string; image: string; runCommand: string; reason: string }): ProjectSuggestion;
 	propose(chatId: string, project: ProjectInfo, input: { path: string; explanation: string; content?: string; replacements?: Array<{ find: string; replace: string }> }): EditProposal;
 	annotate(chatId: string, project: ProjectInfo, input: { path: string; line: number; endLine?: number; note: string }): FileNote;
 }
@@ -28,6 +30,7 @@ export function runText(run: ProjectRun): string {
 export const PROJECT_INSTRUCTIONS = [
 	"# Project workspaces",
 	"A session may have a project workspace attached: a folder on the learner's machine that they build in over many turns and sessions, with their own editor. " +
+		"When none is attached and the teaching would be better as one growing program, you may suggest one with project_suggest. " +
 		"It is mounted at /work in a long-lived Linux container (their language image, network on, HOME persists). " +
 		"Use project_files and project_read to look at it, project_annotate to point at lines, project_problems for compiler/type errors, project_changes to see what they changed since you last looked, and project_run to run a command in /work (the learner sees every run).",
 	"- The learner builds it. Do not write their code for them: point, ask, and suggest. When a change from you is genuinely warranted (scaffolding they asked for, a fix after they understand it), propose it with project_propose_edit — they accept or reject it.",
@@ -43,6 +46,23 @@ export function createProjectTools(chatId: string, deps: ProjectToolDeps): Tool[
 		return p;
 	};
 	return [
+		{
+			name: "project_suggest",
+			label: "suggest a project",
+			description: "Suggest that the learner start a project workspace for this session (when the teaching would be better as one growing program than as separate exercises). Nothing is created: the learner sees the suggestion in the Coding pane and creates it or dismisses it; you are told which. Only when no project is attached.",
+			parameters: Type.Object({
+				name: Type.String({ description: "REQUIRED — a short project name, e.g. \"Todo API\"." }),
+				image: Type.Union(CODE_IMAGES.map(i => Type.Literal(i)), { description: "REQUIRED — the language image." }),
+				runCommand: Type.String({ description: "REQUIRED — the command Run will use, e.g. \"npm test\" (may be empty until there is something to run)." }),
+				reason: Type.String({ description: "REQUIRED — one sentence the learner sees: what you will build together and why a project." }),
+			}),
+			executionMode: "sequential",
+			execute: async (_id: string, params: unknown) => {
+				const input = params as { name: string; image: string; runCommand: string; reason: string };
+				const suggestion = deps.suggest(chatId, input);
+				return text(`Suggested the project "${suggestion.name}"; the learner can create it from the Coding pane or dismiss it.`, { suggestion });
+			},
+		},
 		{
 			name: "project_files",
 			label: "list project files",

@@ -70,6 +70,35 @@ export function activate(ctx: PluginFrontendContext): () => void {
 
 	cleanups.push(ctx.registerProblemRenderer(projectTaskRenderer(ctx)));
 	cleanups.push(ctx.registerMarkerRenderer({
+		typeId: MARKERS.suggestion,
+		mount: (container, marker) => {
+			const d = marker.details as { name?: string; accepted?: boolean } | undefined;
+			return line(container, "lh-cw-marker", d?.accepted ? `Project "${d.name ?? ""}" created` : `Project suggestion "${d?.name ?? ""}" dismissed`);
+		},
+	}));
+	// One-line chat summaries for the project tools.
+	const projectToolLines: Record<string, (details: Record<string, unknown> | undefined, input: Record<string, unknown> | undefined) => string> = {
+		project_suggest: d => `Suggested a project${(d?.suggestion as { name?: string } | undefined)?.name ? `: ${(d?.suggestion as { name: string }).name}` : ""} — see the Coding pane`,
+		project_files: () => "Looked at the project's files",
+		project_read: (_d, i) => `Read ${typeof i?.path === "string" ? i.path : "a project file"}`,
+		project_changes: () => "Looked at your changes",
+		project_problems: () => "Checked the project for problems",
+		project_run: (_d, i) => `Ran ${typeof i?.command === "string" ? `\`${i.command}\`` : "a command"} in the project`,
+		project_annotate: d => {
+			const n = d?.note as { path?: string; line?: number; note?: string } | undefined;
+			return n ? `Note on ${n.path}:${n.line}: ${n.note}` : "Adding a note…";
+		},
+	};
+	for (const [toolName, describe] of Object.entries(projectToolLines)) {
+		cleanups.push(ctx.registerToolRenderer({
+			toolName,
+			mount: (container, tool) => {
+				if (tool.state === "output-error") return line(container, "lh-cw-marker", tool.errorText ?? `${toolName} failed`);
+				return line(container, "lh-cw-marker", describe(tool.result?.details as Record<string, unknown> | undefined, tool.input as Record<string, unknown> | undefined));
+			},
+		}));
+	}
+	cleanups.push(ctx.registerMarkerRenderer({
 		typeId: MARKERS.proposal,
 		mount: (container, marker) => {
 			const d = marker.details as { path?: string; status?: string } | undefined;

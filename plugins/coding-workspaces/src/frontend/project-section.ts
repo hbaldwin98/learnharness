@@ -203,7 +203,29 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 		const actions = el(doc, "div", "lh-cw__actions");
 		actions.append(button("New project…", () => { mode = "create"; render(); }));
 		if (state.projects.length) actions.append(button("Attach existing…", () => { mode = "attach"; render(); }));
-		body.replaceChildren(el(doc, "p", "lh-cw__empty", "No project workspace for this session. A project is a folder on your machine that this session (and others) can keep building on."), actions);
+		body.replaceChildren(...renderSuggestion(), el(doc, "p", "lh-cw__empty", "No project workspace for this session. A project is a folder on your machine that this session (and others) can keep building on."), actions);
+	}
+
+	/** The tutor's suggested project: Create (optionally in a chosen folder) or Dismiss. */
+	function renderSuggestion(): HTMLElement[] {
+		const s = state?.suggestion;
+		if (!s) return [];
+		const card = el(doc, "div", "lh-cw-project__proposal");
+		card.append(
+			el(doc, "strong", undefined, `The tutor suggests a project: ${s.name}`),
+			el(doc, "div", "lh-cw__time", `${s.image}${s.runCommand ? ` · run: ${s.runCommand}` : ""}`),
+		);
+		if (s.reason) card.append(el(doc, "p", "lh-cw__message", s.reason));
+		const folder = el(doc, "input");
+		folder.type = "text";
+		folder.placeholder = "Leave empty for a managed folder";
+		const actions = el(doc, "div", "lh-cw__actions");
+		actions.append(
+			button("Create", () => void call(OPS.suggestionDecide, { accept: true, ...(folder.value.trim() ? { folder: folder.value } : {}) }), "default"),
+			button("Dismiss", () => void call(OPS.suggestionDecide, { accept: false })),
+		);
+		card.append(field("Folder (absolute path, optional)", folder), actions);
+		return [card];
 	}
 
 	const off = ctx.onNotification(event => { if (event.topic === TOPICS.projects && mode === "view" && !busy && !doc.activeElement?.closest(".lh-cw-project input")) refresh(); });
