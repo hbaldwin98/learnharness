@@ -136,6 +136,21 @@ export interface ProjectRuntime {
 	runs: ProjectRun[];
 }
 
+/** A tutor note pinned to lines of a project file (1-based, inclusive). */
+export interface FileNote extends CodeAnnotation {
+	chatId: string;
+	/** Relative to the project root. */
+	path: string;
+}
+
+/** A project file's content for the viewer. */
+export interface ProjectFileView {
+	path: string;
+	content: string;
+	truncated: boolean;
+	size: number;
+}
+
 /** A file change the tutor proposed; nothing is written until the learner accepts. */
 export interface EditProposal {
 	id: string;
@@ -159,6 +174,8 @@ export interface ProjectsState {
 	runtime: ProjectRuntime | null;
 	/** Pending proposals for the attached project. */
 	proposals: EditProposal[];
+	/** Tutor notes on the attached project's files (live first, then outdated). */
+	notes: FileNote[];
 	projects: ProjectInfo[];
 }
 
@@ -187,6 +204,9 @@ export const OPS = {
 	projectStop: "projects.stop",
 	projectAsk: "projects.ask",
 	proposalDecide: "projects.proposal-decide",
+	projectFiles: "projects.files",
+	projectReadFile: "projects.read-file",
+	noteDismiss: "projects.note-dismiss",
 } as const;
 
 /** Backend → frontend notification topics. */

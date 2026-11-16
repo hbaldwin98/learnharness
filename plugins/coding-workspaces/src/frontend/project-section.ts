@@ -1,5 +1,6 @@
 import type { PluginFrontendContext } from "learnharness-plugin-api";
 import { OPS, TOPICS, type ProjectInfo, type ProjectsState } from "../shared/protocol.ts";
+import { createFilesView } from "./files-view.ts";
 
 const IMAGES = ["node", "python", "dotnet", "java", "go", "rust", "cpp"] as const;
 
@@ -37,7 +38,8 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 		catch (e) { error.textContent = e instanceof Error ? e.message : String(e); }
 		finally { busy = false; render(); }
 	};
-	const refresh = () => { void ctx.call<ProjectsState>(OPS.projectsGet, { chatId }).then(next => { state = next; render(); }).catch(() => {}); };
+	const refresh = () => { void ctx.call<ProjectsState>(OPS.projectsGet, { chatId }).then(next => { state = next; render(); files.refresh(); }).catch(() => {}); };
+	const files = createFilesView(ctx, doc, chatId, id => void call(OPS.noteDismiss, { id }));
 
 	const button = (label: string, onClick: () => void, variant: "outline" | "default" = "outline") => {
 		const slot = el(doc, "span");
@@ -67,7 +69,8 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 			button("Detach", () => void call(OPS.projectDetach, {})),
 			button("Switch…", () => { mode = "attach"; render(); }),
 		);
-		body.replaceChildren(meta, pathRow, actions, ...renderRuntime(p));
+		files.setNotes(state?.notes ?? []);
+		body.replaceChildren(meta, pathRow, actions, ...renderRuntime(p), files.element);
 	}
 
 	/** Container status, the run command, Run/Stop, and recent runs. */

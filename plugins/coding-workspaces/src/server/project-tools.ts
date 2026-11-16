@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import type { PluginTools } from "learnharness-plugin-api";
-import type { EditProposal, ProjectInfo, ProjectRun } from "../shared/protocol.ts";
+import type { EditProposal, FileNote, ProjectInfo, ProjectRun } from "../shared/protocol.ts";
 import { numbered, readText, walkFiles } from "./project-files.ts";
 
 type Tool = ReturnType<PluginTools["create"]>[number];
@@ -11,6 +11,7 @@ export interface ProjectToolDeps {
 	changes(chatId: string, project: ProjectInfo): Promise<string>;
 	run(project: ProjectInfo, command: string): Promise<ProjectRun>;
 	propose(chatId: string, project: ProjectInfo, input: { path: string; explanation: string; content?: string; replacements?: Array<{ find: string; replace: string }> }): EditProposal;
+	annotate(chatId: string, project: ProjectInfo, input: { path: string; line: number; endLine?: number; note: string }): FileNote;
 }
 
 const text = (t: string, details: unknown = {}) => ({ content: [{ type: "text" as const, text: t }], details });
@@ -26,7 +27,7 @@ export const PROJECT_INSTRUCTIONS = [
 	"# Project workspaces",
 	"A session may have a project workspace attached: a folder on the learner's machine that they build in over many turns and sessions, with their own editor. " +
 		"It is mounted at /work in a long-lived Linux container (their language image, network on, HOME persists). " +
-		"Use project_files and project_read to look at it, project_changes to see what they changed since you last looked, and project_run to run a command in /work (the learner sees every run).",
+		"Use project_files and project_read to look at it, project_annotate to point at lines, project_changes to see what they changed since you last looked, and project_run to run a command in /work (the learner sees every run).",
 	"- The learner builds it. Do not write their code for them: point, ask, and suggest. When a change from you is genuinely warranted (scaffolding they asked for, a fix after they understand it), propose it with project_propose_edit — they accept or reject it.",
 	"- Teach toward the project: each step should leave it working and a little further along. Prefer small, runnable increments.",
 	"- Their Ask includes the changes since your last look and the latest run; you do not need to fetch those again.",
@@ -94,6 +95,23 @@ export function createProjectTools(chatId: string, deps: ProjectToolDeps): Tool[
 				const p = attached();
 				const run = await deps.run(p, (params as { command: string }).command);
 				return text(runText(run), { run });
+			},
+		},
+		{
+			name: "project_annotate",
+			label: "note on a project file",
+			description: "Pin a short note to lines of a file in the learner's project (\"look at this loop bound\"). It does not change the file. The note follows its lines as they edit and goes outdated if they delete them. Line numbers are of the file as it is now (read it first).",
+			parameters: Type.Object({
+				path: Type.String({ description: "REQUIRED — file path relative to the project root." }),
+				line: Type.Integer({ minimum: 1, description: "REQUIRED — the first line (1-based)." }),
+				endLine: Type.Optional(Type.Integer({ minimum: 1, description: "The last line (inclusive); omit for one line." })),
+				note: Type.String({ description: "REQUIRED — one or two short sentences pointing at what to look at. Never the fix itself." }),
+			}),
+			executionMode: "sequential",
+			execute: async (_id: string, params: unknown) => {
+				const input = params as { path: string; line: number; endLine?: number; note: string };
+				const note = deps.annotate(chatId, attached(), input);
+				return text(`Noted ${note.path}:${note.line}${note.endLine > note.line ? `–${note.endLine}` : ""}. The learner sees it in the Coding pane.`, { note });
 			},
 		},
 		{

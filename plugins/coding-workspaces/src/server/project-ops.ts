@@ -7,6 +7,8 @@ import { createProjectContainers } from "./project-container.ts";
 import { createProjectRuntime } from "./project-runtime.ts";
 import { createProjects } from "./projects.ts";
 import { createProposals } from "./proposals.ts";
+import { createFileNotes } from "./file-notes.ts";
+import { readText, walkFiles } from "./project-files.ts";
 import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
 import { createProjectTools, PROJECT_INSTRUCTIONS } from "./project-tools.ts";
 
@@ -28,6 +30,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 	const changed = () => { if (!ctx.signal.aborted) ctx.events.emit(TOPICS.projects, {}); };
 	const containers = createProjectContainers(runner, { onIdleRemoved: () => changed() });
 	const proposals = createProposals(path.join(ctx.dataDirectory, "proposals"));
+	const notes = createFileNotes(path.join(ctx.dataDirectory, "file-notes"));
 	const runtime = createProjectRuntime({
 		runsDirectory: path.join(ctx.dataDirectory, "project-runs"),
 		dockerStatus: () => runner.status(),
@@ -66,6 +69,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			...base,
 			runtime: base.attached ? await runtime.state(base.attached.id) : null,
 			proposals: base.attached ? proposals.pending(base.attached.id) : [],
+			notes: base.attached?.exists ? notes.list(base.attached.id, base.attached.hostPath) : [],
 		};
 	}
 	/** The project the chat is attached to (errors when none). */
@@ -115,6 +119,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			const id = str(input.id, "id");
 			runtime.forget(id);
 			proposals.forget(id);
+			notes.forget(id);
 			if ((await runner.status()) === "running") await containers.destroy(id);
 			projects.remove(id, input.deleteFiles === true);
 			changed();
@@ -157,6 +162,21 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			changed();
 			return state(chatId);
 		}),
+		handle(OPS.projectFiles, input => {
+			const project = attachedTo(str(input.chatId, "chatId"));
+			return walkFiles(project.hostPath);
+		}),
+		handle(OPS.projectReadFile, input => {
+			const project = attachedTo(str(input.chatId, "chatId"));
+			const relative = str(input.path, "path");
+			return { path: relative, ...readText(project.hostPath, relative) };
+		}),
+		handle(OPS.noteDismiss, input => {
+			const chatId = str(input.chatId, "chatId");
+			notes.dismiss(attachedTo(chatId).id, str(input.id, "id"));
+			changed();
+			return state(chatId);
+		}),
 		handle(OPS.projectStop, input => {
 			runtime.stop(attachedTo(str(input.chatId, "chatId")).id);
 			return null;
@@ -175,6 +195,11 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 				const proposal = proposals.propose({ projectId: project.id, root: project.hostPath, chatId, ...input });
 				changed();
 				return proposal;
+			},
+			annotate: (chatId, project, input) => {
+				const note = notes.add(project.id, project.hostPath, { chatId, ...input });
+				changed();
+				return note;
 			},
 		}),
 	}));
