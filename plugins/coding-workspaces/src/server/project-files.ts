@@ -10,7 +10,7 @@ const LIST_MAX = 2000;
  * Rejects absolute paths, `..` escapes, and symlinks that point outside the folder.
  */
 export function resolveInside(root: string, relative: string): string {
-	const cleaned = relative.replace(/\\/g, "/").replace(/^\/work(\/|$)/, "").replace(/^\.\/?/, "");
+	const cleaned = relative.replace(/\\/g, "/").replace(/^\/work(\/|$)/, "").replace(/^(\.\/)+/, "");
 	if (path.isAbsolute(cleaned) || /^[a-zA-Z]:/.test(cleaned)) throw new Error("Use a path relative to the project folder");
 	const rootReal = fs.realpathSync(root);
 	const target = path.resolve(rootReal, cleaned || ".");
