@@ -53,3 +53,5 @@
 .lh-cw-files__note { white-space: normal; margin: 0.15rem 0 0.3rem 1.5rem; padding: 0.2rem 0.4rem; border-left: 2px solid var(--primary, #4a7dff); font-family: var(--font-sans, inherit); }
 .lh-cw-files__outdated { opacity: 0.6; }
 .lh-cw-files__dismiss { margin-left: auto; padding: 0 0.3rem !important; }
+.lh-cw-task { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
+.lh-cw-task__line { margin: 0; }

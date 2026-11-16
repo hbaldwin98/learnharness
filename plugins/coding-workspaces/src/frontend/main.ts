@@ -4,6 +4,7 @@ import { MARKERS, OPS, TOPICS, type CodeAnnotation, type WorkspaceState } from "
 import { createEditorExtension, PANEL_ID, runItem } from "./editor-extension.ts";
 import { askWithoutWords, mountPanel } from "./panel.ts";
 import { mountProjectSection } from "./project-section.ts";
+import { projectTaskRenderer } from "./project-task-view.ts";
 import { mountSettings } from "./settings.ts";
 import { createViewStore } from "./store.ts";
 
@@ -67,6 +68,7 @@ export function activate(ctx: PluginFrontendContext): () => void {
 		},
 	}));
 
+	cleanups.push(ctx.registerProblemRenderer(projectTaskRenderer(ctx)));
 	cleanups.push(ctx.registerMarkerRenderer({
 		typeId: MARKERS.proposal,
 		mount: (container, marker) => {

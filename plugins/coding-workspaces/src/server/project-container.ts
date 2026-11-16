@@ -10,7 +10,8 @@
  */
 
 import type Docker from "dockerode";
-import { WORKSPACE_LABEL, exec, type DockerRunner, type ExecResult } from "./docker-runner.ts";
+import { WORKSPACE_LABEL, exec, extractFresh, type DockerRunner, type ExecResult } from "./docker-runner.ts";
+import { tarFiles, type TarEntry } from "./tar.ts";
 import type { CodeImage } from "./languages.ts";
 
 const LABEL_VALUE = "project";
@@ -135,6 +136,33 @@ export function createProjectContainers(runner: DockerRunner, options: { sweep?:
 				});
 			} finally {
 				lastUsed.set(project.id, Date.now());
+			}
+		},
+		/**
+		 * Run a task's tests against the project: hidden test files go to a fresh
+		 * /tmp/lh-task (never the learner's folder, exposed as $LH_TESTS), then the
+		 * command runs in /work. The test files are removed afterwards.
+		 */
+		async runTask(project: ProjectRef, input: { command: string; files: TarEntry[]; signal?: AbortSignal; timeoutMs?: number }): Promise<ExecResult> {
+			const container = await ensure(project);
+			const modem = docker().modem;
+			const dir = "/tmp/lh-task";
+			try {
+				const prepared = await exec(container, modem, ["sh", "-c", `rm -rf ${dir} && mkdir -p ${dir}`], { timeoutMs: 30_000 });
+				if (prepared.code !== 0) throw new Error(`could not prepare the tests: ${prepared.stderr.trim()}`);
+				if (input.files.length) {
+					const copied = await exec(container, modem, ["sh", "-c", extractFresh(dir)], { stdin: tarFiles(input.files), timeoutMs: 30_000 });
+					if (copied.code !== 0) throw new Error(`could not copy the tests: ${copied.stderr.trim()}`);
+				}
+				return await exec(container, modem, ["sh", "-lc", `export LH_TESTS=${dir}; ${input.command}`], {
+					workingDir: "/work",
+					timeoutMs: input.timeoutMs ?? RUN_TIMEOUT_MS,
+					cap: RUN_CAP_BYTES,
+					...(input.signal ? { signal: input.signal } : {}),
+				});
+			} finally {
+				lastUsed.set(project.id, Date.now());
+				await exec(container, modem, ["rm", "-rf", dir], { timeoutMs: 30_000 }).catch(() => {});
 			}
 		},
 		/** Remove the project's container and its HOME volume (project removal). */

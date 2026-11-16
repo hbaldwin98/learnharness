@@ -10,6 +10,7 @@ import { createProposals } from "./proposals.ts";
 import { createFileNotes } from "./file-notes.ts";
 import { readText, walkFiles } from "./project-files.ts";
 import { createTerminals } from "./terminals.ts";
+import { PROJECT_TASK_INSTRUCTIONS, registerProjectTask } from "./project-task.ts";
 import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
 import { createProjectTools, PROJECT_INSTRUCTIONS } from "./project-tools.ts";
 
@@ -232,6 +233,20 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 		}),
 	}));
 	cleanups.push(ctx.registerInstructions({ agents: ["teacher", "practice"], text: PROJECT_INSTRUCTIONS }));
+
+	cleanups.push(registerProjectTask(ctx, {
+		forChat: chatId => projects.forChat(chatId),
+		snapshot: async (project, reason) => (await hasGit()) ? createSnapshots(project.hostPath).snapshot(reason) : null,
+		changesStat: async (chatId, project) => (await hasGit())
+			? (await createSnapshots(project.hostPath).changesSinceLook(chatId, "task submission")).stat || "(no changes since your last look)"
+			: "(git is not installed; changes unavailable)",
+		runTask: async (project, input) => {
+			if ((await runner.status()) !== "running") throw new Error("Docker is not running, so the project's tests cannot run");
+			try { return await containers.runTask(refOf(project), input); }
+			finally { changed(); }
+		},
+	}));
+	cleanups.push(ctx.registerInstructions({ agents: ["practice"], text: PROJECT_TASK_INSTRUCTIONS }));
 
 	// Orphaned project containers from an earlier run (best effort).
 	void runner.status().then(s => s === "running" ? containers.reapAll() : undefined).catch(() => {});

@@ -53,7 +53,21 @@ describe("project containers — real Docker", { skip: enabled ? false : "set LH
 		assert.equal(exited, true);
 	});
 
-	it("has network",{ timeout: 120_000 }, async () => {
+	it("runs a task's hidden tests against the project without writing them into the folder", { timeout: 120_000 }, async () => {
+		fs.writeFileSync(path.join(folder, "calc.py"), "def add(a, b):\n    return a + b\n");
+		const test = { path: "check.py", content: "import sys\nsys.path.insert(0, '/work')\nfrom calc import add\nassert add(2, 3) == 5\nprint('task ok')\n" };
+		const pass = await containers.runTask(project, { command: "python3 $LH_TESTS/check.py", files: [test] });
+		assert.equal(pass.code, 0, pass.stderr);
+		assert.equal(pass.stdout.trim(), "task ok");
+		assert.equal(fs.existsSync(path.join(folder, "check.py")), false);
+		fs.writeFileSync(path.join(folder, "calc.py"), "def add(a, b):\n    return a - b\n");
+		const fail = await containers.runTask(project, { command: "python3 $LH_TESTS/check.py", files: [test] });
+		assert.notEqual(fail.code, 0);
+		const gone = await containers.run(project, "test -e /tmp/lh-task && echo left || echo cleaned");
+		assert.equal(gone.stdout.trim(), "cleaned");
+	});
+
+	it("has network", { timeout: 120_000 }, async () => {
 		const run = await containers.run(project, "python3 -c \"import socket; socket.getaddrinfo('pypi.org', 443); print('dns ok')\"");
 		assert.equal(run.stdout.trim(), "dns ok", run.stderr);
 	});
