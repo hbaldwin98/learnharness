@@ -67,7 +67,46 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 			button("Detach", () => void call(OPS.projectDetach, {})),
 			button("Switch…", () => { mode = "attach"; render(); }),
 		);
-		body.replaceChildren(meta, pathRow, actions);
+		body.replaceChildren(meta, pathRow, actions, ...renderRuntime(p));
+	}
+
+	/** Container status, the run command, Run/Stop, and recent runs. */
+	function renderRuntime(p: ProjectInfo): HTMLElement[] {
+		const rt = state?.runtime;
+		if (!rt) return [];
+		const status = el(doc, "div", "lh-cw__status");
+		status.setAttribute("role", "status");
+		const dockerLine = rt.docker === "missing" ? "Docker is not installed — the project needs it to run" : rt.docker === "stopped" ? "Docker is not running — start it to run the project" : rt.containerRunning ? "Container running" : "Container stopped (starts on Run)";
+		status.append(el(doc, "div", undefined, dockerLine));
+		if (rt.running) status.append(el(doc, "div", undefined, rt.running));
+
+		const commandRow = el(doc, "div", "lh-cw-project__path");
+		const command = el(doc, "input");
+		command.type = "text"; command.value = p.runCommand; command.placeholder = "Run command, e.g. npm test";
+		command.setAttribute("aria-label", "Run command");
+		command.addEventListener("change", () => { if (command.value.trim() !== p.runCommand) void call(OPS.projectUpdate, { id: p.id, runCommand: command.value }); });
+		commandRow.append(command);
+		const runActions = el(doc, "div", "lh-cw__actions");
+		if (rt.running) runActions.append(button("Stop", () => { void ctx.call(OPS.projectStop, { chatId }).catch(() => {}); }));
+		else if (rt.docker === "running") runActions.append(button("Run", () => {
+			error.textContent = "";
+			void ctx.call(OPS.projectRun, { chatId, command: command.value }).catch(e => { error.textContent = e instanceof Error ? e.message : String(e); });
+		}, "default"));
+
+		const runs = el(doc, "ol", "lh-cw__runs");
+		for (const r of [...rt.runs].reverse().slice(0, 3)) {
+			const li = el(doc, "li", "lh-cw__run");
+			li.dataset.status = r.error ? "error" : r.exitCode === 0 ? "passed" : "failed";
+			const label = r.error ?? (r.timedOut ? "Timed out" : r.exitCode === 0 ? "Exited 0" : `Exited ${r.exitCode ?? "?"}`);
+			const summary = el(doc, "div", "lh-cw__run-summary");
+			summary.append(el(doc, "time", "lh-cw__time", new Date(r.at).toLocaleTimeString()), el(doc, "strong", undefined, label), el(doc, "code", undefined, r.command));
+			li.append(summary);
+			for (const [text, truncated] of [[r.stdout, r.stdoutTruncated], [r.stderr, r.stderrTruncated]] as const) {
+				if (text) li.append(el(doc, "pre", "lh-cw__output", text + (truncated ? "\n… (truncated)" : "")));
+			}
+			runs.append(li);
+		}
+		return [status, commandRow, runActions, runs];
 	}
 
 	function renderCreate() {
@@ -116,7 +155,7 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 		body.replaceChildren(el(doc, "p", "lh-cw__empty", "No project workspace for this session. A project is a folder on your machine that this session (and others) can keep building on."), actions);
 	}
 
-	const off = ctx.onNotification(event => { if (event.topic === TOPICS.projects && mode === "view" && !busy) refresh(); });
+	const off = ctx.onNotification(event => { if (event.topic === TOPICS.projects && mode === "view" && !busy && !doc.activeElement?.closest(".lh-cw-project input")) refresh(); });
 	const offResync = ctx.onResync(refresh);
 	refresh();
 	render();

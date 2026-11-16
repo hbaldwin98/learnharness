@@ -116,7 +116,7 @@ export function activate(ctx: PluginBackendContext): () => Promise<void> {
 		return runner.removeImages(only as CodeImage | undefined);
 	});
 
-	cleanups.push(...registerProjectOps(ctx));
+	cleanups.push(...registerProjectOps(ctx, runner));
 
 	// ── turns and listening ──────────────────────────────────────────────────────
 	cleanups.push(ctx.events.on(event => {

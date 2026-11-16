@@ -81,7 +81,7 @@ export const containerName = (key: ItemKey) => `lh-code-${safe(key.chatId)}-${sa
 
 const statusCode = (error: unknown) => (error as { statusCode?: number } | null)?.statusCode;
 
-interface ExecResult {
+export interface ExecResult {
 	code: number | null;
 	stdout: string;
 	stderr: string;
@@ -126,11 +126,11 @@ function sink(cap: number): { stream: Writable; text: () => string; truncated: (
 
 /** Run one command in a container: stdout/stderr split, exit code from the
  *  exec's inspect, optional stdin, host-side timeout backstop. */
-async function exec(
+export async function exec(
 	container: Docker.Container,
 	modem: Docker.Modem,
 	cmd: string[],
-	opts: { stdin?: Buffer; workingDir?: string; timeoutMs?: number; signal?: AbortSignal; cap?: number } = {},
+	opts: { stdin?: Buffer; workingDir?: string; timeoutMs?: number; signal?: AbortSignal; cap?: number; user?: string } = {},
 ): Promise<ExecResult> {
 	const created = await container.exec({
 		Cmd: cmd,
@@ -139,6 +139,7 @@ async function exec(
 		AttachStderr: true,
 		Tty: false,
 		...(opts.workingDir ? { WorkingDir: opts.workingDir } : {}),
+		...(opts.user ? { User: opts.user } : {}),
 	});
 	const stream = await created.start({ hijack: true, stdin: Boolean(opts.stdin) });
 	const out = sink(opts.cap ?? STREAM_CAP_BYTES);
@@ -273,6 +274,10 @@ export function createDockerRunner(options: DockerRunnerOptions) {
 	}
 
 	const runner = {
+		/** The engine client (project containers share it). */
+		engine: docker,
+		/** The current tag for a language image. */
+		tagOf,
 		async status(): Promise<DockerStatus> {
 			if (status && Date.now() - status.at < STATUS_TTL_MS) return status.value;
 			let value: DockerStatus;

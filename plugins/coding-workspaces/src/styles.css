@@ -30,3 +30,4 @@
 .lh-cw-project__list li > div { flex: 1; min-width: 0; }
 .lh-cw-project__error { margin: 0; color: var(--destructive, #d33); font-size: 0.75rem; }
 .lh-cw-project__error:empty { display: none; }
+.lh-cw-project__path input { flex: 1; min-width: 0; padding: 0.25rem 0.4rem; border: 1px solid var(--border, #8884); border-radius: 0.375rem; background: var(--background, transparent); color: inherit; font: inherit; font-family: var(--font-mono, monospace); font-size: 0.75rem; }

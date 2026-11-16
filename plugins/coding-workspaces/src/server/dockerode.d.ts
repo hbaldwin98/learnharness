@@ -38,6 +38,7 @@ declare module "dockerode" {
 
 		interface ContainerInspectInfo {
 			State: { Running: boolean };
+			Config: { Image: string };
 		}
 
 		interface ExecInspectInfo {
@@ -45,7 +46,19 @@ declare module "dockerode" {
 			ExitCode: number | null;
 		}
 
+		interface MountSpec {
+			Type: "bind" | "volume";
+			Source: string;
+			Target: string;
+			ReadOnly?: boolean;
+		}
+
+		interface Volume {
+			remove(options?: { force?: boolean }): Promise<unknown>;
+		}
+
 		interface HostConfig {
+			Mounts?: MountSpec[];
 			AutoRemove?: boolean;
 			NetworkMode?: string;
 			ReadonlyRootfs?: boolean;
@@ -63,6 +76,8 @@ declare module "dockerode" {
 			Image: string;
 			Cmd?: string[];
 			User?: string;
+			WorkingDir?: string;
+			Env?: string[];
 			Labels?: Record<string, string>;
 			HostConfig?: HostConfig;
 		}
@@ -130,6 +145,7 @@ declare module "dockerode" {
 		modem: Docker.Modem;
 		ping(): Promise<unknown>;
 		getImage(name: string): Docker.Image;
+		getVolume(name: string): Docker.Volume;
 		listImages(options?: { filters?: string | Record<string, string[]> }): Promise<Docker.ImageInfo[]>;
 		buildImage(context: Readable, options: Docker.BuildImageOptions): Promise<Readable>;
 		getContainer(id: string): Docker.Container;

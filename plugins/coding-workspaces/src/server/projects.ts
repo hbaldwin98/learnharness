@@ -97,7 +97,7 @@ export function createProjects(deps: ProjectsDeps) {
 			return record ? info(record) : null;
 		},
 		state(chatId: string): ProjectsState {
-			return { chatId, attached: this.forChat(chatId), projects: this.list() };
+			return { chatId, attached: this.forChat(chatId), runtime: null, projects: this.list() };
 		},
 		create(input: { name: string; image: string; folder?: string; runCommand?: string }): ProjectInfo {
 			const name = validateName(input.name);

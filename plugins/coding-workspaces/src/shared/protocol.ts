@@ -113,9 +113,33 @@ export interface ProjectInfo {
 	sessions: string[];
 }
 
+/** One Run of a project's run command. */
+export interface ProjectRun {
+	at: string;
+	command: string;
+	exitCode: number | null;
+	timedOut: boolean;
+	stdout: string;
+	stderr: string;
+	stdoutTruncated: boolean;
+	stderrTruncated: boolean;
+	/** Set when the run could not start (Docker missing, image build failed…). */
+	error?: string;
+}
+
+/** The attached project's container and runs. */
+export interface ProjectRuntime {
+	docker: DockerStatus;
+	containerRunning: boolean;
+	/** A Run (or container start) in progress, with its progress line. */
+	running: string | null;
+	runs: ProjectRun[];
+}
+
 export interface ProjectsState {
 	chatId: string;
 	attached: ProjectInfo | null;
+	runtime: ProjectRuntime | null;
 	projects: ProjectInfo[];
 }
 
@@ -140,6 +164,8 @@ export const OPS = {
 	projectAttach: "projects.attach",
 	projectDetach: "projects.detach",
 	projectRemove: "projects.remove",
+	projectRun: "projects.run",
+	projectStop: "projects.stop",
 } as const;
 
 /** Backend → frontend notification topics. */
