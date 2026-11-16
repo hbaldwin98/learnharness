@@ -9,6 +9,7 @@ import { createDockerRunner, type ItemKey } from "./server/docker-runner.ts";
 import { CODE_IMAGES, languageSpec, SANDBOX_TOOLS, type CodeImage } from "./server/languages.ts";
 import { createFileStore } from "./server/store.ts";
 import { createWorkspaces } from "./server/workspaces.ts";
+import { registerProjectOps } from "./server/project-ops.ts";
 import { ANNOTATE_DESCRIPTION, instructions, STAY_QUIET_DESCRIPTION } from "./server/prompts.ts";
 
 type Tool = ReturnType<PluginTools["create"]>[number];
@@ -114,6 +115,8 @@ export function activate(ctx: PluginBackendContext): () => Promise<void> {
 		if (only !== undefined && !(CODE_IMAGES as readonly string[]).includes(only)) throw new Error("Unknown image");
 		return runner.removeImages(only as CodeImage | undefined);
 	});
+
+	cleanups.push(...registerProjectOps(ctx));
 
 	// ── turns and listening ──────────────────────────────────────────────────────
 	cleanups.push(ctx.events.on(event => {

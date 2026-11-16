@@ -3,6 +3,7 @@ import { codingEditorRegistry } from "../../../coding-questions/src/editor-hook.
 import { MARKERS, OPS, TOPICS, type CodeAnnotation, type WorkspaceState } from "../shared/protocol.ts";
 import { createEditorExtension, PANEL_ID, runItem } from "./editor-extension.ts";
 import { askWithoutWords, mountPanel } from "./panel.ts";
+import { mountProjectSection } from "./project-section.ts";
 import { mountSettings } from "./settings.ts";
 import { createViewStore } from "./store.ts";
 
@@ -40,7 +41,11 @@ export function activate(ctx: PluginFrontendContext): () => void {
 		title: "Coding",
 		icon: CODE_ICON,
 		defaultWidth: 380,
-		mount: (container, panel) => mountPanel(ctx, store, container, panel),
+		mount: (container, panel) => {
+			const unmountPanel = mountPanel(ctx, store, container, panel);
+			const unmountProject = mountProjectSection(ctx, container, panel.sessionId, panel.signal);
+			return () => { unmountProject(); unmountPanel(); };
+		},
 	}));
 
 	cleanups.push(ctx.registerMarkerRenderer({

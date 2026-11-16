@@ -96,6 +96,29 @@ export interface ImageInfo {
 	current: boolean;
 }
 
+/** A long-lived project workspace (host folder mounted into its container). */
+export interface ProjectInfo {
+	id: string;
+	name: string;
+	/** One of the sandbox language images. */
+	image: string;
+	hostPath: string;
+	/** The app created the folder under its data directory (vs. a folder the learner chose). */
+	managed: boolean;
+	runCommand: string;
+	createdAt: string;
+	/** The folder is present on disk. */
+	exists: boolean;
+	/** Chats attached to this project. */
+	sessions: string[];
+}
+
+export interface ProjectsState {
+	chatId: string;
+	attached: ProjectInfo | null;
+	projects: ProjectInfo[];
+}
+
 /** Frontend → backend operations. */
 export const OPS = {
 	open: "workspace.open",
@@ -111,10 +134,16 @@ export const OPS = {
 	dockerStatus: "docker.status",
 	images: "docker.images",
 	removeImages: "docker.remove-images",
+	projectsGet: "projects.get",
+	projectCreate: "projects.create",
+	projectUpdate: "projects.update",
+	projectAttach: "projects.attach",
+	projectDetach: "projects.detach",
+	projectRemove: "projects.remove",
 } as const;
 
 /** Backend → frontend notification topics. */
-export const TOPICS = { state: "state", settings: "settings" } as const;
+export const TOPICS = { state: "state", settings: "settings", projects: "projects" } as const;
 
 /** Marker type ids. */
 export const MARKERS = { trace: "trace", annotation: "annotation", quiet: "quiet" } as const;
