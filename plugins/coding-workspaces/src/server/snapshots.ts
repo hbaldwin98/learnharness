@@ -23,7 +23,7 @@ export const DIFF_CAP = 48 * 1024;
 
 const DEFAULT_IGNORE = ["node_modules/", ".venv/", "venv/", "__pycache__/", "*.pyc", "target/", "bin/", "obj/", "build/", "dist/", ".gradle/", ".DS_Store", ""].join("\n");
 
-type Git = (args: string[], opts?: { env?: NodeJS.ProcessEnv; input?: string }) => Promise<string>;
+type Git = (args: string[], opts?: { env?: Record<string, string>; input?: string }) => Promise<string>;
 
 function gitIn(cwd: string): Git {
 	return (args, opts = {}) => new Promise((resolve, reject) => {
