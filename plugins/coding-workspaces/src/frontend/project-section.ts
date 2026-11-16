@@ -119,7 +119,35 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 			}
 			runs.append(li);
 		}
-		return [status, commandRow, runActions, askRow, runs];
+		return [...renderProposals(), status, commandRow, runActions, askRow, runs];
+	}
+
+	/** Tutor-proposed changes awaiting the learner: diff, explanation, Accept / Reject. */
+	function renderProposals(): HTMLElement[] {
+		const pending = state?.proposals ?? [];
+		if (!pending.length) return [];
+		const heading = el(doc, "h3", "lh-cw__heading", `Proposed changes (${pending.length})`);
+		const list = el(doc, "ul", "lh-cw-project__proposals");
+		for (const proposal of pending) {
+			const li = el(doc, "li", "lh-cw-project__proposal");
+			const title = el(doc, "div", "lh-cw__run-summary");
+			title.append(el(doc, "code", undefined, proposal.path), el(doc, "span", "lh-cw__time", proposal.baseHash === null ? "new file" : "edit"));
+			li.append(title);
+			if (proposal.explanation) li.append(el(doc, "p", "lh-cw__message", proposal.explanation));
+			const pre = el(doc, "pre", "lh-cw__output lh-cw-project__diff");
+			for (const line of proposal.diff.split("\n")) {
+				const span = el(doc, "span", line.startsWith("+") ? "lh-cw-project__add" : line.startsWith("-") ? "lh-cw-project__del" : undefined, `${line}\n`);
+				pre.append(span);
+			}
+			const actions = el(doc, "div", "lh-cw__actions");
+			actions.append(
+				button("Accept", () => void call(OPS.proposalDecide, { id: proposal.id, accept: true }), "default"),
+				button("Reject", () => void call(OPS.proposalDecide, { id: proposal.id, accept: false })),
+			);
+			li.append(pre, actions);
+			list.append(li);
+		}
+		return [heading, list];
 	}
 
 	function renderCreate() {

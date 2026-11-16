@@ -67,6 +67,23 @@ export function activate(ctx: PluginFrontendContext): () => void {
 		},
 	}));
 
+	cleanups.push(ctx.registerMarkerRenderer({
+		typeId: MARKERS.proposal,
+		mount: (container, marker) => {
+			const d = marker.details as { path?: string; status?: string } | undefined;
+			const outcome = d?.status === "accepted" ? "accepted" : d?.status === "rejected" ? "rejected" : "not applied (the file changed)";
+			return line(container, "lh-cw-marker", `Proposed change to ${d?.path ?? "a file"} ${outcome}`);
+		},
+	}));
+	cleanups.push(ctx.registerToolRenderer({
+		toolName: "project_propose_edit",
+		mount: (container, tool) => {
+			if (tool.state === "output-error") return line(container, "lh-cw-marker", tool.errorText ?? "Proposal refused");
+			const p = (tool.result?.details as { proposal?: { path: string } } | undefined)?.proposal;
+			return line(container, "lh-cw-marker", p ? `Proposed a change to ${p.path} — review it in the Coding pane` : "Proposing a change…");
+		},
+	}));
+
 	cleanups.push(ctx.registerSettings((container, signal) => mountSettings(ctx, container, signal)));
 
 	// Shortcuts (the old fork's defaults; Submit stays coding-questions' host Submit).

@@ -1,11 +1,12 @@
 import path from "node:path";
 import type { PluginBackendContext } from "learnharness-plugin-api";
-import { OPS, TOPICS, type ProjectsState } from "../shared/protocol.ts";
+import { MARKERS, OPS, TOPICS, type ProjectsState } from "../shared/protocol.ts";
 import type { DockerRunner } from "./docker-runner.ts";
 import type { CodeImage } from "./languages.ts";
 import { createProjectContainers } from "./project-container.ts";
 import { createProjectRuntime } from "./project-runtime.ts";
 import { createProjects } from "./projects.ts";
+import { createProposals } from "./proposals.ts";
 import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
 import { createProjectTools, PROJECT_INSTRUCTIONS } from "./project-tools.ts";
 
@@ -26,6 +27,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 	const projects = createProjects({ dataDirectory: ctx.dataDirectory });
 	const changed = () => { if (!ctx.signal.aborted) ctx.events.emit(TOPICS.projects, {}); };
 	const containers = createProjectContainers(runner, { onIdleRemoved: () => changed() });
+	const proposals = createProposals(path.join(ctx.dataDirectory, "proposals"));
 	const runtime = createProjectRuntime({
 		runsDirectory: path.join(ctx.dataDirectory, "project-runs"),
 		dockerStatus: () => runner.status(),
@@ -60,7 +62,11 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 
 	async function state(chatId: string): Promise<ProjectsState> {
 		const base = projects.state(chatId);
-		return { ...base, runtime: base.attached ? await runtime.state(base.attached.id) : null };
+		return {
+			...base,
+			runtime: base.attached ? await runtime.state(base.attached.id) : null,
+			proposals: base.attached ? proposals.pending(base.attached.id) : [],
+		};
 	}
 	/** The project the chat is attached to (errors when none). */
 	const attachedTo = (chatId: string) => {
@@ -108,6 +114,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 		handle(OPS.projectRemove, async input => {
 			const id = str(input.id, "id");
 			runtime.forget(id);
+			proposals.forget(id);
 			if ((await runner.status()) === "running") await containers.destroy(id);
 			projects.remove(id, input.deleteFiles === true);
 			changed();
@@ -133,6 +140,23 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 				trigger: "learner",
 			});
 		}),
+		handle(OPS.proposalDecide, async input => {
+			const chatId = str(input.chatId, "chatId");
+			const project = attachedTo(chatId);
+			const accept = input.accept === true;
+			const decided = proposals.decide(project.id, project.hostPath, str(input.id, "id"), accept);
+			if (decided.status === "accepted") await snapshot(project.hostPath, `accepted proposal for ${decided.path}`);
+			const outcome = decided.status === "stale" ? "could not be applied: the learner changed the file after you proposed it" : decided.status;
+			// Tell the chat the proposal came from (it may differ from the deciding chat).
+			await ctx.markers.append(decided.chatId, {
+				typeId: MARKERS.proposal,
+				details: { path: decided.path, status: decided.status },
+				modelText: `Your proposed change to ${decided.path} was ${outcome}.`,
+				idempotencyKey: `proposal:${decided.id}`,
+			}).catch(error => console.error("[coding-workspaces] proposal marker failed", error));
+			changed();
+			return state(chatId);
+		}),
 		handle(OPS.projectStop, input => {
 			runtime.stop(attachedTo(str(input.chatId, "chatId")).id);
 			return null;
@@ -147,6 +171,11 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 				? changesText(await createSnapshots(project.hostPath).changesSinceLook(chatId, "look"))
 				: "git is not installed on the learner's machine, so changes cannot be shown; read the files instead.",
 			run: (project, command) => runtime.run(refOf(project), command),
+			propose: (chatId, project, input) => {
+				const proposal = proposals.propose({ projectId: project.id, root: project.hostPath, chatId, ...input });
+				changed();
+				return proposal;
+			},
 		}),
 	}));
 	cleanups.push(ctx.registerInstructions({ agents: ["teacher", "practice"], text: PROJECT_INSTRUCTIONS }));

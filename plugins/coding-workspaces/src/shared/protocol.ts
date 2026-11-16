@@ -136,10 +136,29 @@ export interface ProjectRuntime {
 	runs: ProjectRun[];
 }
 
+/** A file change the tutor proposed; nothing is written until the learner accepts. */
+export interface EditProposal {
+	id: string;
+	chatId: string;
+	/** Relative to the project root. */
+	path: string;
+	explanation: string;
+	/** sha256 of the file when proposed; null for a new file. */
+	baseHash: string | null;
+	content: string;
+	/** Unified line diff for display. */
+	diff: string;
+	at: string;
+	/** stale: the file changed after the proposal, so it was not applied. */
+	status: "pending" | "accepted" | "rejected" | "stale";
+}
+
 export interface ProjectsState {
 	chatId: string;
 	attached: ProjectInfo | null;
 	runtime: ProjectRuntime | null;
+	/** Pending proposals for the attached project. */
+	proposals: EditProposal[];
 	projects: ProjectInfo[];
 }
 
@@ -167,10 +186,11 @@ export const OPS = {
 	projectRun: "projects.run",
 	projectStop: "projects.stop",
 	projectAsk: "projects.ask",
+	proposalDecide: "projects.proposal-decide",
 } as const;
 
 /** Backend → frontend notification topics. */
 export const TOPICS = { state: "state", settings: "settings", projects: "projects" } as const;
 
 /** Marker type ids. */
-export const MARKERS = { trace: "trace", annotation: "annotation", quiet: "quiet" } as const;
+export const MARKERS = { trace: "trace", annotation: "annotation", quiet: "quiet", proposal: "proposal" } as const;

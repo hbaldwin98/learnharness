@@ -19,7 +19,7 @@ const call = async (tools: ReturnType<typeof createProjectTools>, name: string, 
 
 describe("project tools", () => {
 	it("refuse without an attached project", async () => {
-		const tools = createProjectTools("c", { forChat: () => null, changes: async () => "", run: async () => { throw new Error(); } });
+		const tools = createProjectTools("c", { forChat: () => null, changes: async () => "", run: async () => { throw new Error(); }, propose: () => { throw new Error(); } });
 		await assert.rejects(call(tools, "project_files"), /no project workspace/);
 	});
 	it("list, read with line numbers and ranges, and run", async () => {
@@ -28,6 +28,7 @@ describe("project tools", () => {
 		const tools = createProjectTools("c", {
 			forChat: () => info(),
 			changes: async () => "diff",
+			propose: () => { throw new Error("unused"); },
 			run: async (_p, command): Promise<ProjectRun> => { runs.push(command); return { at: "", command, exitCode: 1, timedOut: false, stdout: "", stderr: "boom", stdoutTruncated: false, stderrTruncated: false }; },
 		});
 		assert.equal(await call(tools, "project_files"), "a.py");

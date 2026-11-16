@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import type { PluginTools } from "learnharness-plugin-api";
-import type { ProjectInfo, ProjectRun } from "../shared/protocol.ts";
+import type { EditProposal, ProjectInfo, ProjectRun } from "../shared/protocol.ts";
 import { numbered, readText, walkFiles } from "./project-files.ts";
 
 type Tool = ReturnType<PluginTools["create"]>[number];
@@ -10,6 +10,7 @@ export interface ProjectToolDeps {
 	/** Changes since the tutor's last look in the chat, as text for the model. */
 	changes(chatId: string, project: ProjectInfo): Promise<string>;
 	run(project: ProjectInfo, command: string): Promise<ProjectRun>;
+	propose(chatId: string, project: ProjectInfo, input: { path: string; explanation: string; content?: string; replacements?: Array<{ find: string; replace: string }> }): EditProposal;
 }
 
 const text = (t: string, details: unknown = {}) => ({ content: [{ type: "text" as const, text: t }], details });
@@ -93,6 +94,25 @@ export function createProjectTools(chatId: string, deps: ProjectToolDeps): Tool[
 				const p = attached();
 				const run = await deps.run(p, (params as { command: string }).command);
 				return text(runText(run), { run });
+			},
+		},
+		{
+			name: "project_propose_edit",
+			label: "propose a change",
+			description: "Propose a change to one file in the learner's project (or a new file). Nothing is written: the learner sees the diff and your explanation, and accepts or rejects it; you are told which. " +
+				"Give either `replacements` (exact text to find, each occurring once, and its replacement) for an existing file, or `content` (the whole file) for a new or rewritten file. Use sparingly — the learner should write most of the code.",
+			parameters: Type.Object({
+				path: Type.String({ description: "REQUIRED — file path relative to the project root." }),
+				explanation: Type.String({ description: "REQUIRED — one or two sentences on what the change does and why." }),
+				replacements: Type.Optional(Type.Array(Type.Object({ find: Type.String(), replace: Type.String() }))),
+				content: Type.Optional(Type.String({ description: "The complete new file content." })),
+			}),
+			executionMode: "sequential",
+			execute: async (_id: string, params: unknown) => {
+				const input = params as { path: string; explanation: string; content?: string; replacements?: Array<{ find: string; replace: string }> };
+				const p = attached();
+				const proposal = deps.propose(chatId, p, input);
+				return text(`Proposed a change to ${proposal.path}; it is waiting for the learner to accept or reject it.`, { proposal: { id: proposal.id, path: proposal.path, explanation: proposal.explanation, diff: proposal.diff } });
 			},
 		},
 	];
