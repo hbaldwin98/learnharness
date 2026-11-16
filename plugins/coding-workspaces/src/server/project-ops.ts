@@ -7,6 +7,7 @@ import { createProjectContainers } from "./project-container.ts";
 import { createProjectRuntime } from "./project-runtime.ts";
 import { createProjects } from "./projects.ts";
 import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
+import { createProjectTools, PROJECT_INSTRUCTIONS } from "./project-tools.ts";
 
 const obj = (value: unknown): Record<string, unknown> => {
 	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Input must be an object");
@@ -137,6 +138,18 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			return null;
 		}),
 	];
+
+	cleanups.push(ctx.registerTools({
+		agents: ["teacher", "practice"],
+		create: context => createProjectTools(context.chatId, {
+			forChat: chatId => projects.forChat(chatId),
+			changes: async (chatId, project) => (await hasGit())
+				? changesText(await createSnapshots(project.hostPath).changesSinceLook(chatId, "look"))
+				: "git is not installed on the learner's machine, so changes cannot be shown; read the files instead.",
+			run: (project, command) => runtime.run(refOf(project), command),
+		}),
+	}));
+	cleanups.push(ctx.registerInstructions({ agents: ["teacher", "practice"], text: PROJECT_INSTRUCTIONS }));
 
 	// Orphaned project containers from an earlier run (best effort).
 	void runner.status().then(s => s === "running" ? containers.reapAll() : undefined).catch(() => {});
