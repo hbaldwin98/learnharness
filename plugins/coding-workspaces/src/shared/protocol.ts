@@ -166,6 +166,7 @@ export const OPS = {
 	projectRemove: "projects.remove",
 	projectRun: "projects.run",
 	projectStop: "projects.stop",
+	projectAsk: "projects.ask",
 } as const;
 
 /** Backend → frontend notification topics. */

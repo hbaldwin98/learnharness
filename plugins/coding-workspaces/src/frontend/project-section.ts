@@ -93,6 +93,19 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 			void ctx.call(OPS.projectRun, { chatId, command: command.value }).catch(e => { error.textContent = e instanceof Error ? e.message : String(e); });
 		}, "default"));
 
+		const askRow = el(doc, "div", "lh-cw-project__path");
+		const question = el(doc, "input");
+		question.type = "text"; question.placeholder = "Ask the tutor about the project…";
+		question.setAttribute("aria-label", "Question for the tutor");
+		const ask = () => {
+			error.textContent = "";
+			const text = question.value;
+			question.value = "";
+			void ctx.call(OPS.projectAsk, { chatId, text }).catch(e => { error.textContent = e instanceof Error ? e.message : String(e); question.value = text; });
+		};
+		question.addEventListener("keydown", event => { if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); ask(); } });
+		askRow.append(question, button("Ask", ask));
+
 		const runs = el(doc, "ol", "lh-cw__runs");
 		for (const r of [...rt.runs].reverse().slice(0, 3)) {
 			const li = el(doc, "li", "lh-cw__run");
@@ -106,7 +119,7 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 			}
 			runs.append(li);
 		}
-		return [status, commandRow, runActions, runs];
+		return [status, commandRow, runActions, askRow, runs];
 	}
 
 	function renderCreate() {

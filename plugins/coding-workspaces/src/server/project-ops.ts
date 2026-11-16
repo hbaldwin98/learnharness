@@ -6,6 +6,7 @@ import type { CodeImage } from "./languages.ts";
 import { createProjectContainers } from "./project-container.ts";
 import { createProjectRuntime } from "./project-runtime.ts";
 import { createProjects } from "./projects.ts";
+import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
 
 const obj = (value: unknown): Record<string, unknown> => {
 	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Input must be an object");
@@ -28,10 +29,33 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 		runsDirectory: path.join(ctx.dataDirectory, "project-runs"),
 		dockerStatus: () => runner.status(),
 		containerRunning: id => containers.running(id),
-		exec: (project, command, opts) => containers.run(project, command, opts),
+		exec: async (project, command, opts) => {
+			await snapshot(project.hostPath, `run: ${command}`);
+			return containers.run(project, command, opts);
+		},
 		stopContainer: id => containers.remove(id),
 		changed,
 	});
+
+	/** Snapshot the folder (best effort; git may be missing). */
+	async function snapshot(hostPath: string, reason: string): Promise<void> {
+		if (!(await hasGit())) return;
+		await createSnapshots(hostPath).snapshot(reason).catch(error => console.error("[coding-workspaces] snapshot failed", error));
+	}
+
+	/** The tutor's view of the project: what changed since its last look in this chat and the latest run. */
+	async function projectTrace(chatId: string, project: { id: string; name: string; hostPath: string }): Promise<string> {
+		const parts = [`Project workspace "${project.name}" (mounted at /work in its container).`];
+		if (await hasGit()) parts.push(changesText(await createSnapshots(project.hostPath).changesSinceLook(chatId, "look")));
+		else parts.push("(git is not installed on the learner's machine, so changes cannot be shown; use the workspace tools to read files.)");
+		const last = (await runtime.state(project.id)).runs.at(-1);
+		if (last) {
+			const outcome = last.error ?? (last.timedOut ? "timed out" : `exit ${last.exitCode}`);
+			const output = [last.stdout && `stdout:\n${last.stdout.slice(-4000)}`, last.stderr && `stderr:\n${last.stderr.slice(-4000)}`].filter(Boolean).join("\n");
+			parts.push(`Latest run (${last.at}): \`${last.command}\` → ${outcome}\n${output}`);
+		}
+		return parts.join("\n\n");
+	}
 
 	async function state(chatId: string): Promise<ProjectsState> {
 		const base = projects.state(chatId);
@@ -93,6 +117,20 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			const command = optStr(input.command, "command");
 			const project = attachedTo(chatId);
 			return runtime.run(refOf(project), command);
+		}),
+		handle(OPS.projectAsk, async input => {
+			const chatId = str(input.chatId, "chatId");
+			const question = (optStr(input.text, "text") ?? "").trim();
+			const project = attachedTo(chatId);
+			const trace = await projectTrace(chatId, project);
+			const modelText = `${question ? `The learner asks about their project: ${question}` : "The learner asked for help with their project (no words)."}\n\n${trace}`;
+			return ctx.turns.steer(chatId, {
+				displayText: question ? `Ask: ${question}` : "Asked for help with the project",
+				modelText,
+				details: { kind: "project-ask", projectId: project.id, text: question },
+				idempotencyKey: `project-ask:${project.id}:${Date.now()}`,
+				trigger: "learner",
+			});
 		}),
 		handle(OPS.projectStop, input => {
 			runtime.stop(attachedTo(str(input.chatId, "chatId")).id);
