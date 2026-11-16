@@ -55,3 +55,8 @@
 .lh-cw-files__dismiss { margin-left: auto; padding: 0 0.3rem !important; }
 .lh-cw-task { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
 .lh-cw-task__line { margin: 0; }
+.lh-cw-files__problems-row { display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap; }
+.lh-cw-files__problems { list-style: none; margin: 0; padding: 0; max-height: 10rem; overflow: auto; font-size: 0.75rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.lh-cw-files__problem { display: flex; gap: 0.4rem; }
+.lh-cw-files__problem--error .lh-cw__lines { color: var(--destructive, #c33); }
+.lh-cw-files__problem--warning .lh-cw__lines { color: var(--warning, #b7791f); }

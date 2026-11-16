@@ -13,6 +13,7 @@ import { createTerminals } from "./terminals.ts";
 import { PROJECT_TASK_INSTRUCTIONS, registerProjectTask } from "./project-task.ts";
 import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
 import { createProjectTools, PROJECT_INSTRUCTIONS } from "./project-tools.ts";
+import { createProjectDiagnostics, problemsText, type ProjectDiagnostics } from "./project-diagnostics.ts";
 
 const obj = (value: unknown): Record<string, unknown> => {
 	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Input must be an object");
@@ -33,7 +34,25 @@ const refOf =(p: { id: string; image: string; hostPath: string; runCommand: stri
 export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunner) {
 	const projects = createProjects({ dataDirectory: ctx.dataDirectory });
 	const changed = () => { if (!ctx.signal.aborted) ctx.events.emit(TOPICS.projects, {}); };
-	const containers = createProjectContainers(runner, { onIdleRemoved: id => { terminals.close(id); changed(); } });
+	const containers = createProjectContainers(runner, { onIdleRemoved: id => { dropLive(id); changed(); } });
+	const servers = new Map<string, ProjectDiagnostics>();
+	/** The container is going away: end its shell and language server. */
+	const dropLive = (id: string) => {
+		terminals.close(id);
+		void servers.get(id)?.stop().catch(() => {});
+		servers.delete(id);
+	};
+	/** Check a project with its language server (started on first use). */
+	const problems = async (project: { id: string; image: string; hostPath: string; runCommand: string }) => {
+		if ((await runner.status()) !== "running") throw new Error("Docker is not running");
+		const ref = refOf(project);
+		let server = servers.get(project.id);
+		if (!server) {
+			server = createProjectDiagnostics({ image: ref.image, hostPath: ref.hostPath, spawn: command => containers.spawn(ref, command) });
+			servers.set(project.id, server);
+		}
+		return server.check();
+	};
 	const terminals = createTerminals({
 		container: id => containers.ensure(refOf(projects.get(id))),
 		emit: event => { if (!ctx.signal.aborted) ctx.events.emit(TOPICS.terminal, event); },
@@ -48,7 +67,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			await snapshot(project.hostPath, `run: ${command}`);
 			return containers.run(project, command, opts);
 		},
-		stopContainer: id => { terminals.close(id); return containers.remove(id); },
+		stopContainer: id => { dropLive(id); return containers.remove(id); },
 		changed,
 	});
 
@@ -108,7 +127,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			const before = projects.get(id);
 			projects.update(id, { ...(name !== undefined ? { name } : {}), ...(image !== undefined ? { image } : {}), ...(runCommand !== undefined ? { runCommand } : {}) });
 			// A new image takes effect on the next start.
-			if (image !== undefined && image !== before.image) { terminals.close(id); await containers.remove(id); }
+			if (image !== undefined && image !== before.image) { dropLive(id); await containers.remove(id); }
 			changed();
 			return state(str(input.chatId, "chatId"));
 		}),
@@ -129,7 +148,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			runtime.forget(id);
 			proposals.forget(id);
 			notes.forget(id);
-			terminals.close(id);
+			dropLive(id);
 			if ((await runner.status()) === "running") await containers.destroy(id);
 			projects.remove(id, input.deleteFiles === true);
 			changed();
@@ -187,6 +206,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			changed();
 			return state(chatId);
 		}),
+		handle(OPS.projectProblems, input => problems(attachedTo(str(input.chatId, "chatId")))),
 		handle(OPS.terminalOpen, async input => {
 			const project = attachedTo(str(input.chatId, "chatId"));
 			if ((await runner.status()) !== "running") throw new Error("Docker is not running");
@@ -220,6 +240,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 				? changesText(await createSnapshots(project.hostPath).changesSinceLook(chatId, "look"))
 				: "git is not installed on the learner's machine, so changes cannot be shown; read the files instead.",
 			run: (project, command) => runtime.run(refOf(project), command),
+			problems: async project => problemsText(await problems(project)),
 			propose: (chatId, project, input) => {
 				const proposal = proposals.propose({ projectId: project.id, root: project.hostPath, chatId, ...input });
 				changed();
@@ -252,6 +273,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 	void runner.status().then(s => s === "running" ? containers.reapAll() : undefined).catch(() => {});
 
 	cleanups.push(async () => {
+		for (const id of [...servers.keys()]) dropLive(id);
 		terminals.closeAll();
 		containers.dispose();
 		if ((await runner.status().catch(() => "stopped")) === "running") await containers.reapAll().catch(() => {});

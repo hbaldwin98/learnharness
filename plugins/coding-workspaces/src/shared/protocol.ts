@@ -143,6 +143,16 @@ export interface FileNote extends CodeAnnotation {
 	path: string;
 }
 
+/** Language-server problems across a project's source files (0-based LSP positions). */
+export interface ProjectProblems {
+	status: "ready" | "crashed" | "unavailable";
+	name: string;
+	files: Array<{ path: string; diagnostics: CodeDiagnostic[] }>;
+	/** Source files sent to the server. */
+	checked: number;
+	message?: string;
+}
+
 /** A project file's content for the viewer. */
 export interface ProjectFileView {
 	path: string;
@@ -207,6 +217,7 @@ export const OPS = {
 	projectFiles: "projects.files",
 	projectReadFile: "projects.read-file",
 	noteDismiss: "projects.note-dismiss",
+	projectProblems: "projects.problems",
 	terminalOpen: "terminal.open",
 	terminalWrite: "terminal.write",
 	terminalResize: "terminal.resize",

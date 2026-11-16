@@ -11,6 +11,7 @@ import { after, describe, it } from "node:test";
 import { createDockerRunner } from "../src/server/docker-runner.ts";
 import { createProjectContainers } from "../src/server/project-container.ts";
 import { createTerminals } from "../src/server/terminals.ts";
+import { createProjectDiagnostics } from "../src/server/project-diagnostics.ts";
 
 const enabled = process.env.LH_DOCKER_TESTS === "1";
 
@@ -65,6 +66,24 @@ describe("project containers — real Docker", { skip: enabled ? false : "set LH
 		assert.notEqual(fail.code, 0);
 		const gone = await containers.run(project, "test -e /tmp/lh-task && echo left || echo cleaned");
 		assert.equal(gone.stdout.trim(), "cleaned");
+	});
+
+	it("reports language-server problems across project files, and updates after edits", { timeout: 300_000 }, async () => {
+		fs.mkdirSync(path.join(folder, "pkg"), { recursive: true });
+		fs.writeFileSync(path.join(folder, "pkg", "util.py"), "def twice(x: int) -> int:\n    return x * 2\n");
+		fs.writeFileSync(path.join(folder, "main.py"), "from pkg.util import twice\nvalue: str = twice(3)\n");
+		const diagnostics = createProjectDiagnostics({ image: "python", hostPath: folder, spawn: command => containers.spawn(project, command) });
+		try {
+			const first = await diagnostics.check();
+			assert.equal(first.status, "ready");
+			const main = first.files.find(f => f.path === "main.py");
+			assert.ok(main?.diagnostics.some(d => d.severity === "error" && d.line === 1), JSON.stringify(first));
+			fs.writeFileSync(path.join(folder, "main.py"), "from pkg.util import twice\nvalue: int = twice(3)\n");
+			const second = await diagnostics.check();
+			assert.equal(second.files.find(f => f.path === "main.py"), undefined, JSON.stringify(second));
+		} finally {
+			await diagnostics.stop();
+		}
 	});
 
 	it("has network", { timeout: 120_000 }, async () => {

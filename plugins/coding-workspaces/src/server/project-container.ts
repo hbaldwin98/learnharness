@@ -10,7 +10,8 @@
  */
 
 import type Docker from "dockerode";
-import { WORKSPACE_LABEL, exec, extractFresh, type DockerRunner, type ExecResult } from "./docker-runner.ts";
+import { PassThrough, Writable, type Duplex } from "node:stream";
+import { WORKSPACE_LABEL, exec, extractFresh, type DockerRunner, type ExecResult, type SpawnedProcess } from "./docker-runner.ts";
 import { tarFiles, type TarEntry } from "./tar.ts";
 import type { CodeImage } from "./languages.ts";
 
@@ -164,6 +165,26 @@ export function createProjectContainers(runner: DockerRunner, options: { sweep?:
 				lastUsed.set(project.id, Date.now());
 				await exec(container, modem, ["rm", "-rf", dir], { timeoutMs: 30_000 }).catch(() => {});
 			}
+		},
+		/** A long-running process in /work (a language server): stdin/stdout piped, stderr drained. */
+		async spawn(project: ProjectRef, command: string): Promise<SpawnedProcess> {
+			const container = await ensure(project);
+			const created = await container.exec({ Cmd: ["sh", "-c", command], AttachStdin: true, AttachStdout: true, AttachStderr: true, Tty: false, WorkingDir: "/work" });
+			const stream: Duplex = await created.start({ hijack: true, stdin: true });
+			const stdout = new PassThrough();
+			const stderr = new Writable({ write: (_c, _e, cb) => cb() });
+			docker().modem.demuxStream(stream, stdout, stderr);
+			const exited = new Promise<void>(resolve => {
+				const done = () => { stdout.end(); resolve(); };
+				stream.on("end", done);
+				stream.on("close", done);
+				stream.on("error", done);
+			});
+			const stdin = new Writable({
+				write(chunk, _encoding, callback) { stream.write(chunk, callback); },
+				final(callback) { stream.end(); callback(); },
+			});
+			return { stdin, stdout, exited, kill: () => stream.destroy() };
 		},
 		/** Remove the project's container and its HOME volume (project removal). */
 		async destroy(id: string): Promise<void> {

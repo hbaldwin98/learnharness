@@ -10,6 +10,8 @@ export interface ProjectToolDeps {
 	/** Changes since the tutor's last look in the chat, as text for the model. */
 	changes(chatId: string, project: ProjectInfo): Promise<string>;
 	run(project: ProjectInfo, command: string): Promise<ProjectRun>;
+	/** Language-server problems across the project, as text. */
+	problems(project: ProjectInfo): Promise<string>;
 	propose(chatId: string, project: ProjectInfo, input: { path: string; explanation: string; content?: string; replacements?: Array<{ find: string; replace: string }> }): EditProposal;
 	annotate(chatId: string, project: ProjectInfo, input: { path: string; line: number; endLine?: number; note: string }): FileNote;
 }
@@ -27,7 +29,7 @@ export const PROJECT_INSTRUCTIONS = [
 	"# Project workspaces",
 	"A session may have a project workspace attached: a folder on the learner's machine that they build in over many turns and sessions, with their own editor. " +
 		"It is mounted at /work in a long-lived Linux container (their language image, network on, HOME persists). " +
-		"Use project_files and project_read to look at it, project_annotate to point at lines, project_changes to see what they changed since you last looked, and project_run to run a command in /work (the learner sees every run).",
+		"Use project_files and project_read to look at it, project_annotate to point at lines, project_problems for compiler/type errors, project_changes to see what they changed since you last looked, and project_run to run a command in /work (the learner sees every run).",
 	"- The learner builds it. Do not write their code for them: point, ask, and suggest. When a change from you is genuinely warranted (scaffolding they asked for, a fix after they understand it), propose it with project_propose_edit — they accept or reject it.",
 	"- Teach toward the project: each step should leave it working and a little further along. Prefer small, runnable increments.",
 	"- Their Ask includes the changes since your last look and the latest run; you do not need to fetch those again.",
@@ -96,6 +98,14 @@ export function createProjectTools(chatId: string, deps: ProjectToolDeps): Tool[
 				const run = await deps.run(p, (params as { command: string }).command);
 				return text(runText(run), { run });
 			},
+		},
+		{
+			name: "project_problems",
+			label: "project problems",
+			description: "Errors and warnings from the project's language server across its source files (compiler/type-checker view). The first check starts the server and can take a minute.",
+			parameters: Type.Object({}),
+			executionMode: "sequential",
+			execute: async () => text(await deps.problems(attached())),
 		},
 		{
 			name: "project_annotate",

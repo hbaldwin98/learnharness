@@ -1,5 +1,5 @@
 import type { PluginFrontendContext } from "learnharness-plugin-api";
-import { OPS, type FileNote, type ProjectFileView } from "../shared/protocol.ts";
+import { OPS, type FileNote, type ProjectFileView, type ProjectProblems } from "../shared/protocol.ts";
 
 function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
 	const node = doc.createElement(tag);
@@ -34,7 +34,37 @@ export function createFilesView(ctx: PluginFrontendContext, doc: Document, chatI
 	const viewerTitle = el(doc, "div", "lh-cw-files__title");
 	const viewer = el(doc, "div", "lh-cw-files__viewer");
 	browser.append(tree, viewerTitle, viewer);
-	root.append(notesHeading, notesList, toggle, browser);
+	const problemsRow = el(doc, "div", "lh-cw-files__problems-row");
+	const check = el(doc, "button", "lh-cw-files__toggle", "Check problems");
+	check.type = "button";
+	check.title = "Run the language server over the project's source files";
+	const problemsStatus = el(doc, "span", "lh-cw__time");
+	problemsRow.append(check, problemsStatus);
+	const problemsList = el(doc, "ul", "lh-cw-files__problems");
+	check.addEventListener("click", () => {
+		check.disabled = true;
+		problemsStatus.textContent = "Checking… (the first check starts the language server)";
+		void ctx.call<ProjectProblems>(OPS.projectProblems, { chatId })
+			.then(result => renderProblems(result))
+			.catch(error => { problemsStatus.textContent = error instanceof Error ? error.message : String(error); problemsList.replaceChildren(); })
+			.finally(() => { check.disabled = false; });
+	});
+	root.append(notesHeading, notesList, problemsRow, problemsList, toggle, browser);
+
+	function renderProblems(result: ProjectProblems) {
+		const count = result.files.reduce((n, f) => n + f.diagnostics.length, 0);
+		problemsStatus.textContent = result.status === "unavailable" ? "No language server for this language"
+			: result.status === "crashed" && !count ? `The ${result.name} language server failed${result.message ? `: ${result.message}` : ""}`
+			: count ? `${count} problem${count === 1 ? "" : "s"} (${result.name})` : `No problems in ${result.checked} file${result.checked === 1 ? "" : "s"} (${result.name})`;
+		problemsList.replaceChildren(...result.files.flatMap(f => f.diagnostics.map(d => {
+			const li = el(doc, "li", `lh-cw-files__problem lh-cw-files__problem--${d.severity}`);
+			const where = el(doc, "button", "lh-cw__lines", `${f.path}:${d.line + 1}`);
+			where.type = "button";
+			where.addEventListener("click", () => view.open(f.path, d.line + 1));
+			li.append(where, el(doc, "span", undefined, d.message));
+			return li;
+		})));
+	}
 
 	let files: string[] = [];
 	let notes: FileNote[] = [];
