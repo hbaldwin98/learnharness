@@ -207,10 +207,14 @@ export const OPS = {
 	projectFiles: "projects.files",
 	projectReadFile: "projects.read-file",
 	noteDismiss: "projects.note-dismiss",
+	terminalOpen: "terminal.open",
+	terminalWrite: "terminal.write",
+	terminalResize: "terminal.resize",
+	terminalClose: "terminal.close",
 } as const;
 
 /** Backend → frontend notification topics. */
-export const TOPICS = { state: "state", settings: "settings", projects: "projects" } as const;
+export const TOPICS = { state: "state", settings: "settings", projects: "projects", terminal: "terminal" } as const;
 
 /** Marker type ids. */
 export const MARKERS = { trace: "trace", annotation: "annotation", quiet: "quiet", proposal: "proposal" } as const;

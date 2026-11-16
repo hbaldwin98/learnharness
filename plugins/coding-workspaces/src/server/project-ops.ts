@@ -9,6 +9,7 @@ import { createProjects } from "./projects.ts";
 import { createProposals } from "./proposals.ts";
 import { createFileNotes } from "./file-notes.ts";
 import { readText, walkFiles } from "./project-files.ts";
+import { createTerminals } from "./terminals.ts";
 import { changesText, createSnapshots, hasGit } from "./snapshots.ts";
 import { createProjectTools, PROJECT_INSTRUCTIONS } from "./project-tools.ts";
 
@@ -22,13 +23,20 @@ const str = (value: unknown, name: string): string => {
 };
 const optStr = (value: unknown, name: string): string | undefined => value === undefined ? undefined : str(value, name);
 
-const refOf = (p: { id: string; image: string; hostPath: string; runCommand: string }) => ({ id: p.id, image: p.image as CodeImage, hostPath: p.hostPath, runCommand: p.runCommand });
+const dim = (value: unknown, fallback: number) => typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 1000 ? value : fallback;
+const sizeOf = (input: Record<string, unknown>) => ({ cols: dim(input.cols, 80), rows: dim(input.rows, 24) });
+
+const refOf =(p: { id: string; image: string; hostPath: string; runCommand: string }) => ({ id: p.id, image: p.image as CodeImage, hostPath: p.hostPath, runCommand: p.runCommand });
 
 /** Project workspaces: registry, containers, Run, and their frontend operations. */
 export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunner) {
 	const projects = createProjects({ dataDirectory: ctx.dataDirectory });
 	const changed = () => { if (!ctx.signal.aborted) ctx.events.emit(TOPICS.projects, {}); };
-	const containers = createProjectContainers(runner, { onIdleRemoved: () => changed() });
+	const containers = createProjectContainers(runner, { onIdleRemoved: id => { terminals.close(id); changed(); } });
+	const terminals = createTerminals({
+		container: id => containers.ensure(refOf(projects.get(id))),
+		emit: event => { if (!ctx.signal.aborted) ctx.events.emit(TOPICS.terminal, event); },
+	});
 	const proposals = createProposals(path.join(ctx.dataDirectory, "proposals"));
 	const notes = createFileNotes(path.join(ctx.dataDirectory, "file-notes"));
 	const runtime = createProjectRuntime({
@@ -39,7 +47,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			await snapshot(project.hostPath, `run: ${command}`);
 			return containers.run(project, command, opts);
 		},
-		stopContainer: id => containers.remove(id),
+		stopContainer: id => { terminals.close(id); return containers.remove(id); },
 		changed,
 	});
 
@@ -99,7 +107,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			const before = projects.get(id);
 			projects.update(id, { ...(name !== undefined ? { name } : {}), ...(image !== undefined ? { image } : {}), ...(runCommand !== undefined ? { runCommand } : {}) });
 			// A new image takes effect on the next start.
-			if (image !== undefined && image !== before.image) await containers.remove(id);
+			if (image !== undefined && image !== before.image) { terminals.close(id); await containers.remove(id); }
 			changed();
 			return state(str(input.chatId, "chatId"));
 		}),
@@ -120,6 +128,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			runtime.forget(id);
 			proposals.forget(id);
 			notes.forget(id);
+			terminals.close(id);
 			if ((await runner.status()) === "running") await containers.destroy(id);
 			projects.remove(id, input.deleteFiles === true);
 			changed();
@@ -177,6 +186,25 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 			changed();
 			return state(chatId);
 		}),
+		handle(OPS.terminalOpen, async input => {
+			const project = attachedTo(str(input.chatId, "chatId"));
+			if ((await runner.status()) !== "running") throw new Error("Docker is not running");
+			const backlog = await terminals.open(project.id, sizeOf(input));
+			changed();
+			return { projectId: project.id, ...backlog };
+		}),
+		handle(OPS.terminalWrite, input => {
+			terminals.write(attachedTo(str(input.chatId, "chatId")).id, str(input.data, "data"));
+			return null;
+		}),
+		handle(OPS.terminalResize, async input => {
+			await terminals.resize(attachedTo(str(input.chatId, "chatId")).id, sizeOf(input));
+			return null;
+		}),
+		handle(OPS.terminalClose, input => {
+			terminals.close(attachedTo(str(input.chatId, "chatId")).id);
+			return null;
+		}),
 		handle(OPS.projectStop, input => {
 			runtime.stop(attachedTo(str(input.chatId, "chatId")).id);
 			return null;
@@ -209,6 +237,7 @@ export function registerProjectOps(ctx: PluginBackendContext, runner: DockerRunn
 	void runner.status().then(s => s === "running" ? containers.reapAll() : undefined).catch(() => {});
 
 	cleanups.push(async () => {
+		terminals.closeAll();
 		containers.dispose();
 		if ((await runner.status().catch(() => "stopped")) === "running") await containers.reapAll().catch(() => {});
 	});

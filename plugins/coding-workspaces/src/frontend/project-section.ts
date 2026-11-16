@@ -1,6 +1,7 @@
 import type { PluginFrontendContext } from "learnharness-plugin-api";
 import { OPS, TOPICS, type ProjectInfo, type ProjectsState } from "../shared/protocol.ts";
 import { createFilesView } from "./files-view.ts";
+import { createTerminalView } from "./terminal-view.ts";
 
 const IMAGES = ["node", "python", "dotnet", "java", "go", "rust", "cpp"] as const;
 
@@ -40,6 +41,7 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 	};
 	const refresh = () => { void ctx.call<ProjectsState>(OPS.projectsGet, { chatId }).then(next => { state = next; render(); files.refresh(); }).catch(() => {}); };
 	const files = createFilesView(ctx, doc, chatId, id => void call(OPS.noteDismiss, { id }));
+	const terminal = createTerminalView(ctx, doc, chatId);
 
 	const button = (label: string, onClick: () => void, variant: "outline" | "default" = "outline") => {
 		const slot = el(doc, "span");
@@ -70,7 +72,11 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 			button("Switch…", () => { mode = "attach"; render(); }),
 		);
 		files.setNotes(state?.notes ?? []);
-		body.replaceChildren(meta, pathRow, actions, ...renderRuntime(p), files.element);
+		terminal.setProject(p.id, state?.runtime?.docker === "running");
+		// Re-parenting the terminal blurs it: keep the learner's typing focus.
+		const typing = doc.activeElement instanceof HTMLElement && terminal.element.contains(doc.activeElement) ? doc.activeElement : null;
+		body.replaceChildren(meta, pathRow, actions, ...renderRuntime(p), terminal.element, files.element);
+		typing?.focus();
 	}
 
 	/** Container status, the run command, Run/Stop, and recent runs. */
@@ -193,6 +199,7 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 		if (mode === "create") return renderCreate();
 		if (mode === "attach") return renderAttach(state.projects.filter(p => p.id !== state?.attached?.id));
 		if (state.attached) return renderAttached(state.attached);
+		terminal.setProject(null, false);
 		const actions = el(doc, "div", "lh-cw__actions");
 		actions.append(button("New project…", () => { mode = "create"; render(); }));
 		if (state.projects.length) actions.append(button("Attach existing…", () => { mode = "attach"; render(); }));
@@ -203,5 +210,5 @@ export function mountProjectSection(ctx: PluginFrontendContext, container: HTMLE
 	const offResync = ctx.onResync(refresh);
 	refresh();
 	render();
-	return () => { off(); offResync(); renderScope.abort(); root.remove(); };
+	return () => { off(); offResync(); renderScope.abort(); terminal.dispose(); root.remove(); };
 }

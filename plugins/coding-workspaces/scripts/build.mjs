@@ -13,21 +13,27 @@ try {
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 const common = { bundle: true, target: "es2022", minify: true, legalComments: "eof", logLevel: "warning", absWorkingDir: root };
-await build({ ...common, entryPoints: { main: "src/main.ts" }, outdir: output, format: "esm", platform: "browser" });
+const frontend = await build({ ...common, entryPoints: { main: "src/main.ts" }, outdir: output, format: "esm", platform: "browser", metafile: true });
 // ssh2 (dockerode's SSH transport) loads optional native accelerators inside
 // try/catch; leave them unresolved so the pure-JS fallbacks are used.
 const backend = await build({
   ...common, entryPoints: ["src/backend.ts"], outfile: path.join(output, "backend.cjs"), format: "cjs", platform: "node", metafile: true,
   external: ["cpu-features", "*.node"],
 });
-for (const [from, to] of [["manifest.json", "manifest.json"], ["src/styles.css", "styles.css"], ["README.md", "README.md"], ["LICENSE", "LICENSE"]]) {
+// xterm.js's stylesheet ships with the plugin's (the host loads one styles.css).
+fs.writeFileSync(path.join(output, "styles.css"), [
+  fs.readFileSync(path.join(root, "src/styles.css"), "utf8"),
+  "/* @xterm/xterm (MIT) */",
+  fs.readFileSync(path.join(root, "node_modules/@xterm/xterm/css/xterm.css"), "utf8"),
+].join("\n"));
+for (const [from, to] of [["manifest.json", "manifest.json"], ["README.md", "README.md"], ["LICENSE", "LICENSE"]]) {
   fs.copyFileSync(path.join(root, from), path.join(output, to));
 }
 // The sandbox images' build contexts, read by the backend at run time.
 fs.cpSync(path.join(root, "docker"), path.join(output, "docker"), { recursive: true });
-// Attribution for every package bundled into the backend.
+// Attribution for every package bundled into the frontend and backend.
 const packages = new Map();
-for (const input of Object.keys(backend.metafile.inputs)) {
+for (const input of [...Object.keys(frontend.metafile.inputs), ...Object.keys(backend.metafile.inputs)]) {
   if (!input.includes("node_modules/")) continue;
   let directory = path.dirname(path.resolve(root, input));
   while (directory !== path.dirname(directory)) {

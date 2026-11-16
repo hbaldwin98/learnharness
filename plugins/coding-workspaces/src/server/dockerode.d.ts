@@ -89,6 +89,8 @@ declare module "dockerode" {
 			AttachStderr?: boolean;
 			WorkingDir?: string;
 			Tty?: boolean;
+			User?: string;
+			Env?: string[];
 		}
 
 		interface ExecStartOptions {
@@ -100,6 +102,7 @@ declare module "dockerode" {
 		interface Exec {
 			start(options: ExecStartOptions): Promise<Duplex>;
 			inspect(): Promise<ExecInspectInfo>;
+			resize(options: { h: number; w: number }): Promise<unknown>;
 		}
 
 		interface Container {
