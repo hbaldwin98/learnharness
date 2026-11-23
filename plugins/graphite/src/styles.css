@@ -279,21 +279,3 @@ button[role="switch"][aria-checked="true"] {
 .cm-gutters {
 	background-color: var(--lh-graphite-editor);
 }
-
-/* ---------- Transcript column ---------- */
-
-/* A centred 760px column (upstream runs it full width via .max-w-none).
-   The top-bar width chip sets data-lh-transcript-width on <html>; the
-   composer dock keeps its width. */
-[data-session-find-root].max-w-none {
-	max-width: 760px;
-}
-:root[data-lh-transcript-width="wide"] [data-session-find-root].max-w-none {
-	max-width: 960px;
-}
-:root[data-lh-transcript-width="wider"] [data-session-find-root].max-w-none {
-	max-width: 1160px;
-}
-:root[data-lh-transcript-width="widest"] [data-session-find-root].max-w-none {
-	max-width: 1360px;
-}
